@@ -11,6 +11,7 @@ import {
   deleteAvailabilitySetting,
 } from "@/app/actions/schedule-actions"
 import type { Database } from "@/lib/supabase/database.types"
+import { useCSRF } from "@/hooks/use-csrf"
 
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 type AvailabilitySetting = Database["public"]["Tables"]["availability_settings"]["Row"]
@@ -49,6 +50,8 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
   const [newEndTime, setNewEndTime] = useState<string>("17:00")
   const [isAdding, setIsAdding] = useState(false)
 
+  const { csrfToken, isLoading: isLoadingCSRF, error: csrfError } = useCSRF()
+
   useEffect(() => {
     if (!serviceType) return
 
@@ -68,11 +71,18 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
     loadAvailabilitySettings()
   }, [serviceType])
 
+  // 予約可能時間スケジューラーのエラーハンドリングを一貫させる
   const handleAddAvailability = async () => {
     if (!serviceType) return
 
     try {
       setIsAdding(true)
+
+      if (!csrfToken) {
+        setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
+        return
+      }
+
       const dayOfWeekNum = Number.parseInt(newDayOfWeek)
 
       // 時間の検証
@@ -95,19 +105,20 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
         return
       }
 
-      const newSetting = await upsertAvailabilitySetting({
-        service_type_id: serviceType.id,
-        day_of_week: dayOfWeekNum,
-        start_time: newStartTime,
-        end_time: newEndTime,
-        is_available: true,
-      })
+      const formData = new FormData()
+      formData.append("csrf_token", csrfToken)
+      formData.append("service_type_id", serviceType.id.toString())
+      formData.append("day_of_week", dayOfWeekNum.toString())
+      formData.append("start_time", newStartTime)
+      formData.append("end_time", newEndTime)
+      formData.append("is_available", "true")
 
+      const newSetting = await upsertAvailabilitySetting(formData)
       setAvailabilitySettings([...availabilitySettings, newSetting])
       setError(null)
     } catch (err) {
-      console.error(err)
-      setError("予約可能時間の追加に失敗しました")
+      console.error("Availability setting error")
+      setError("予約可能時間の追加に失敗しました。もう一度お試しください。")
     } finally {
       setIsAdding(false)
     }
@@ -115,11 +126,20 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
 
   const handleDeleteAvailability = async (id: number) => {
     try {
-      await deleteAvailabilitySetting(id)
+      if (!csrfToken) {
+        setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
+        return
+      }
+
+      const formData = new FormData()
+      formData.append("csrf_token", csrfToken)
+      formData.append("id", id.toString())
+
+      await deleteAvailabilitySetting(formData)
       setAvailabilitySettings(availabilitySettings.filter((setting) => setting.id !== id))
     } catch (err) {
-      console.error(err)
-      setError("予約可能時間の削除に失敗しました")
+      console.error("Availability deletion error")
+      setError("予約可能時間の削除に失敗しました。もう一度お試しください。")
     }
   }
 

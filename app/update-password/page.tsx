@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseBrowser } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,9 +19,9 @@ export default function UpdatePasswordPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
-  const supabase = createClient()
   const router = useRouter()
 
+  // パスワード更新のエラーメッセージを一般化し、エラーハンドリングを一貫させる
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -36,13 +36,26 @@ export default function UpdatePasswordPage() {
       return
     }
 
+    // パスワード強度の検証を追加
+    if (password.length < 8) {
+      setMessage({
+        type: "error",
+        text: "パスワードは8文字以上である必要があります。",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
     try {
+      const supabase = getSupabaseBrowser()
+
       const { error } = await supabase.auth.updateUser({
         password,
       })
 
       if (error) {
-        throw error
+        console.error("Password update failed")
+        throw new Error("パスワードの更新に失敗しました")
       }
 
       setMessage({
@@ -52,11 +65,11 @@ export default function UpdatePasswordPage() {
 
       // 3秒後にログインページにリダイレクト
       setTimeout(() => {
-        router.push("/")
+        window.location.href = "/"
       }, 3000)
     } catch (error: any) {
       // 詳細なエラーはログにのみ記録
-      console.error("Password update error:", error)
+      console.error("Password update process error")
 
       // ユーザーには一般的なメッセージのみを表示
       setMessage({

@@ -1,40 +1,44 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
+import type { Database } from "@/lib/supabase/database.types"
 
+// 認証コールバックのエラーメッセージを一般化し、エラーハンドリングを一貫させる
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get("code")
+  try {
+    const requestUrl = new URL(request.url)
+    const code = requestUrl.searchParams.get("code")
 
-  if (code) {
-    const supabase = createClient()
+    if (code) {
+      const cookieStore = cookies()
+      const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
 
-    try {
       // コードをセッションに交換
       const { error } = await supabase.auth.exchangeCodeForSession(code)
 
       if (error) {
-        console.error("Error exchanging code for session:", error)
-        return NextResponse.redirect(new URL("/?error=auth_callback_error", request.url))
+        console.error("Authentication callback error")
+        return NextResponse.redirect(new URL("/?error=auth_error", request.url))
       }
 
       // セッションが確立されたか確認
       const { data: sessionData } = await supabase.auth.getSession()
 
       if (sessionData.session) {
-        console.log("Session established successfully in callback")
+        console.log("Authentication successful")
       } else {
-        console.error("Failed to establish session in callback")
-        return NextResponse.redirect(new URL("/?error=no_session", request.url))
+        console.error("Session establishment failed")
+        return NextResponse.redirect(new URL("/?error=auth_error", request.url))
       }
-    } catch (error) {
-      console.error("Exception in auth callback:", error)
-      return NextResponse.redirect(new URL("/?error=auth_exception", request.url))
+    } else {
+      console.error("Missing authentication code")
+      return NextResponse.redirect(new URL("/?error=auth_error", request.url))
     }
-  } else {
-    console.error("No code provided to auth callback")
-    return NextResponse.redirect(new URL("/?error=no_code", request.url))
-  }
 
-  // ダッシュボードにリダイレクト
-  return NextResponse.redirect(new URL("/dashboard", request.url))
+    // ダッシュボードにリダイレクト
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  } catch (error) {
+    console.error("Authentication process error")
+    return NextResponse.redirect(new URL("/?error=auth_error", request.url))
+  }
 }

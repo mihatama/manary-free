@@ -25,7 +25,7 @@ Supabaseダッシュボードから管理者ユーザーを作成する手順：
 
 1. Supabaseダッシュボード > Authentication > Users に移動
 2. 「Add User」をクリック
-3. メールアドレス（info@manary.care）とパスワード（manary）を入力
+3. メールアドレスを入力し、強力なパスワードを設定してください（パスワードは12文字以上で、大文字、小文字、数字、特殊文字を含めることを推奨）
 4. ユーザーが作成されたら、Database > Table editor に移動
 5. 「profiles」テーブルを選択
 6. 作成したユーザーのレコードを見つけて、「role」フィールドを「admin」に更新
@@ -45,10 +45,3 @@ Vercelダッシュボードで以下の環境変数が正しく設定されて�
 1. ブラウザのCookieが有効になっていること
 2. Supabaseの認証リダイレクトURLが正しく設定されていること
 3. 環境変数が正しく設定されていること
-\`\`\`
-
-
-
-
-```types file="lib/supabase/database.types"
-... superseded — newer version follows ...

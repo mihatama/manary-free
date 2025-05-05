@@ -12,7 +12,8 @@ import { EyeIcon, EyeOffIcon, Calendar, Home } from "lucide-react"
 import { loginAction } from "@/app/actions/auth-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseBrowser } from "@/lib/supabase/client"
+import { CSRFForm } from "@/components/csrf-form"
 
 const initialState = {
   status: "idle",
@@ -35,24 +36,34 @@ export function LoginForm() {
 
       // セッションが確実に設定されるのを待つ
       const checkSession = async () => {
-        const supabase = createClient()
-        const { data } = await supabase.auth.getSession()
+        try {
+          const supabase = getSupabaseBrowser()
 
-        if (data.session) {
-          console.log("Session confirmed, redirecting to dashboard")
-          router.push("/dashboard")
-          router.refresh()
-        } else {
-          console.log("No session found, retrying in 500ms")
-          // 最大5回まで再試行
-          if (retryCount < 5) {
-            setRetryCount(retryCount + 1)
-            setTimeout(checkSession, 500)
+          // getUser() を使用して認証済みのユーザー情報を取得
+          const {
+            data: { user },
+            error,
+          } = await supabase.auth.getUser()
+
+          if (user && !error) {
+            console.log("User authenticated, redirecting")
+            // 強制的にページをリロードしてセッションを確実に反映させる
+            window.location.href = "/dashboard"
           } else {
-            // 5回試行しても失敗した場合は手動リダイレクトを促す
-            console.log("Max retries reached, suggesting manual navigation")
-            setManualRedirect(true)
+            console.log("Session check retry")
+            // 最大5回まで再試行
+            if (retryCount < 5) {
+              setRetryCount(retryCount + 1)
+              setTimeout(checkSession, 500)
+            } else {
+              // 5回試行しても失敗した場合は手動リダイレクトを促す
+              console.log("Session check max retries reached")
+              setManualRedirect(true)
+            }
           }
+        } catch (error) {
+          console.error("Session check error")
+          setManualRedirect(true)
         }
       }
 
@@ -82,21 +93,21 @@ export function LoginForm() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
+            <a
               href="/dashboard"
               className="flex items-center justify-center gap-2 px-4 py-2 bg-manary-pink text-white rounded-md hover:bg-[#f78989] transition-colors"
             >
               <Home className="h-4 w-4" />
               <span>ダッシュボード</span>
-            </Link>
+            </a>
 
-            <Link
+            <a
               href="/dashboard/schedule-settings"
               className="flex items-center justify-center gap-2 px-4 py-2 bg-manary-green text-white rounded-md hover:bg-[#6a946c] transition-colors"
             >
               <Calendar className="h-4 w-4" />
               <span>予約設定画面</span>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -116,7 +127,7 @@ export function LoginForm() {
           </Alert>
         )}
 
-        <form action={formAction} className="space-y-4">
+        <CSRFForm action={formAction} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">メールアドレス</Label>
             <Input
@@ -186,7 +197,7 @@ export function LoginForm() {
           <Button type="submit" className="w-full bg-[#f8a0a0] hover:bg-[#f78989] text-white" disabled={pending}>
             {pending ? "ログイン中..." : "ログイン"}
           </Button>
-        </form>
+        </CSRFForm>
       </CardContent>
     </Card>
   )

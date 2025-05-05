@@ -1,5 +1,7 @@
 "use client"
 
+import { DialogTrigger } from "@/components/ui/dialog"
+
 import { useState, useEffect } from "react"
 import { Plus, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -34,6 +35,7 @@ import {
   deleteServiceType,
 } from "@/app/actions/schedule-actions"
 import type { Database } from "@/lib/supabase/database.types"
+import { useCSRF } from "@/hooks/use-csrf"
 
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
@@ -55,6 +57,8 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
   const [description, setDescription] = useState("")
   const [duration, setDuration] = useState("60")
   const [color, setColor] = useState("#f8a0a0")
+
+  const { csrfToken, isLoading: isLoadingCSRF, error: csrfError } = useCSRF()
 
   useEffect(() => {
     if (!clinicId) return
@@ -108,36 +112,54 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
 
   const handleSubmit = async () => {
     try {
+      if (!csrfToken) {
+        setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
+        return
+      }
+
+      const formData = new FormData()
+      formData.append("csrf_token", csrfToken)
+
       if (editingServiceType) {
         // 更新
-        const updated = await updateServiceType(editingServiceType.id, {
-          name,
-          description,
-          duration: Number.parseInt(duration),
-          color,
-        })
+        formData.append("id", editingServiceType.id.toString())
+        formData.append("name", name)
+        formData.append("description", description)
+        formData.append("duration", duration)
+        formData.append("color", color)
+
+        const updated = await updateServiceType(formData)
         setServiceTypes(serviceTypes.map((st) => (st.id === updated.id ? updated : st)))
       } else {
         // 新規作成
-        const created = await createServiceType({
-          clinic_id: clinicId,
-          name,
-          description,
-          duration: Number.parseInt(duration),
-          color,
-        })
+        formData.append("clinic_id", clinicId.toString())
+        formData.append("name", name)
+        formData.append("description", description)
+        formData.append("duration", duration)
+        formData.append("color", color)
+
+        const created = await createServiceType(formData)
         setServiceTypes([...serviceTypes, created])
       }
       handleCloseDialog()
     } catch (err) {
-      console.error(err)
-      setError("診療種別の保存に失敗しました")
+      console.error("Service type operation error")
+      setError("データの保存に失敗しました。もう一度お試しください。")
     }
   }
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteServiceType(id)
+      if (!csrfToken) {
+        setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
+        return
+      }
+
+      const formData = new FormData()
+      formData.append("csrf_token", csrfToken)
+      formData.append("id", id.toString())
+
+      await deleteServiceType(formData)
       setServiceTypes(serviceTypes.filter((st) => st.id !== id))
 
       // 選択中の診療種別が削除された場合、別の診療種別を選択
@@ -148,8 +170,8 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
         }
       }
     } catch (err) {
-      console.error(err)
-      setError("診療種別の削除に失敗しました")
+      console.error("Service type deletion error")
+      setError("データの削除に失敗しました。もう一度お試しください。")
     }
   }
 

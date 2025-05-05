@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseBrowser } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,7 +15,6 @@ export default function ResetPasswordPage() {
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,6 +24,7 @@ export default function ResetPasswordPage() {
     try {
       // 現在のURLからベースURLを取得（Vercel環境でも動作するように）
       const baseUrl = window.location.origin
+      const supabase = getSupabaseBrowser()
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${baseUrl}/update-password`,
@@ -32,7 +32,7 @@ export default function ResetPasswordPage() {
 
       if (error) {
         // 詳細なエラーはログにのみ記録
-        console.error("Password reset error:", error)
+        console.error("Password reset request failed")
         throw new Error("パスワードリセットに失敗しました")
       }
 
@@ -42,12 +42,12 @@ export default function ResetPasswordPage() {
       })
     } catch (error: any) {
       // 詳細なエラーはログにのみ記録
-      console.error("Password reset error:", error)
+      console.error("Password reset process error")
 
       // ユーザーには一般的なメッセージのみを表示
       setMessage({
         type: "error",
-        text: "パスワードリセットに失敗しました。もう一度お試しください。",
+        text: "パスワードリセット処理に失敗しました。メールアドレスを確認してもう一度お試しください。",
       })
     } finally {
       setIsSubmitting(false)
