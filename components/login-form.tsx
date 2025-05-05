@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useFormState, useFormStatus } from "react-dom"
+import { useState, useEffect } from "react"
+import { useActionState } from "react"
+import { useFormStatus } from "react-dom"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EyeIcon, EyeOffIcon } from "lucide-react"
 import { loginAction } from "@/app/actions/auth-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
 const initialState = {
   status: "idle",
@@ -18,14 +21,38 @@ const initialState = {
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
-  const [state, formAction] = useFormState(loginAction, initialState)
+  const [state, formAction] = useActionState(loginAction, initialState)
   const { pending } = useFormStatus()
   const router = useRouter()
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   // ログイン成功時にダッシュボードにリダイレクト
-  if (state.status === "success") {
-    router.push("/dashboard")
-    return null
+  useEffect(() => {
+    if (state.status === "success" && !isRedirecting) {
+      setIsRedirecting(true)
+
+      // セッションが確実に設定されるのを待つ
+      const checkSession = async () => {
+        const supabase = createClient()
+        const { data } = await supabase.auth.getSession()
+
+        if (data.session) {
+          console.log("Session confirmed, redirecting to dashboard")
+          router.push("/dashboard")
+          router.refresh()
+        } else {
+          console.log("No session found, retrying in 500ms")
+          // セッションが見つからない場合は少し待ってから再試行
+          setTimeout(checkSession, 500)
+        }
+      }
+
+      checkSession()
+    }
+  }, [state.status, router, isRedirecting])
+
+  if (isRedirecting) {
+    return <div className="text-center py-4">ログインに成功しました。ダッシュボードにリダイレクトしています...</div>
   }
 
   return (
@@ -104,9 +131,9 @@ export function LoginForm() {
                 ログイン状態を保存
               </Label>
             </div>
-            <a href="#" className="text-sm text-[#f8a0a0] hover:underline">
+            <Link href="/reset-password" className="text-sm text-[#f8a0a0] hover:underline">
               パスワードをお忘れですか？
-            </a>
+            </Link>
           </div>
           <Button type="submit" className="w-full bg-[#f8a0a0] hover:bg-[#f78989] text-white" disabled={pending}>
             {pending ? "ログイン中..." : "ログイン"}
