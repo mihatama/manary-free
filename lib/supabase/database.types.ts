@@ -34,6 +34,113 @@ export interface Database {
           },
         ]
       }
+      clinics: {
+        Row: {
+          id: number
+          name: string
+          address: string | null
+          phone: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          address?: string | null
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          address?: string | null
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      service_types: {
+        Row: {
+          id: number
+          clinic_id: number
+          name: string
+          description: string | null
+          duration: number
+          color: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          clinic_id: number
+          name: string
+          description?: string | null
+          duration: number
+          color?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          clinic_id?: number
+          name?: string
+          description?: string | null
+          duration?: number
+          color?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_types_clinic_id_fkey"
+            columns: ["clinic_id"]
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability_settings: {
+        Row: {
+          id: number
+          service_type_id: number
+          day_of_week: number
+          start_time: string
+          end_time: string
+          is_available: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          service_type_id: number
+          day_of_week: number
+          start_time: string
+          end_time: string
+          is_available?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          service_type_id?: number
+          day_of_week?: number
+          start_time?: string
+          end_time?: string
+          is_available?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_settings_service_type_id_fkey"
+            columns: ["service_type_id"]
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

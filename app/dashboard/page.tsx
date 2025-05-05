@@ -1,6 +1,8 @@
 import { requireAuth } from "@/lib/auth"
 import { LogoutButton } from "@/components/logout-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { Calendar, Users, MessageSquare } from "lucide-react"
 
 export default async function DashboardPage() {
   const { user } = await requireAuth()
@@ -23,35 +25,50 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold mb-6">ダッシュボード</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>利用者数</CardTitle>
-              <CardDescription>システム全体の利用者数</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">128</p>
-            </CardContent>
-          </Card>
+          <Link href="/dashboard/schedule-settings">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>予約設定</CardTitle>
+                  <Calendar className="h-5 w-5 text-manary-pink" />
+                </div>
+                <CardDescription>診療種別と予約可能時間の設定</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{/* 数値データがあれば表示 */}</p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>本日の予約</CardTitle>
-              <CardDescription>本日の予約件数</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">24</p>
-            </CardContent>
-          </Card>
+          <Link href="/dashboard/users">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>利用者管理</CardTitle>
+                  <Users className="h-5 w-5 text-manary-green" />
+                </div>
+                <CardDescription>システム全体の利用者数</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">128</p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>未読メッセージ</CardTitle>
-              <CardDescription>未対応のお問い合わせ</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">5</p>
-            </CardContent>
-          </Card>
+          <Link href="/dashboard/messages">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>未読メッセージ</CardTitle>
+                  <MessageSquare className="h-5 w-5 text-manary-lightgreen" />
+                </div>
+                <CardDescription>未対応のお問い合わせ</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">5</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         <div className="mt-8">
