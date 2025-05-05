@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { ClinicSelector } from "@/components/clinic-selector"
+import { ClinicManager } from "@/components/clinic-manager"
 import { ServiceTypeManager } from "@/components/service-type-manager"
 import { AvailabilityScheduler } from "@/components/availability-scheduler"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -33,28 +34,37 @@ export function ScheduleSettingsClient() {
           />
         </div>
 
-        {selectedClinicId && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <Tabs defaultValue="service-types">
-              <TabsList className="mb-6">
-                <TabsTrigger value="service-types">診療種別</TabsTrigger>
-                <TabsTrigger value="availability">予約可能時間</TabsTrigger>
-              </TabsList>
+        <div className="bg-white rounded-lg shadow p-6">
+          <Tabs defaultValue="service-types">
+            <TabsList className="mb-6">
+              <TabsTrigger value="clinics">助産院管理</TabsTrigger>
+              <TabsTrigger value="service-types">診療種別</TabsTrigger>
+              <TabsTrigger value="availability">予約可能時間</TabsTrigger>
+            </TabsList>
 
-              <TabsContent value="service-types">
+            <TabsContent value="clinics">
+              <ClinicManager />
+            </TabsContent>
+
+            <TabsContent value="service-types">
+              {selectedClinicId ? (
                 <ServiceTypeManager
                   clinicId={selectedClinicId}
                   selectedServiceTypeId={selectedServiceType?.id || null}
                   onSelectServiceType={setSelectedServiceType}
                 />
-              </TabsContent>
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-gray-50">
+                  <p className="text-gray-500">助産院を選択してください</p>
+                </div>
+              )}
+            </TabsContent>
 
-              <TabsContent value="availability">
-                <AvailabilityScheduler serviceType={selectedServiceType} />
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
+            <TabsContent value="availability">
+              <AvailabilityScheduler serviceType={selectedServiceType} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </main>
     </div>
   )
