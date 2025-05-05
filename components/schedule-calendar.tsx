@@ -173,11 +173,23 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
     // 特定の日付の設定を先に処理
     const specificDateSettings = availabilitySettings.filter((setting) => setting.specific_date)
+
+    // デバッグ用
+    console.log("特定日の設定数:", specificDateSettings.length)
+    if (specificDateSettings.length > 0) {
+      console.log("特定日の設定例:", specificDateSettings[0])
+    }
+
     specificDateSettings.forEach((setting) => {
       const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
       if (!serviceType) return
 
-      const specificDate = new Date(setting.specific_date!)
+      // 日付文字列を確実にパースするためにmomentを使用
+      const specificDate = moment(setting.specific_date).toDate()
+
+      // デバッグ用
+      console.log("処理中の特定日:", setting.specific_date, "パース結果:", specificDate)
+
       // 現在の月の範囲内かチェック
       if (specificDate >= firstDay && specificDate <= lastDay) {
         // 開始時間と終了時間を解析
@@ -203,6 +215,9 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
           dayOfWeek: specificDate.getDay(),
           specificDate: setting.specific_date,
         })
+
+        // デバッグ用
+        console.log("特定日のイベントを追加:", start, end, serviceType.name)
       }
     })
 

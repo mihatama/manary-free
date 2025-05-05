@@ -64,13 +64,17 @@ export async function getAvailabilitySettings(serviceTypeId: number) {
       .order("day_of_week")
 
     if (error) {
-      console.error("Database query error")
+      console.error("Database query error", error)
       throw new Error("データの取得に失敗しました")
     }
 
+    // デバッグ用
+    console.log(`サービスタイプID ${serviceTypeId} の予約可能時間:`, data)
+    console.log("特定日の設定数:", data.filter((s) => s.specific_date).length)
+
     return data
   } catch (error) {
-    console.error("Error in getAvailabilitySettings")
+    console.error("Error in getAvailabilitySettings", error)
     throw new Error("データの取得に失敗しました")
   }
 }
@@ -189,6 +193,9 @@ export async function upsertAvailabilitySetting(formData: FormData) {
       specific_date: (formData.get("specific_date") as string) || null,
     }
 
+    // デバッグ用
+    console.log("保存する設定:", setting)
+
     const supabase = createClient()
 
     // 既存の設定を確認
@@ -201,13 +208,21 @@ export async function upsertAvailabilitySetting(formData: FormData) {
 
     // 特定の日付が指定されている場合
     if (setting.specific_date) {
+      console.log("特定日の設定を検索:", setting.specific_date) // デバッグ用
       query = query.eq("specific_date", setting.specific_date)
     } else {
       // 曜日ベースの場合
+      console.log("曜日ベースの設定を検索:", setting.day_of_week) // デバッグ用
       query = query.eq("day_of_week", setting.day_of_week).is("specific_date", null)
     }
 
-    const { data: existingData } = await query
+    const { data: existingData, error: queryError } = await query
+
+    if (queryError) {
+      console.error("既存設定の検索エラー:", queryError) // デバッグ用
+    } else {
+      console.log("既存設定の検索結果:", existingData) // デバッグ用
+    }
 
     if (existingData && existingData.length > 0) {
       // 既存の設定を更新

@@ -59,6 +59,7 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [specificStartTime, setSpecificStartTime] = useState<string>("09:00")
   const [specificEndTime, setSpecificEndTime] = useState<string>("17:00")
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   const [isAdding, setIsAdding] = useState(false)
 
@@ -159,6 +160,9 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
       // 日付をYYYY-MM-DD形式に変換
       const formattedDate = format(selectedDate, "yyyy-MM-dd")
 
+      // デバッグ用
+      console.log("特定日の予約枠を追加:", formattedDate, specificStartTime, specificEndTime)
+
       // 重複チェック
       const hasOverlap = availabilitySettings.some(
         (setting) =>
@@ -183,6 +187,9 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
       formData.append("specific_date", formattedDate)
 
       const newSetting = await upsertAvailabilitySetting(formData)
+      console.log("追加された特定日の設定:", newSetting) // デバッグ用
+
+      // 新しい設定を追加
       setAvailabilitySettings([...availabilitySettings, newSetting])
       setSelectedDate(undefined) // 日付選択をリセット
       setError(null)
@@ -387,27 +394,36 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1 block">日付</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {selectedDate ? (
-                          format(selectedDate, "yyyy年MM月dd日", { locale: ja })
-                        ) : (
-                          <span>日付を選択</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={setSelectedDate}
-                        initialFocus
-                        locale={ja}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <div className="relative">
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          onClick={() => setIsCalendarOpen(true)}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {selectedDate ? (
+                            format(selectedDate, "yyyy年MM月dd日", { locale: ja })
+                          ) : (
+                            <span>日付を選択</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => {
+                            setSelectedDate(date)
+                            setIsCalendarOpen(false)
+                          }}
+                          initialFocus
+                          locale={ja}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">開始時間</label>
