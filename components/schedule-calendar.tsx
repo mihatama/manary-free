@@ -37,6 +37,11 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useCSRF } from "@/hooks/use-csrf"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { ja } from "date-fns/locale"
+import { Switch } from "@/components/ui/switch"
 
 // 日本語ロケールを設定
 moment.locale("ja")
@@ -61,6 +66,7 @@ interface CalendarEvent {
   availabilityId?: number // 既存の予約可能時間ID
   isRecurring: boolean // 定期的な予約可能時間かどうか
   dayOfWeek: number // 曜日（0: 日曜日, 1: 月曜日, ...）
+  specificDate?: string // 特定の日付
 }
 
 // 時間オプションの生成
@@ -94,6 +100,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
   const [editStartTime, setEditStartTime] = useState<string>("")
   const [editEndTime, setEditEndTime] = useState<string>("")
   const [editIsRecurring, setEditIsRecurring] = useState<boolean>(true)
+  const [editSpecificDate, setEditSpecificDate] = useState<Date | undefined>(undefined)
 
   const { csrfToken, isLoading: isLoadingCSRF, error: csrfError } = useCSRF()
 
@@ -164,41 +171,86 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
     // 新しいイベント配列を作成（古いイベントは完全に破棄）
     const newEvents: CalendarEvent[] = []
 
-    // 現在の月の各日について
-    for (let day = moment(firstDay); day.isSameOrBefore(lastDay); day.add(1, "days")) {
-      const dayOfWeek = day.day() // 0: 日曜日, 1: 月曜日, ...
+    // 特定の日付の設定を先に処理
+    const specificDateSettings = availabilitySettings.filter((setting) => setting.specific_date)
+    specificDateSettings.forEach((setting) => {
+      const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
+      if (!serviceType) return
 
-      // その曜日の予約可能時間を取得
-      const daySettings = availabilitySettings.filter((setting) => setting.day_of_week === dayOfWeek)
-
-      // 各予約可能時間をイベントに変換
-      daySettings.forEach((setting) => {
-        const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
-        if (!serviceType) return
-
+      const specificDate = new Date(setting.specific_date!)
+      // 現在の月の範囲内かチェック
+      if (specificDate >= firstDay && specificDate <= lastDay) {
         // 開始時間と終了時間を解析
         const [startHour, startMinute] = setting.start_time.split(":").map(Number)
         const [endHour, endMinute] = setting.end_time.split(":").map(Number)
 
         // イベントの開始時間と終了時間を設定
-        const start = moment(day).hour(startHour).minute(startMinute).second(0).toDate()
-        const end = moment(day).hour(endHour).minute(endMinute).second(0).toDate()
+        const start = moment(specificDate).hour(startHour).minute(startMinute).second(0).toDate()
+        const end = moment(specificDate).hour(endHour).minute(endMinute).second(0).toDate()
 
-        // 一意のIDを生成して重複を防ぐ
-        const uniqueId = `${setting.id}-${day.format("YYYY-MM-DD")}`
+        // 一意のIDを生成
+        const uniqueId = `specific-${setting.id}`
 
         newEvents.push({
           id: uniqueId,
-          title: serviceType.name,
+          title: `${serviceType.name} (特別設定)`,
           start,
           end,
           serviceTypeId: serviceType.id,
           color: serviceType.color,
           availabilityId: setting.id,
-          isRecurring: true,
-          dayOfWeek: dayOfWeek,
+          isRecurring: false,
+          dayOfWeek: specificDate.getDay(),
+          specificDate: setting.specific_date,
         })
-      })
+      }
+    })
+
+    // 曜日ベースの設定を処理
+    const weeklySettings = availabilitySettings.filter((setting) => !setting.specific_date)
+
+    // 現在の月の各日について
+    for (let day = moment(firstDay); day.isSameOrBefore(lastDay); day.add(1, "days")) {
+      const dayOfWeek = day.day() // 0: 日曜日, 1: 月曜日, ...
+      const currentDateStr = day.format("YYYY-MM-DD")
+
+      // その日に特定の日付設定があるかチェック
+      const hasSpecificDateSetting = specificDateSettings.some((setting) => setting.specific_date === currentDateStr)
+
+      // 特定の日付設定がない場合のみ、曜日ベースの設定を適用
+      if (!hasSpecificDateSetting) {
+        // その曜日の予約可能時間を取得
+        const daySettings = weeklySettings.filter((setting) => setting.day_of_week === dayOfWeek)
+
+        // 各予約可能時間をイベントに変換
+        daySettings.forEach((setting) => {
+          const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
+          if (!serviceType) return
+
+          // 開始時間と終了時間を解析
+          const [startHour, startMinute] = setting.start_time.split(":").map(Number)
+          const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+
+          // イベントの開始時間と終了時間を設定
+          const start = moment(day).hour(startHour).minute(startMinute).second(0).toDate()
+          const end = moment(day).hour(endHour).minute(endMinute).second(0).toDate()
+
+          // 一意のIDを生成して重複を防ぐ
+          const uniqueId = `weekly-${setting.id}-${day.format("YYYY-MM-DD")}`
+
+          newEvents.push({
+            id: uniqueId,
+            title: serviceType.name,
+            start,
+            end,
+            serviceTypeId: serviceType.id,
+            color: serviceType.color,
+            availabilityId: setting.id,
+            isRecurring: true,
+            dayOfWeek: dayOfWeek,
+          })
+        })
+      }
     }
 
     // 完全に新しい配列で置き換え
@@ -218,9 +270,12 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
   // カスタムイベントスタイル
   const eventStyleGetter = (event: CalendarEvent) => {
+    // 特定日付の設定は少し濃い色で表示
+    const backgroundColor = event.specificDate ? event.color : `${event.color}CC` // CCは透明度80%
+
     return {
       style: {
-        backgroundColor: event.color,
+        backgroundColor,
         borderRadius: "4px",
         opacity: 0.8,
         color: "#fff",
@@ -253,6 +308,13 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
     setEditStartTime(moment(event.start).format("HH:mm"))
     setEditEndTime(moment(event.end).format("HH:mm"))
     setEditIsRecurring(event.isRecurring)
+
+    if (event.specificDate) {
+      setEditSpecificDate(new Date(event.specificDate))
+    } else {
+      setEditSpecificDate(undefined)
+    }
+
     setIsEditDialogOpen(true)
   }
 
@@ -268,6 +330,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
     setEditStartTime(startTime)
     setEditEndTime(endTime)
     setEditIsRecurring(true)
+    setEditSpecificDate(new Date(slotInfo.start))
 
     setIsNewEventDialogOpen(true)
   }
@@ -292,7 +355,21 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
       // 新しい予約可能時間を作成する
       formData.append("service_type_id", editServiceTypeId)
-      formData.append("day_of_week", selectedEvent.dayOfWeek.toString())
+
+      if (editIsRecurring) {
+        // 曜日ベースの設定
+        formData.append("day_of_week", selectedEvent.dayOfWeek.toString())
+        // specific_dateは送信しない
+      } else {
+        // 特定日付の設定
+        if (!editSpecificDate) {
+          setError("日付を選択してください")
+          return
+        }
+        formData.append("day_of_week", editSpecificDate.getDay().toString())
+        formData.append("specific_date", format(editSpecificDate, "yyyy-MM-dd"))
+      }
+
       formData.append("start_time", editStartTime)
       formData.append("end_time", editEndTime)
       formData.append("is_available", "true")
@@ -350,12 +427,25 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
     if (!newEventSlot || !csrfToken) return
 
     try {
-      const dayOfWeek = moment(newEventSlot.start).day()
-
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
       formData.append("service_type_id", editServiceTypeId)
-      formData.append("day_of_week", dayOfWeek.toString())
+
+      if (editIsRecurring) {
+        // 曜日ベースの設定
+        const dayOfWeek = moment(newEventSlot.start).day()
+        formData.append("day_of_week", dayOfWeek.toString())
+        // specific_dateは送信しない
+      } else {
+        // 特定日付の設定
+        if (!editSpecificDate) {
+          setError("日付を選択してください")
+          return
+        }
+        formData.append("day_of_week", editSpecificDate.getDay().toString())
+        formData.append("specific_date", format(editSpecificDate, "yyyy-MM-dd"))
+      }
+
       formData.append("start_time", editStartTime)
       formData.append("end_time", editEndTime)
       formData.append("is_available", "true")
@@ -532,6 +622,50 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-is-recurring">繰り返し設定</Label>
+                <div className="flex items-center space-x-2">
+                  <Switch id="edit-is-recurring" checked={editIsRecurring} onCheckedChange={setEditIsRecurring} />
+                  <Label htmlFor="edit-is-recurring" className="text-sm">
+                    {editIsRecurring ? "毎週繰り返す" : "特定の日付のみ"}
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            {!editIsRecurring && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-specific-date">日付</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="edit-specific-date"
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editSpecificDate ? (
+                        format(editSpecificDate, "yyyy年MM月dd日", { locale: ja })
+                      ) : (
+                        <span>日付を選択</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={editSpecificDate}
+                      onSelect={setEditSpecificDate}
+                      initialFocus
+                      locale={ja}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-start-time">開始時間</Label>
@@ -622,6 +756,50 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="new-is-recurring">繰り返し設定</Label>
+                <div className="flex items-center space-x-2">
+                  <Switch id="new-is-recurring" checked={editIsRecurring} onCheckedChange={setEditIsRecurring} />
+                  <Label htmlFor="new-is-recurring" className="text-sm">
+                    {editIsRecurring ? "毎週繰り返す" : "特定の日付のみ"}
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            {!editIsRecurring && (
+              <div className="space-y-2">
+                <Label htmlFor="new-specific-date">日付</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="new-specific-date"
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editSpecificDate ? (
+                        format(editSpecificDate, "yyyy年MM月dd日", { locale: ja })
+                      ) : (
+                        <span>日付を選択</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={editSpecificDate}
+                      onSelect={setEditSpecificDate}
+                      initialFocus
+                      locale={ja}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="new-start-time">開始時間</Label>
@@ -653,23 +831,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="new-is-recurring"
-                  checked={editIsRecurring}
-                  onChange={(e) => setEditIsRecurring(e.target.checked)}
-                  className="mr-2 rounded border-gray-300 text-manary-pink focus:ring-manary-pink"
-                />
-                <Label htmlFor="new-is-recurring" className="text-sm">
-                  毎週同じ曜日に繰り返す
-                </Label>
-              </div>
-              <p className="text-xs text-gray-500">
-                チェックすると、選択した曜日に毎週この時間帯が予約可能になります。
-              </p>
             </div>
           </div>
           <DialogFooter>

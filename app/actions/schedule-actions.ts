@@ -186,18 +186,28 @@ export async function upsertAvailabilitySetting(formData: FormData) {
       start_time: formData.get("start_time") as string,
       end_time: formData.get("end_time") as string,
       is_available: formData.get("is_available") === "true",
+      specific_date: (formData.get("specific_date") as string) || null,
     }
 
     const supabase = createClient()
 
     // 既存の設定を確認
-    const { data: existingData } = await supabase
+    let query = supabase
       .from("availability_settings")
       .select("id")
       .eq("service_type_id", setting.service_type_id)
-      .eq("day_of_week", setting.day_of_week)
       .eq("start_time", setting.start_time)
       .eq("end_time", setting.end_time)
+
+    // 特定の日付が指定されている場合
+    if (setting.specific_date) {
+      query = query.eq("specific_date", setting.specific_date)
+    } else {
+      // 曜日ベースの場合
+      query = query.eq("day_of_week", setting.day_of_week).is("specific_date", null)
+    }
+
+    const { data: existingData } = await query
 
     if (existingData && existingData.length > 0) {
       // 既存の設定を更新
@@ -264,5 +274,49 @@ export async function deleteAvailabilitySetting(formData: FormData) {
   } catch (error) {
     console.error("Error in deleteAvailabilitySetting")
     throw new Error("データの削除に失敗しました")
+  }
+}
+
+// 特定の日付の予約可能時間を取得
+export async function getAvailabilitySettingsByDate(serviceTypeIds: number[], date: string) {
+  const supabase = createClient()
+  try {
+    // 特定の日付の設定を取得
+    const { data: specificDateData, error: specificDateError } = await supabase
+      .from("availability_settings")
+      .select("*")
+      .in("service_type_id", serviceTypeIds)
+      .eq("specific_date", date)
+      .eq("is_available", true)
+
+    if (specificDateError) {
+      console.error("Database query error", specificDateError)
+      throw new Error("データの取得に失敗しました")
+    }
+
+    // 特定の日付の設定がある場合はそれを返す
+    if (specificDateData && specificDateData.length > 0) {
+      return specificDateData
+    }
+
+    // 特定の日付の設定がない場合は曜日ベースの設定を取得
+    const dayOfWeek = new Date(date).getDay() // 0: 日曜日, 1: 月曜日, ...
+    const { data: weeklyData, error: weeklyError } = await supabase
+      .from("availability_settings")
+      .select("*")
+      .in("service_type_id", serviceTypeIds)
+      .eq("day_of_week", dayOfWeek)
+      .is("specific_date", null)
+      .eq("is_available", true)
+
+    if (weeklyError) {
+      console.error("Database query error", weeklyError)
+      throw new Error("データの取得に失敗しました")
+    }
+
+    return weeklyData
+  } catch (error) {
+    console.error("Error in getAvailabilitySettingsByDate", error)
+    throw new Error("データの取得に失敗しました")
   }
 }
