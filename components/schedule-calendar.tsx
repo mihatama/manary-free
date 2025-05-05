@@ -280,11 +280,17 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
 
+      // 既存の予約可能時間を削除する
       if (selectedEvent.availabilityId) {
-        // 既存の予約可能時間を更新
-        formData.append("id", selectedEvent.availabilityId.toString())
+        const deleteFormData = new FormData()
+        deleteFormData.append("csrf_token", csrfToken)
+        deleteFormData.append("id", selectedEvent.availabilityId.toString())
+
+        // 古い設定を削除
+        await deleteAvailabilitySetting(deleteFormData)
       }
 
+      // 新しい予約可能時間を作成する
       formData.append("service_type_id", editServiceTypeId)
       formData.append("day_of_week", selectedEvent.dayOfWeek.toString())
       formData.append("start_time", editStartTime)
