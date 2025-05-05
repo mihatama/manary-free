@@ -5,6 +5,7 @@ import { ClinicSelector } from "@/components/clinic-selector"
 import { ClinicManager } from "@/components/clinic-manager"
 import { ServiceTypeManager } from "@/components/service-type-manager"
 import { AvailabilityScheduler } from "@/components/availability-scheduler"
+import { ScheduleCalendar } from "@/components/schedule-calendar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Database } from "@/lib/supabase/database.types"
 
@@ -40,6 +41,7 @@ export function ScheduleSettingsClient() {
               <TabsTrigger value="clinics">助産院管理</TabsTrigger>
               <TabsTrigger value="service-types">診療種別</TabsTrigger>
               <TabsTrigger value="availability">予約可能時間</TabsTrigger>
+              <TabsTrigger value="calendar">カレンダー表示</TabsTrigger>
             </TabsList>
 
             <TabsContent value="clinics">
@@ -62,6 +64,10 @@ export function ScheduleSettingsClient() {
 
             <TabsContent value="availability">
               <AvailabilityScheduler serviceType={selectedServiceType} />
+            </TabsContent>
+
+            <TabsContent value="calendar">
+              <ScheduleCalendar clinicId={selectedClinicId} />
             </TabsContent>
           </Tabs>
         </div>
