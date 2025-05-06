@@ -114,12 +114,6 @@ export async function submitQuestionnaire(formData: FormData) {
 
 // 電話番号で問診票を取得
 export async function getQuestionnaireByPhone(phoneNumber: string) {
-  try {
-    // テスト用に常にnullを返す（問診票がない状態をシミュレート）
-    // 実際の環境では、データベースから取得するロジックを実装する
-    return null
-  } catch (error) {
-    console.error("Error in getQuestionnaireByPhone:", error)
-    throw new Error("問診票の取得に失敗しました")
-  }
+  // テスト用に常にnullを返す（問診票がない状態をシミュレート）
+  return null
 }

@@ -17,7 +17,6 @@ import { ja } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react"
-import { getAvailableTimeSlots } from "@/app/actions/schedule-actions"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRouter } from "next/navigation"
@@ -84,23 +83,20 @@ export function ReservationCalendar({
         const start = format(startOfMonth(currentMonth), "yyyy-MM-dd")
         const end = format(endOfMonth(currentMonth), "yyyy-MM-dd")
 
-        // APIから利用可能な日付を取得
-        const response = await fetch(
-          `/api/available-dates?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&start=${start}&end=${end}`,
-        )
+        // テスト用に、すべての日付を利用可能とする
+        const allDates = eachDayOfInterval({
+          start: startOfMonth(currentMonth),
+          end: endOfMonth(currentMonth),
+        }).map((date) => format(date, "yyyy-MM-dd"))
 
-        if (!response.ok) {
-          throw new Error("利用可能な日付の取得に失敗しました")
-        }
-
-        const data = await response.json()
-        setAvailableDates(data.availableDates || [])
+        setAvailableDates(allDates)
       } catch (err) {
         console.error("利用可能な日付の取得エラー:", err)
         // エラーが発生した場合は、すべての日付を利用可能とする（テスト用）
-        const start = startOfMonth(currentMonth)
-        const end = endOfMonth(currentMonth)
-        const allDates = eachDayOfInterval({ start, end }).map((date) => format(date, "yyyy-MM-dd"))
+        const allDates = eachDayOfInterval({
+          start: startOfMonth(currentMonth),
+          end: endOfMonth(currentMonth),
+        }).map((date) => format(date, "yyyy-MM-dd"))
         setAvailableDates(allDates)
       } finally {
         setIsLoadingDates(false)
@@ -119,23 +115,15 @@ export function ReservationCalendar({
         setIsLoadingTimeSlots(true)
         setError(null)
 
-        const formattedDate = format(selectedDateInternal, "yyyy-MM-dd")
-
-        try {
-          const slots = await getAvailableTimeSlots(serviceTypeId, formattedDate)
-          setAvailableTimeSlots(slots)
-        } catch (err) {
-          console.error("時間枠取得エラー:", err)
-          // エラーが発生した場合は、テスト用のデータを設定
-          setAvailableTimeSlots([
-            { startTime: "09:00", endTime: "10:00", available: true },
-            { startTime: "10:00", endTime: "11:00", available: true },
-            { startTime: "11:00", endTime: "12:00", available: true },
-            { startTime: "13:00", endTime: "14:00", available: true },
-            { startTime: "14:00", endTime: "15:00", available: true },
-            { startTime: "15:00", endTime: "16:00", available: true },
-          ])
-        }
+        // テスト用のデータを設定
+        setAvailableTimeSlots([
+          { startTime: "09:00", endTime: "10:00", available: true },
+          { startTime: "10:00", endTime: "11:00", available: true },
+          { startTime: "11:00", endTime: "12:00", available: true },
+          { startTime: "13:00", endTime: "14:00", available: true },
+          { startTime: "14:00", endTime: "15:00", available: true },
+          { startTime: "15:00", endTime: "16:00", available: true },
+        ])
       } catch (err) {
         console.error("時間枠取得エラー:", err)
         setError("利用可能な時間枠の取得に失敗しました")
@@ -240,10 +228,8 @@ export function ReservationCalendar({
                   className={cn(
                     "h-10 w-full relative",
                     !isCurrentMonth && "text-gray-300",
-                    isSelected && "bg-manary-pink text-white hover:bg-manary-pink hover:text-white",
-                    isAvailable &&
-                      !isSelected &&
-                      "border-manary-pink text-manary-pink hover:bg-manary-pink hover:text-white",
+                    isSelected && "bg-[#f8a0a0] text-white hover:bg-[#f8a0a0] hover:text-white",
+                    isAvailable && !isSelected && "border-[#f8a0a0] text-[#f8a0a0] hover:bg-[#f8a0a0] hover:text-white",
                     !isAvailable && "cursor-not-allowed opacity-50",
                     isTodayDate && !isSelected && "border-blue-500",
                     dayOfWeek === 0 && "text-red-500",
@@ -254,7 +240,7 @@ export function ReservationCalendar({
                 >
                   <span className="text-sm">{format(date, "d")}</span>
                   {isAvailable && (
-                    <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-manary-pink rounded-full"></span>
+                    <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-[#f8a0a0] rounded-full"></span>
                   )}
                 </Button>
               )
@@ -281,8 +267,8 @@ export function ReservationCalendar({
                     key={i}
                     variant="outline"
                     className={cn(
-                      "border-manary-pink text-manary-pink hover:bg-manary-pink hover:text-white",
-                      selectedTime && selectedTime.start === slot.startTime && "bg-manary-pink text-white",
+                      "border-[#f8a0a0] text-[#f8a0a0] hover:bg-[#f8a0a0] hover:text-white",
+                      selectedTime && selectedTime.start === slot.startTime && "bg-[#f8a0a0] text-white",
                     )}
                     onClick={() => handleSelectTimeSlot(slot.startTime, slot.endTime)}
                   >
