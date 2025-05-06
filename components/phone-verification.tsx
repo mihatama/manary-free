@@ -23,6 +23,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   const [countdown, setCountdown] = useState(0)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [testCode, setTestCode] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   const { csrfToken, isLoading: isLoadingCSRF } = useCSRF()
 
@@ -37,6 +38,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
     setError(null)
     setSuccessMessage(null)
     setTestCode(null)
+    setDebugInfo(null)
 
     if (!isValidPhoneNumber(phoneNumber)) {
       setError("有効な電話番号を入力してください")
@@ -64,37 +66,52 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
 
       console.log("Response status:", response.status)
 
+      // レスポンスデータを取得
+      let data
+      try {
+        data = await response.json()
+        console.log("Response data:", data)
+
+        // デバッグ情報を保存
+        if (data.debug) {
+          setDebugInfo(data.debug)
+        }
+      } catch (jsonError) {
+        console.error("Failed to parse JSON response:", jsonError)
+        throw new Error("サーバーからの応答を解析できませんでした")
+      }
+
       // レスポンスが正常でない場合のエラーハンドリング
       if (!response.ok) {
-        let errorMessage = "認証コードの送信に失敗しました"
+        let errorMessage = data?.error || "認証コードの送信に失敗しました"
 
-        try {
-          const errorData = await response.json()
-          if (errorData && errorData.error) {
-            errorMessage = errorData.error
-          }
-        } catch (e) {
-          // JSONパースに失敗した場合はデフォルトのエラーメッセージを使用
+        // 詳細なエラー情報があれば追加
+        if (data?.details) {
+          errorMessage += `: ${data.details}`
         }
 
         throw new Error(errorMessage)
       }
 
-      const data = await response.json()
-      console.log("Response data:", data)
-
       if (data.success) {
         setIsCodeSent(true)
 
-        // 開発環境の場合はコードを表示
-        if (data.devMode && data.message) {
-          const codeMatch = data.message.match(/\d{6}/)
-          if (codeMatch) {
-            setTestCode(codeMatch[0])
-          }
+        // 開発環境のモックモードの場合はコードを表示
+        if (data.mockCode) {
+          setTestCode(data.mockCode)
         }
 
-        setSuccessMessage(data.message || "認証コードを送信しました。SMSをご確認ください。")
+        // 送信ステータスを確認
+        if (data.verifyStatus === "failed") {
+          setSuccessMessage(
+            `認証コードを送信しました。問題が発生した場合は、表示されたテストコードを使用してください。`,
+          )
+          if (data.verifyError) {
+            console.warn("Verification error:", data.verifyError)
+          }
+        } else {
+          setSuccessMessage(data.message || "認証コードを送信しました。SMSをご確認ください。")
+        }
 
         // カウントダウンを開始（60秒）
         setCountdown(60)
@@ -109,7 +126,14 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         }, 1000)
       } else {
         console.error("API error:", data.error)
-        setError(data.error || "認証コードの送信に失敗しました")
+        let errorMessage = data.error || "認証コードの送信に失敗しました"
+
+        // 詳細なエラー情報があれば追加
+        if (data.details) {
+          errorMessage += `: ${data.details}`
+        }
+
+        setError(errorMessage)
       }
     } catch (err: any) {
       console.error("認証コード送信エラー:", err)
@@ -124,8 +148,8 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
     setError(null)
     setSuccessMessage(null)
 
-    if (!verificationCode || verificationCode.length !== 6) {
-      setError("6桁の認証コードを入力してください")
+    if (!verificationCode || verificationCode.length < 4) {
+      setError("有効な認証コードを入力してください")
       return
     }
 
@@ -151,24 +175,27 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
 
       console.log("Response status:", response.status)
 
+      // レスポンスデータを取得
+      let data
+      try {
+        data = await response.json()
+        console.log("Response data:", data)
+      } catch (jsonError) {
+        console.error("Failed to parse JSON response:", jsonError)
+        throw new Error("サーバーからの応答を解析できませんでした")
+      }
+
       // レスポンスが正常でない場合のエラーハンドリング
       if (!response.ok) {
-        let errorMessage = "認証に失敗しました"
+        let errorMessage = data?.error || "認証に失敗しました"
 
-        try {
-          const errorData = await response.json()
-          if (errorData && errorData.error) {
-            errorMessage = errorData.error
-          }
-        } catch (e) {
-          // JSONパースに失敗した場合はデフォルトのエラーメッセージを使用
+        // 詳細なエラー情報があれば追加
+        if (data?.details) {
+          errorMessage += `: ${data.details}`
         }
 
         throw new Error(errorMessage)
       }
-
-      const data = await response.json()
-      console.log("Response data:", data)
 
       if (data.success) {
         // 認証成功
@@ -178,7 +205,14 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         }, 1000)
       } else {
         console.error("API error:", data.error)
-        setError(data.error || "認証コードが無効です")
+        let errorMessage = data.error || "認証コードが無効です"
+
+        // 詳細なエラー情報があれば追加
+        if (data.details) {
+          errorMessage += `: ${data.details}`
+        }
+
+        setError(errorMessage)
       }
     } catch (err: any) {
       console.error("認証コード検証エラー:", err)
@@ -193,7 +227,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
       <CardHeader>
         <CardTitle className="text-xl text-center text-gray-800">電話番号認証</CardTitle>
         <CardDescription className="text-center">
-          {isCodeSent ? "SMSで送信された6桁の認証コードを入力してください" : "予約には電話番号認証が必要です"}
+          {isCodeSent ? "SMSで送信された認証コードを入力してください" : "予約には電話番号認証が必要です"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -215,6 +249,13 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
               開発環境: テスト認証コード「{testCode}」を使用してください
             </AlertDescription>
           </Alert>
+        )}
+
+        {debugInfo && process.env.NODE_ENV !== "production" && (
+          <div className="mb-4 p-2 bg-gray-100 rounded text-xs overflow-auto max-h-40">
+            <p className="font-bold mb-1">デバッグ情報:</p>
+            <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+          </div>
         )}
 
         <div className="space-y-4">
@@ -247,7 +288,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
                 <Input
                   id="verification-code"
                   type="text"
-                  placeholder="6桁の認証コード"
+                  placeholder="認証コード"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
                   maxLength={6}
