@@ -1,4 +1,6 @@
 "use server"
+
+import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
 import type { AuthError } from "@/lib/auth"
@@ -96,23 +98,17 @@ export async function loginAction(prevState: any, formData: FormData) {
 }
 
 export async function logoutAction(formData: FormData) {
-  try {
-    // CSRF検証 - エラーをログに記録するが、処理は続行する
-    const csrfValidation = await validateCSRF(formData)
-    if (!csrfValidation.success) {
-      console.error("CSRF validation failed during logout - proceeding anyway")
-    }
-
-    const cookieStore = cookies()
-    const supabase = createServerActionClient<Database>({ cookies: () => cookieStore })
-
-    await supabase.auth.signOut()
-
-    // Return success instead of redirecting directly
-    return { success: true }
-  } catch (error) {
-    console.error("Logout error:", error)
-    // Return error instead of redirecting directly
-    return { success: false, error: "ログアウトに失敗しました" }
+  // CSRF検証
+  const csrfValidation = await validateCSRF(formData)
+  if (!csrfValidation.success) {
+    // エラーをログに記録して、ログインページにリダイレクト
+    console.error("CSRF validation failed during logout")
+    redirect("/?error=security_error")
   }
+
+  const cookieStore = cookies()
+  const supabase = createServerActionClient<Database>({ cookies: () => cookieStore })
+
+  await supabase.auth.signOut()
+  redirect("/")
 }
