@@ -3,37 +3,6 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string
-          name: string
-          role: string
-          created_at: string
-          updated_at: string | null
-        }
-        Insert: {
-          id: string
-          name: string
-          role: string
-          created_at?: string
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          name?: string
-          role?: string
-          created_at?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey"
-            columns: ["id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       clinics: {
         Row: {
           id: number
@@ -41,7 +10,7 @@ export interface Database {
           address: string | null
           phone: string | null
           created_at: string
-          updated_at: string
+          updated_at: string | null
         }
         Insert: {
           id?: number
@@ -49,7 +18,7 @@ export interface Database {
           address?: string | null
           phone?: string | null
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
         Update: {
           id?: number
@@ -57,9 +26,8 @@ export interface Database {
           address?: string | null
           phone?: string | null
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
-        Relationships: []
       }
       service_types: {
         Row: {
@@ -68,9 +36,8 @@ export interface Database {
           name: string
           description: string | null
           duration: number
-          color: string
           created_at: string
-          updated_at: string
+          updated_at: string | null
         }
         Insert: {
           id?: number
@@ -78,9 +45,8 @@ export interface Database {
           name: string
           description?: string | null
           duration: number
-          color?: string
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
         Update: {
           id?: number
@@ -88,64 +54,126 @@ export interface Database {
           name?: string
           description?: string | null
           duration?: number
-          color?: string
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "service_types_clinic_id_fkey"
-            columns: ["clinic_id"]
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-        ]
+      }
+      schedules: {
+        Row: {
+          id: number
+          clinic_id: number
+          date: string
+          start_time: string
+          end_time: string
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          clinic_id: number
+          date: string
+          start_time: string
+          end_time: string
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          clinic_id?: number
+          date?: string
+          start_time?: string
+          end_time?: string
+          created_at?: string
+          updated_at?: string | null
+        }
+      }
+      bookings: {
+        Row: {
+          id: number
+          clinic_id: number
+          service_type_id: number
+          booking_date: string
+          start_time: string
+          end_time: string
+          patient_name: string
+          patient_email: string | null
+          patient_phone: string
+          notes: string | null
+          status: string
+          access_token: string
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          clinic_id: number
+          service_type_id: number
+          booking_date: string
+          start_time: string
+          end_time: string
+          patient_name: string
+          patient_email?: string | null
+          patient_phone: string
+          notes?: string | null
+          status: string
+          access_token: string
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          clinic_id?: number
+          service_type_id?: number
+          booking_date?: string
+          start_time?: string
+          end_time?: string
+          patient_name?: string
+          patient_email?: string | null
+          patient_phone?: string
+          notes?: string | null
+          status?: string
+          access_token?: string
+          created_at?: string
+          updated_at?: string | null
+        }
       }
       availability_settings: {
         Row: {
           id: number
           service_type_id: number
-          day_of_week: number
+          day_of_week: number | null
           specific_date: string | null
           start_time: string
           end_time: string
           is_available: boolean
-          created_at: string
-          updated_at: string
           end_date: string | null
+          created_at: string
+          updated_at: string | null
         }
         Insert: {
           id?: number
           service_type_id: number
-          day_of_week: number
+          day_of_week?: number | null
           specific_date?: string | null
           start_time: string
           end_time: string
           is_available?: boolean
-          created_at?: string
-          updated_at?: string
           end_date?: string | null
+          created_at?: string
+          updated_at?: string | null
         }
         Update: {
           id?: number
           service_type_id?: number
-          day_of_week?: number
+          day_of_week?: number | null
           specific_date?: string | null
           start_time?: string
           end_time?: string
           is_available?: boolean
-          created_at?: string
-          updated_at?: string
           end_date?: string | null
+          created_at?: string
+          updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "availability_settings_service_type_id_fkey"
-            columns: ["service_type_id"]
-            referencedRelation: "service_types"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {
