@@ -8,11 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { EyeIcon, EyeOffIcon, Calendar, Home } from "lucide-react"
+import { EyeIcon, EyeOffIcon } from "lucide-react"
 import { loginAction } from "@/app/actions/auth-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
-import { getSupabaseBrowser } from "@/lib/supabase/client"
 import { CSRFForm } from "@/components/csrf-form"
 
 const initialState = {
@@ -26,89 +25,23 @@ export function LoginForm() {
   const { pending } = useFormStatus()
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
-  const [manualRedirect, setManualRedirect] = useState(false)
 
   // ログイン成功時にダッシュボードにリダイレクト
   useEffect(() => {
     if (state.status === "success" && !isRedirecting) {
       setIsRedirecting(true)
 
-      // セッションが確実に設定されるのを待つ
-      const checkSession = async () => {
-        try {
-          const supabase = getSupabaseBrowser()
-
-          // getUser() を使用して認証済みのユーザー情報を取得
-          const {
-            data: { user },
-            error,
-          } = await supabase.auth.getUser()
-
-          if (user && !error) {
-            console.log("User authenticated, redirecting")
-            // 強制的にページをリロードしてセッションを確実に反映させる
-            window.location.href = "/dashboard"
-          } else {
-            console.log("Session check retry")
-            // 最大5回まで再試行
-            if (retryCount < 5) {
-              setRetryCount(retryCount + 1)
-              setTimeout(checkSession, 500)
-            } else {
-              // 5回試行しても失敗した場合は手動リダイレクトを促す
-              console.log("Session check max retries reached")
-              setManualRedirect(true)
-            }
-          }
-        } catch (error) {
-          console.error("Session check error")
-          setManualRedirect(true)
-        }
-      }
-
-      checkSession()
+      // 直接ダッシュボードにリダイレクト
+      window.location.href = "/dashboard"
     }
-  }, [state.status, router, isRedirecting, retryCount])
+  }, [state.status, isRedirecting])
 
   if (isRedirecting) {
     return (
       <div className="text-center py-8 space-y-6">
         <div className="py-4">
-          <p className="text-lg mb-2">
-            {manualRedirect
-              ? "自動リダイレクトに失敗しました。以下のリンクをクリックしてください。"
-              : "ログインに成功しました。ダッシュボードにリダイレクトしています..."}
-          </p>
-          {!manualRedirect && (
-            <div className="animate-spin w-8 h-8 border-4 border-manary-pink border-t-transparent rounded-full mx-auto"></div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            {manualRedirect
-              ? "以下のリンクからページに移動してください："
-              : "リダイレクトされない場合は、以下のリンクをクリックしてください："}
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="/dashboard"
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-manary-pink text-white rounded-md hover:bg-[#f78989] transition-colors"
-            >
-              <Home className="h-4 w-4" />
-              <span>ダッシュボード</span>
-            </a>
-
-            <a
-              href="/dashboard/schedule-settings"
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-manary-green text-white rounded-md hover:bg-[#6a946c] transition-colors"
-            >
-              <Calendar className="h-4 w-4" />
-              <span>予約設定画面</span>
-            </a>
-          </div>
+          <p className="text-lg mb-2">ログインに成功しました。ダッシュボードにリダイレクトしています...</p>
+          <div className="animate-spin w-8 h-8 border-4 border-manary-pink border-t-transparent rounded-full mx-auto"></div>
         </div>
       </div>
     )

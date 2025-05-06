@@ -112,6 +112,7 @@ export interface Database {
           is_available: boolean
           created_at: string
           updated_at: string
+          end_date: string | null
         }
         Insert: {
           id?: number
@@ -123,6 +124,7 @@ export interface Database {
           is_available?: boolean
           created_at?: string
           updated_at?: string
+          end_date?: string | null
         }
         Update: {
           id?: number
@@ -134,6 +136,7 @@ export interface Database {
           is_available?: boolean
           created_at?: string
           updated_at?: string
+          end_date?: string | null
         }
         Relationships: [
           {

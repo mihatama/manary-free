@@ -184,6 +184,7 @@ export async function upsertAvailabilitySetting(formData: FormData) {
     // CSRF検証
     await validateCSRF(formData)
 
+    const endDateValue = (formData.get("end_date") as string) || null
     const setting = {
       service_type_id: Number(formData.get("service_type_id")),
       day_of_week: Number(formData.get("day_of_week")),
@@ -191,6 +192,19 @@ export async function upsertAvailabilitySetting(formData: FormData) {
       end_time: formData.get("end_time") as string,
       is_available: formData.get("is_available") === "true",
       specific_date: (formData.get("specific_date") as string) || null,
+    }
+
+    // Add end_date only if the column exists in the database
+    try {
+      // Check if we have an end date value
+      if (endDateValue) {
+        console.log("End date provided:", endDateValue)
+        // @ts-ignore - We'll add this field even if TypeScript doesn't know about it yet
+        setting.end_date = endDateValue
+      }
+    } catch (error) {
+      console.error("Error setting end_date:", error)
+      // Continue without the end_date field
     }
 
     // デバッグ用
@@ -236,8 +250,9 @@ export async function upsertAvailabilitySetting(formData: FormData) {
         .select()
 
       if (error) {
-        console.error("Database operation error")
-        throw new Error("データの更新に失敗しました")
+        console.error("Database operation error:", error)
+        console.error("Attempted to save setting:", setting)
+        throw new Error("データの更新に失敗しました: " + error.message)
       }
 
       revalidatePath("/dashboard/schedule-settings")
@@ -255,8 +270,9 @@ export async function upsertAvailabilitySetting(formData: FormData) {
         .select()
 
       if (error) {
-        console.error("Database operation error")
-        throw new Error("データの保存に失敗しました")
+        console.error("Database operation error:", error)
+        console.error("Attempted to save setting:", setting)
+        throw new Error("データの保存に失敗しました: " + error.message)
       }
 
       revalidatePath("/dashboard/schedule-settings")

@@ -1,14 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Clock, CalendarIcon } from "lucide-react"
+import { Plus, Trash2, Clock, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format } from "date-fns"
+import { format, addMonths, subMonths } from "date-fns"
 import { ja } from "date-fns/locale"
 import {
   getAvailabilitySettings,
@@ -35,6 +33,8 @@ const DAYS_OF_WEEK = [
   { value: 6, label: "土曜日" },
 ]
 
+const DAYS_OF_WEEK_SHORT = ["日", "月", "火", "水", "木", "金", "土"]
+
 const TIME_OPTIONS = Array.from({ length: 24 * 4 }).map((_, i) => {
   const hour = Math.floor(i / 4)
   const minute = (i % 4) * 15
@@ -43,6 +43,165 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }).map((_, i) => {
     label: `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`,
   }
 })
+
+// SimpleCalendarコンポーネントを更新して折りたたみ機能を追加します
+function SimpleCalendar({
+  selectedDate,
+  onSelectDate,
+  disablePastDates = true,
+}: {
+  selectedDate: Date | undefined
+  onSelectDate: (date: Date) => void
+  disablePastDates?: boolean
+}) {
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [isOpen, setIsOpen] = useState(false)
+
+  // 月を前後に移動する関数
+  const goToPreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
+  const goToNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
+
+  // 現在の月のカレンダーデータを生成
+  const generateCalendarDays = () => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+
+    // 月の最初の日
+    const firstDayOfMonth = new Date(year, month, 1)
+    // 月の最後の日
+    const lastDayOfMonth = new Date(year, month + 1, 0)
+
+    // 最初の日の曜日（0: 日曜日, 1: 月曜日, ...）
+    const firstDayOfWeek = firstDayOfMonth.getDay()
+
+    // カレンダーに表示する日数（前月の日 + 当月の日 + 次月の日）
+    const daysInMonth = lastDayOfMonth.getDate()
+
+    // 前月の日を追加
+    const prevMonthDays = []
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      const day = new Date(year, month, 0 - i)
+      prevMonthDays.unshift(day)
+    }
+
+    // 当月の日を追加
+    const currentMonthDays = []
+    for (let i = 1; i <= daysInMonth; i++) {
+      currentMonthDays.push(new Date(year, month, i))
+    }
+
+    // 次月の日を追加（6週間分になるように）
+    const nextMonthDays = []
+    const totalDays = prevMonthDays.length + currentMonthDays.length
+    const remainingDays = 42 - totalDays // 6週間 = 42日
+
+    for (let i = 1; i <= remainingDays; i++) {
+      nextMonthDays.push(new Date(year, month + 1, i))
+    }
+
+    return [...prevMonthDays, ...currentMonthDays, ...nextMonthDays]
+  }
+
+  const calendarDays = generateCalendarDays()
+
+  // 日付が選択可能かどうかを判定
+  const isDateDisabled = (date: Date) => {
+    if (!disablePastDates) return false
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return date < today
+  }
+
+  // 日付が現在の月かどうかを判定
+  const isCurrentMonth = (date: Date) => {
+    return date.getMonth() === currentMonth.getMonth()
+  }
+
+  // 日付が選択されているかどうかを判定
+  const isSelected = (date: Date) => {
+    if (!selectedDate) return false
+    return (
+      date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear()
+    )
+  }
+
+  // カレンダーを開閉するトグル関数
+  const toggleCalendar = () => {
+    setIsOpen(!isOpen)
+  }
+
+  // 日付を選択したときの処理
+  const handleSelectDate = (date: Date) => {
+    onSelectDate(date)
+    setIsOpen(false) // 日付を選択したらカレンダーを閉じる
+  }
+
+  return (
+    <div className="w-full max-w-sm">
+      <button
+        onClick={toggleCalendar}
+        className="w-full flex items-center justify-between p-2 border rounded-md bg-white hover:bg-gray-50"
+      >
+        <span>{selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : "日付を選択"}</span>
+        <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="mt-1 border rounded-md overflow-hidden bg-white shadow-md">
+          <div className="p-2 bg-gray-50 flex justify-between items-center">
+            <div className="font-medium">{format(currentMonth, "yyyy年M月", { locale: ja })}</div>
+            <div className="flex space-x-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPreviousMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-2">
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {DAYS_OF_WEEK_SHORT.map((day, index) => (
+                <div
+                  key={index}
+                  className="text-center text-sm font-medium text-gray-500 h-8 flex items-center justify-center"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((date, index) => (
+                <button
+                  key={index}
+                  className={`
+                    h-8 w-full flex items-center justify-center rounded-sm text-sm
+                    ${isSelected(date) ? "bg-blue-500 text-white" : ""}
+                    ${!isCurrentMonth(date) ? "text-gray-400" : ""}
+                    ${isDateDisabled(date) ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}
+                  `}
+                  onClick={() => !isDateDisabled(date) && handleSelectDate(date)}
+                  disabled={isDateDisabled(date)}
+                >
+                  {date.getDate()}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedDate && (
+        <div className="mt-2 text-sm">終了日: {format(selectedDate, "yyyy年MM月dd日", { locale: ja })}</div>
+      )}
+    </div>
+  )
+}
 
 export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProps) {
   const [availabilitySettings, setAvailabilitySettings] = useState<AvailabilitySetting[]>([])
@@ -54,12 +213,12 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
   const [newDayOfWeek, setNewDayOfWeek] = useState<string>("1") // デフォルトは月曜日
   const [newStartTime, setNewStartTime] = useState<string>("09:00")
   const [newEndTime, setNewEndTime] = useState<string>("17:00")
+  const [weeklyEndDate, setWeeklyEndDate] = useState<Date | undefined>(undefined)
 
   // 特定日付ベースの設定用の状態
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [specificStartTime, setSpecificStartTime] = useState<string>("09:00")
   const [specificEndTime, setSpecificEndTime] = useState<string>("17:00")
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   const [isAdding, setIsAdding] = useState(false)
 
@@ -126,14 +285,32 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
       formData.append("start_time", newStartTime)
       formData.append("end_time", newEndTime)
       formData.append("is_available", "true")
-      // specific_dateはnullのままで送信
+
+      // 終了日を追加
+      if (weeklyEndDate) {
+        console.log("Adding end date to form:", format(weeklyEndDate, "yyyy-MM-dd"))
+        formData.append("end_date", format(weeklyEndDate, "yyyy-MM-dd"))
+      }
 
       const newSetting = await upsertAvailabilitySetting(formData)
       setAvailabilitySettings([...availabilitySettings, newSetting])
       setError(null)
-    } catch (err) {
-      console.error("Availability setting error")
-      setError("予約可能時間の追加に失敗しました。もう一度お試しください。")
+
+      // 成功メッセージを表示
+      if (weeklyEndDate) {
+        const endDateStr = format(weeklyEndDate, "yyyy年MM月dd日", { locale: ja })
+        setError(
+          `${DAYS_OF_WEEK.find((d) => d.value.toString() === newDayOfWeek)?.label}の予約枠を${endDateStr}まで追加しました`,
+        )
+        setTimeout(() => setError(null), 3000)
+      } else {
+        setError("予約枠を追加しました")
+        setTimeout(() => setError(null), 3000)
+      }
+    } catch (err: any) {
+      console.error("Availability setting error:", err)
+      // エラーメッセージをより詳細に表示
+      setError(`予約可能時間の追加に失敗しました: ${err.message || "不明なエラー"}`)
     } finally {
       setIsAdding(false)
     }
@@ -160,9 +337,6 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
       // 日付をYYYY-MM-DD形式に変換
       const formattedDate = format(selectedDate, "yyyy-MM-dd")
 
-      // デバッグ用
-      console.log("特定日の予約枠を追加:", formattedDate, specificStartTime, specificEndTime)
-
       // 重複チェック
       const hasOverlap = availabilitySettings.some(
         (setting) =>
@@ -187,11 +361,9 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
       formData.append("specific_date", formattedDate)
 
       const newSetting = await upsertAvailabilitySetting(formData)
-      console.log("追加された特定日の設定:", newSetting) // デバッグ用
 
       // 新しい設定を追加
       setAvailabilitySettings([...availabilitySettings, newSetting])
-      setSelectedDate(undefined) // 日付選択をリセット
       setError(null)
     } catch (err) {
       console.error("Specific date availability setting error")
@@ -270,7 +442,7 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
               <CardTitle className="text-base">新しい予約可能時間を追加（毎週）</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1 block">曜日</label>
                   <Select value={newDayOfWeek} onValueChange={setNewDayOfWeek}>
@@ -316,6 +488,16 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
                     </SelectContent>
                   </Select>
                 </div>
+                {/* 毎週の予約枠の部分を更新 */}
+                {/* 「いつまで設定」の部分を更新します */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">いつまで設定</label>
+                  <SimpleCalendar
+                    selectedDate={weeklyEndDate}
+                    onSelectDate={setWeeklyEndDate}
+                    disablePastDates={true}
+                  />
+                </div>
                 <div className="flex items-end">
                   <Button
                     onClick={handleAddWeeklyAvailability}
@@ -357,6 +539,11 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
                                 <Clock className="h-4 w-4 mr-2 text-gray-500" />
                                 <span>
                                   {setting.start_time.substring(0, 5)} - {setting.end_time.substring(0, 5)}
+                                  {setting.end_date && (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      ({format(new Date(setting.end_date), "yyyy/MM/dd")}まで)
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                               <Button
@@ -392,38 +579,10 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* 特定日の予約枠の部分も同様に更新 */}
                 <div>
                   <label className="text-sm font-medium mb-1 block">日付</label>
-                  <div className="relative">
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          onClick={() => setIsCalendarOpen(true)}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate ? (
-                            format(selectedDate, "yyyy年MM月dd日", { locale: ja })
-                          ) : (
-                            <span>日付を選択</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(date) => {
-                            setSelectedDate(date)
-                            setIsCalendarOpen(false)
-                          }}
-                          initialFocus
-                          locale={ja}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <SimpleCalendar selectedDate={selectedDate} onSelectDate={setSelectedDate} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">開始時間</label>

@@ -242,6 +242,11 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
           const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
           if (!serviceType) return
 
+          // 終了日のチェックを追加
+          if (setting.end_date && new Date(setting.end_date) < day.toDate()) {
+            return // 終了日を過ぎている場合はスキップ
+          }
+
           // 開始時間と終了時間を解析
           const [startHour, startMinute] = setting.start_time.split(":").map(Number)
           const [endHour, endMinute] = setting.end_time.split(":").map(Number)
