@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { CSRFForm } from "@/components/csrf-form" // 修正: CsrfForm → CSRFForm
-import { submitQuestionnaire } from "@/app/actions/questionnaire-actions"
-import { createReservation } from "@/app/actions/reservation-actions"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { CSRFForm } from "@/components/csrf-form"
+import { createQuestionnaireAndReservation } from "@/app/actions/questionnaire-actions"
 
 interface MedicalQuestionnaireFormProps {
   phoneNumber: string
@@ -38,54 +38,59 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
       // 問診票データを作成
       const questionnaireData = {
         phoneNumber,
-        name: formData.get("name") as string,
-        birthdate: formData.get("birthdate") as string,
-        gender: formData.get("gender") as string,
-        address: formData.get("address") as string,
+
+        // 受診場所
+        locationNishinomiya: formData.get("locationNishinomiya") === "on",
+        locationTakarazuka: formData.get("locationTakarazuka") === "on",
+        locationNihonbashi: formData.get("locationNihonbashi") === "on",
+        locationAichi: formData.get("locationAichi") === "on",
+        locationVisit: formData.get("locationVisit") === "on",
+
+        // ママ情報
+        motherLastName: formData.get("motherLastName") as string,
+        motherFirstName: formData.get("motherFirstName") as string,
+        motherLastNameKana: formData.get("motherLastNameKana") as string,
+        motherFirstNameKana: formData.get("motherFirstNameKana") as string,
+        motherBirthYear: Number.parseInt(formData.get("motherBirthYear") as string) || null,
+        motherBirthMonth: Number.parseInt(formData.get("motherBirthMonth") as string) || null,
+        motherBirthDay: Number.parseInt(formData.get("motherBirthDay") as string) || null,
+
+        // お子様情報
+        childLastName: formData.get("childLastName") as string,
+        childFirstName: formData.get("childFirstName") as string,
+        childLastNameKana: formData.get("childLastNameKana") as string,
+        childFirstNameKana: formData.get("childFirstNameKana") as string,
+        childBirthYear: Number.parseInt(formData.get("childBirthYear") as string) || null,
+        childBirthMonth: Number.parseInt(formData.get("childBirthMonth") as string) || null,
+        childBirthDay: Number.parseInt(formData.get("childBirthDay") as string) || null,
+        childNumber: Number.parseInt(formData.get("childNumber") as string) || null,
+        childGender: formData.get("childGender") as string,
+
+        // お仕事について
+        occupation: formData.get("occupation") as string,
+        isOnMaternityLeave: formData.get("isOnMaternityLeave") === "on",
+        hasResigned: formData.get("hasResigned") === "on",
+
+        // 予約関連情報
         email: formData.get("email") as string,
-        emergencyContact: formData.get("emergencyContact") as string,
-        medicalHistory: formData.get("medicalHistory") as string,
-        currentMedications: formData.get("currentMedications") as string,
-        allergies: formData.get("allergies") as string,
-        hasInsurance: formData.get("hasInsurance") === "on",
-        insuranceDetails: formData.get("insuranceDetails") as string,
+        notes: formData.get("notes") as string,
+
+        // 予約データ
+        reservationData,
       }
 
       console.log("問診票データ", questionnaireData)
 
-      // 問診票を送信
-      const result = await submitQuestionnaire(questionnaireData)
-      console.log("問診票送信結果", result)
+      // 問診票と予約を同時に作成
+      const result = await createQuestionnaireAndReservation(questionnaireData)
+      console.log("問診票と予約の作成結果", result)
 
       if (!result.success) {
-        throw new Error(result.error || "問診票の送信に失敗しました")
-      }
-
-      // 予約データを作成
-      const reservationFormData = {
-        clinicId: reservationData.clinicId,
-        serviceTypeId: reservationData.serviceTypeId,
-        date: reservationData.date,
-        startTime: reservationData.startTime,
-        endTime: reservationData.endTime,
-        patientName: questionnaireData.name,
-        phoneNumber,
-        email: questionnaireData.email,
-        notes: formData.get("notes") as string,
-      }
-
-      console.log("予約データ", reservationFormData)
-
-      // 予約を作成
-      const reservationResult = await createReservation(reservationFormData)
-      console.log("予約作成結果", reservationResult)
-
-      if (!reservationResult.success) {
-        throw new Error(reservationResult.error || "予約の作成に失敗しました")
+        throw new Error(result.error || "問診票と予約の作成に失敗しました")
       }
 
       // 予約確認ページにリダイレクト
-      router.push(`/reservation/confirmation?id=${reservationResult.reservationId}`)
+      router.push(`/reservation/confirmation?id=${result.reservationId}`)
     } catch (err) {
       console.error("問診票送信エラー:", err)
       setError(err instanceof Error ? err.message : "問診票の送信中にエラーが発生しました")
@@ -100,104 +105,234 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <CSRFForm action={handleSubmit} className="space-y-6">
+      <CSRFForm action={handleSubmit} className="space-y-8">
+        {/* 受診場所 */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-800">基本情報</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                お名前 <span className="text-red-500">*</span>
-              </Label>
-              <Input id="name" name="name" required placeholder="山田 花子" />
+          <h2 className="text-xl font-semibold text-[#f8a0a0]">
+            受診場所 <span className="text-red-500">*</span>
+          </h2>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox id="locationNishinomiya" name="locationNishinomiya" />
+              <Label htmlFor="locationNishinomiya">西宮</Label>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="birthdate">
-                生年月日 <span className="text-red-500">*</span>
-              </Label>
-              <Input id="birthdate" name="birthdate" type="date" required />
+            <div className="flex items-center space-x-2">
+              <Checkbox id="locationTakarazuka" name="locationTakarazuka" />
+              <Label htmlFor="locationTakarazuka">宝塚</Label>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="gender">
-              性別 <span className="text-red-500">*</span>
-            </Label>
-            <select id="gender" name="gender" required className="w-full p-2 border border-gray-300 rounded-md">
-              <option value="">選択してください</option>
-              <option value="female">女性</option>
-              <option value="male">男性</option>
-              <option value="other">その他</option>
-              <option value="prefer_not_to_say">回答しない</option>
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">
-              住所 <span className="text-red-500">*</span>
-            </Label>
-            <Input id="address" name="address" required placeholder="東京都渋谷区〇〇 1-2-3" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">
-                メールアドレス <span className="text-red-500">*</span>
-              </Label>
-              <Input id="email" name="email" type="email" required placeholder="example@email.com" />
+            <div className="flex items-center space-x-2">
+              <Checkbox id="locationNihonbashi" name="locationNihonbashi" />
+              <Label htmlFor="locationNihonbashi">日本橋</Label>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="emergencyContact">緊急連絡先</Label>
-              <Input id="emergencyContact" name="emergencyContact" placeholder="090-1234-5678（続柄）" />
+            <div className="flex items-center space-x-2">
+              <Checkbox id="locationAichi" name="locationAichi" />
+              <Label htmlFor="locationAichi">愛知</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="locationVisit" name="locationVisit" />
+              <Label htmlFor="locationVisit">訪問</Label>
             </div>
           </div>
         </div>
 
+        {/* ママ情報 */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-800">医療情報</h2>
+          <h2 className="text-xl font-semibold text-[#f8a0a0]">ママ情報</h2>
 
-          <div className="space-y-2">
-            <Label htmlFor="medicalHistory">既往歴</Label>
-            <Textarea
-              id="medicalHistory"
-              name="medicalHistory"
-              placeholder="過去にかかった病気や手術歴などがあればご記入ください"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="motherLastName">
+                姓（漢字） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="motherLastName" name="motherLastName" required placeholder="山田" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="motherFirstName">
+                名（漢字） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="motherFirstName" name="motherFirstName" required placeholder="花子" />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="currentMedications">現在服用中の薬</Label>
-            <Textarea
-              id="currentMedications"
-              name="currentMedications"
-              placeholder="現在服用中の薬があればご記入ください"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="motherLastNameKana">
+                ふりがな（姓） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="motherLastNameKana" name="motherLastNameKana" required placeholder="やまだ" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="motherFirstNameKana">
+                ふりがな（名） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="motherFirstNameKana" name="motherFirstNameKana" required placeholder="はなこ" />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="allergies">アレルギー</Label>
-            <Textarea id="allergies" name="allergies" placeholder="薬や食べ物のアレルギーがあればご記入ください" />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox id="hasInsurance" name="hasInsurance" />
-            <Label htmlFor="hasInsurance">健康保険を使用する</Label>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="insuranceDetails">保険情報</Label>
-            <Input id="insuranceDetails" name="insuranceDetails" placeholder="保険証の種類や番号など" />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="motherBirthYear">
+                生年（西暦） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="motherBirthYear" name="motherBirthYear" type="number" required placeholder="1990" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="motherBirthMonth">
+                月 <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="motherBirthMonth"
+                name="motherBirthMonth"
+                type="number"
+                min="1"
+                max="12"
+                required
+                placeholder="1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="motherBirthDay">
+                日 <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="motherBirthDay"
+                name="motherBirthDay"
+                type="number"
+                min="1"
+                max="31"
+                required
+                placeholder="1"
+              />
+            </div>
           </div>
         </div>
 
+        {/* お子様情報 */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-800">予約に関する備考</h2>
+          <h2 className="text-xl font-semibold text-[#f8a0a0]">お子様情報</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="childLastName">
+                姓（漢字） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="childLastName" name="childLastName" required placeholder="山田" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="childFirstName">
+                名（漢字） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="childFirstName" name="childFirstName" required placeholder="太郎" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="childLastNameKana">
+                ふりがな（姓） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="childLastNameKana" name="childLastNameKana" required placeholder="やまだ" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="childFirstNameKana">
+                ふりがな（名） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="childFirstNameKana" name="childFirstNameKana" required placeholder="たろう" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="childBirthYear">
+                生年（西暦） <span className="text-red-500">*</span>
+              </Label>
+              <Input id="childBirthYear" name="childBirthYear" type="number" required placeholder="2023" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="childBirthMonth">
+                月 <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="childBirthMonth"
+                name="childBirthMonth"
+                type="number"
+                min="1"
+                max="12"
+                required
+                placeholder="1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="childBirthDay">
+                日 <span className="text-red-500">*</span>
+              </Label>
+              <Input id="childBirthDay" name="childBirthDay" type="number" min="1" max="31" required placeholder="1" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="childNumber">
+                第（）子 <span className="text-red-500">*</span>
+              </Label>
+              <Input id="childNumber" name="childNumber" type="number" min="1" required placeholder="1" />
+            </div>
+          </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">備考</Label>
-            <Textarea id="notes" name="notes" placeholder="予約に関する特別な要望や質問があればご記入ください" />
+            <Label>
+              お子様の性別 <span className="text-red-500">*</span>
+            </Label>
+            <RadioGroup name="childGender" className="flex space-x-4" defaultValue="男児">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="男児" id="male" />
+                <Label htmlFor="male">男児</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="女児" id="female" />
+                <Label htmlFor="female">女児</Label>
+              </div>
+            </RadioGroup>
+          </div>
+        </div>
+
+        {/* お仕事について */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-[#f8a0a0]">お仕事について</h2>
+
+          <div className="space-y-2">
+            <Label htmlFor="occupation">どのようなお仕事をしていますか？</Label>
+            <Textarea id="occupation" name="occupation" placeholder="例：事務職、看護師、主婦など" />
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox id="isOnMaternityLeave" name="isOnMaternityLeave" />
+              <Label htmlFor="isOnMaternityLeave">産休育休を休んでいる</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="hasResigned" name="hasResigned" />
+              <Label htmlFor="hasResigned">退職した</Label>
+            </div>
+          </div>
+        </div>
+
+        {/* 連絡先情報 */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-[#f8a0a0]">連絡先情報</h2>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">
+              メールアドレス <span className="text-red-500">*</span>
+            </Label>
+            <Input id="email" name="email" type="email" required placeholder="example@email.com" />
+          </div>
+        </div>
+
+        {/* 備考 */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-[#f8a0a0]">備考</h2>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">予約に関する特別な要望や質問があればご記入ください</Label>
+            <Textarea id="notes" name="notes" placeholder="例：授乳室の利用希望、アレルギーがあるなど" />
           </div>
         </div>
 

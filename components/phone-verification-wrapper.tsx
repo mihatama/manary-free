@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { PhoneVerification } from "./phone-verification"
+import { PhoneVerification } from "@/components/phone-verification"
 
 interface PhoneVerificationWrapperProps {
   clinicId: string
@@ -24,8 +24,9 @@ export function PhoneVerificationWrapper({
 
   const handleVerified = (phoneNumber: string) => {
     // 認証完了後、同じページに電話番号を付けてリダイレクト
-    const url = `/reservation/new?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&date=${date}&startTime=${startTime}&endTime=${endTime}&phone=${phoneNumber}&verified=true`
-    window.location.href = url
+    router.push(
+      `/reservation/new?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&date=${date}&startTime=${startTime}&endTime=${endTime}&phone=${phoneNumber}&verified=true`,
+    )
   }
 
   return <PhoneVerification onVerified={handleVerified} buttonText={buttonText} />
