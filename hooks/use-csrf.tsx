@@ -13,11 +13,13 @@ export function useCSRF() {
       try {
         setIsLoading(true)
         // Add a cache-busting parameter to prevent caching
-        const response = await fetch(`/api/csrf?t=${Date.now()}`, {
+        const timestamp = Date.now()
+        const response = await fetch(`/api/csrf?t=${timestamp}`, {
           cache: "no-store",
           headers: {
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             Pragma: "no-cache",
+            Expires: "0",
           },
         })
 

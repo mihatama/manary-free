@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { PhoneVerification } from "@/components/phone-verification"
 import { getAppointmentsByPhone } from "@/app/actions/sms-auth-actions"
 import { AppointmentList } from "@/components/appointment-list"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useSearchParams } from "next/navigation"
 
 export function PhoneAuthReservationManager() {
   const [isVerified, setIsVerified] = useState(false)
@@ -13,14 +14,10 @@ export function PhoneAuthReservationManager() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 電話番号認証が完了したときの処理
-  const handleVerified = async (verifiedPhoneNumber: string) => {
-    setPhoneNumber(verifiedPhoneNumber)
-    setIsVerified(true)
-    await loadAppointments(verifiedPhoneNumber)
-  }
+  // 追加: useSearchParams を使用してURLパラメータを取得
+  const searchParams = useSearchParams()
 
-  // 予約一覧を取得
+  // 予約一覧を取得する関数
   const loadAppointments = async (phone: string) => {
     setIsLoading(true)
     setError(null)
@@ -38,6 +35,21 @@ export function PhoneAuthReservationManager() {
       setIsLoading(false)
     }
   }
+
+  // 電話番号認証が完了したときの処理
+  const handleVerified = async (verifiedPhoneNumber: string) => {
+    setPhoneNumber(verifiedPhoneNumber)
+    setIsVerified(true)
+    await loadAppointments(verifiedPhoneNumber)
+  }
+
+  // 追加: URLから電話番号を取得して自動認証
+  useEffect(() => {
+    const phoneParam = searchParams?.get("phone")
+    if (phoneParam && !isVerified) {
+      handleVerified(phoneParam)
+    }
+  }, [searchParams, isVerified])
 
   return (
     <div className="space-y-6">

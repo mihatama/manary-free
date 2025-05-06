@@ -1,4 +1,5 @@
 import { PhoneAuthReservationManager } from "@/components/phone-auth-reservation-manager"
+import { DevAuthBypass } from "@/components/dev-auth-bypass"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -12,7 +13,7 @@ export default function ManagePage() {
             <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
           </div>
           <div>
-            <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
+            <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline mr-4">
               新規予約
             </Link>
           </div>
@@ -22,6 +23,17 @@ export default function ManagePage() {
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">予約の確認・変更</h1>
+
+          {/* 開発環境用の認証バイパス */}
+          {process.env.NODE_ENV !== "production" && (
+            <DevAuthBypass
+              onLogin={(phone) => {
+                // 開発環境では直接電話番号を渡して認証済みとする
+                window.location.href = `/reservation/manage?phone=${encodeURIComponent(phone)}`
+              }}
+            />
+          )}
+
           <PhoneAuthReservationManager />
         </div>
       </main>

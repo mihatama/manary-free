@@ -11,27 +11,29 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarTimePicker } from "@/components/calendar-time-picker"
+import { CalendarReservation } from "@/components/calendar-reservation"
 import { createAppointment } from "@/app/actions/reservation-actions"
-import { getClinics, getServiceTypes, getAvailableTimeSlots } from "@/app/actions/schedule-actions"
+import { getClinics, getServiceTypes } from "@/app/actions/schedule-actions"
 import { PhoneVerification } from "@/components/phone-verification"
+import { useCSRF } from "@/hooks/use-csrf"
 
 export function ReservationForm() {
   const router = useRouter()
   const [clinics, setClinics] = useState<any[]>([])
+  const { csrfToken, isLoading: isLoadingCSRF, error: csrfError } = useCSRF()
   const [serviceTypes, setServiceTypes] = useState<any[]>([])
   const [selectedClinic, setSelectedClinic] = useState<string>("")
   const [selectedServiceType, setSelectedServiceType] = useState<string>("")
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [selectedTime, setSelectedTime] = useState<string | null>(null)
+  const [selectedTime, setSelectedTime] = useState<{ start: string; end: string } | null>(null)
   const [patientName, setPatientName] = useState("")
   const [patientPhone, setPatientPhone] = useState("")
   const [patientEmail, setPatientEmail] = useState("")
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isVerified, setIsVerified] = useState(false)
   const [verifiedPhone, setVerifiedPhone] = useState("")
+  const [activeTab, setActiveTab] = useState<string>("calendar")
 
   // クリニックを取得
   useEffect(() => {
@@ -73,32 +75,28 @@ export function ReservationForm() {
     fetchServiceTypes()
   }, [selectedClinic])
 
-  // 利用可能な時間枠を取得
+  // 開発環境では電話番号認証をスキップするオプションを追加します
   useEffect(() => {
-    if (!selectedServiceType || !selectedDate) return
-
-    const fetchTimeSlots = async () => {
-      try {
-        setIsLoading(true)
-        const formattedDate = format(selectedDate, "yyyy-MM-dd")
-        const slots = await getAvailableTimeSlots(Number(selectedServiceType), formattedDate)
-        setAvailableTimeSlots(slots)
-      } catch (error) {
-        console.error("時間枠取得エラー:", error)
-        setError("利用可能な時間枠の取得に失敗しました")
-      } finally {
-        setIsLoading(false)
-      }
+    if (process.env.NODE_ENV !== "production" && !isVerified) {
+      // 開発環境では自動的に認証済みとするオプション
+      // 必要に応じてコメントアウトを外してください
+      // setIsVerified(true);
+      // setVerifiedPhone("09012345678");
+      // setPatientPhone("09012345678");
     }
-
-    fetchTimeSlots()
-  }, [selectedServiceType, selectedDate])
+  }, [isVerified])
 
   // 電話番号認証が完了したときの処理
   const handleVerified = (phoneNumber: string) => {
     setIsVerified(true)
     setVerifiedPhone(phoneNumber)
     setPatientPhone(phoneNumber)
+  }
+
+  // カレンダーから日時が選択されたときの処理
+  const handleDateTimeSelect = (date: Date, startTime: string, endTime: string) => {
+    setSelectedDate(date)
+    setSelectedTime({ start: startTime, end: endTime })
   }
 
   // 予約を作成
@@ -111,6 +109,11 @@ export function ReservationForm() {
       return
     }
 
+    if (!csrfToken) {
+      setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
+      return
+    }
+
     if (!selectedClinic || !selectedServiceType || !selectedDate || !selectedTime || !patientName) {
       setError("すべての必須項目を入力してください")
       return
@@ -119,18 +122,13 @@ export function ReservationForm() {
     setIsLoading(true)
 
     try {
-      // 選択された時間枠から終了時間を取得
-      const selectedTimeSlot = availableTimeSlots.find((slot) => slot.startTime === selectedTime)
-      if (!selectedTimeSlot) {
-        throw new Error("選択された時間枠が見つかりません")
-      }
-
       const formData = new FormData()
+      formData.append("csrf_token", csrfToken)
       formData.append("clinic_id", selectedClinic)
       formData.append("service_type_id", selectedServiceType)
       formData.append("appointment_date", format(selectedDate, "yyyy-MM-dd"))
-      formData.append("start_time", selectedTimeSlot.startTime)
-      formData.append("end_time", selectedTimeSlot.endTime)
+      formData.append("start_time", selectedTime.start)
+      formData.append("end_time", selectedTime.end)
       formData.append("patient_name", patientName)
       formData.append("patient_phone", verifiedPhone)
       formData.append("patient_email", patientEmail)
@@ -138,7 +136,7 @@ export function ReservationForm() {
       const result = await createAppointment(formData)
 
       if (result.success) {
-        router.push(`/reservation/confirmation?phone=${encodeURIComponent(verifiedPhone)}`)
+        router.push(`/reservation/confirmation?token=${result.appointment.token}`)
       } else {
         setError(result.error || "予約の作成に失敗しました")
       }
@@ -168,49 +166,57 @@ export function ReservationForm() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="clinic">クリニック</Label>
-                <Select value={selectedClinic} onValueChange={setSelectedClinic}>
-                  <SelectTrigger id="clinic">
-                    <SelectValue placeholder="クリニックを選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clinics.map((clinic) => (
-                      <SelectItem key={clinic.id} value={clinic.id.toString()}>
-                        {clinic.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="clinic">クリニック</Label>
+                  <Select value={selectedClinic} onValueChange={setSelectedClinic}>
+                    <SelectTrigger id="clinic">
+                      <SelectValue placeholder="クリニックを選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clinics.map((clinic) => (
+                        <SelectItem key={clinic.id} value={clinic.id.toString()}>
+                          {clinic.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="service-type">診療種別</Label>
-                <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
-                  <SelectTrigger id="service-type">
-                    <SelectValue placeholder="診療種別を選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {serviceTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.name} ({type.duration}分)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label htmlFor="service-type">診療種別</Label>
+                  <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
+                    <SelectTrigger id="service-type">
+                      <SelectValue placeholder="診療種別を選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {serviceTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id.toString()}>
+                          {type.name} ({type.duration}分)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label>日時を選択</Label>
-                <CalendarTimePicker
-                  selectedDate={selectedDate}
-                  onDateChange={setSelectedDate}
-                  selectedTime={selectedTime}
-                  onTimeChange={setSelectedTime}
-                  availableTimeSlots={availableTimeSlots}
-                  serviceTypeId={selectedServiceType ? Number(selectedServiceType) : null}
+                <CalendarReservation
+                  clinicId={Number(selectedClinic)}
+                  serviceTypeId={Number(selectedServiceType)}
+                  onSelectDateTime={handleDateTimeSelect}
                 />
               </div>
+
+              {selectedDate && selectedTime && (
+                <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
+                  <p className="text-blue-700 font-medium">
+                    選択された日時: {format(selectedDate, "yyyy年MM月dd日(EEE)")} {selectedTime.start} -{" "}
+                    {selectedTime.end}
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="name">お名前</Label>
@@ -240,7 +246,11 @@ export function ReservationForm() {
                 />
               </div>
 
-              <Button type="submit" className="w-full bg-[#f8a0a0] hover:bg-[#f78989] text-white" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full bg-[#f8a0a0] hover:bg-[#f78989] text-white"
+                disabled={isLoading || isLoadingCSRF || !selectedDate || !selectedTime}
+              >
                 {isLoading ? "送信中..." : "予約する"}
               </Button>
             </form>

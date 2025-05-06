@@ -55,6 +55,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
       const response = await fetch("/api/send-verification-code", {
         method: "POST",
         body: formData,
+        cache: "no-store",
       })
 
       const data = await response.json()
@@ -114,6 +115,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
       const response = await fetch("/api/verify-code", {
         method: "POST",
         body: formData,
+        cache: "no-store",
       })
 
       console.log("API レスポンス受信: ステータス=" + response.status)
@@ -219,6 +221,18 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
             </>
           )}
         </div>
+        {process.env.NODE_ENV !== "production" && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <Button
+              variant="outline"
+              onClick={() => onVerified("09012345678")}
+              className="w-full text-blue-600 border-blue-300 hover:bg-blue-50"
+            >
+              開発用: 認証をスキップ
+            </Button>
+            <p className="text-xs text-center text-gray-500 mt-2">※開発環境でのみ表示されます</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
