@@ -62,7 +62,8 @@
     "@supabase/auth-helpers-nextjs": "latest",
     "react-big-calendar": "latest",
     "moment": "latest",
-    "crypto": "latest"
+    "crypto": "latest",
+    "twilio": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

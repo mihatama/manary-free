@@ -2,8 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { validateCSRFToken } from "@/lib/csrf"
 import { verifyCode } from "@/lib/twilio"
 
-export const dynamic = "force-dynamic"
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -24,14 +22,6 @@ export async function POST(request: NextRequest) {
     const normalizedPhone = phoneNumber.replace(/-/g, "")
 
     try {
-      // 開発環境または特定のエラーの場合は、6桁の数字なら成功とする
-      if (process.env.NODE_ENV !== "production" || process.env.MOCK_SMS === "true") {
-        if (/^\d{6}$/.test(code)) {
-          console.log("Using mock verification in development environment")
-          return NextResponse.json({ success: true })
-        }
-      }
-
       // Twilio Verify APIを使用して認証コードを検証
       const isVerified = await verifyCode(normalizedPhone, code)
 

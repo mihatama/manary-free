@@ -87,18 +87,8 @@ export async function getAvailabilitySettings(serviceTypeId: number) {
 }
 
 // 特定の日付と診療種別の利用可能な時間枠を取得
-export async function getAvailableTimeSlots(formData: FormData) {
+export async function getAvailableTimeSlots(serviceTypeId: number, date: string) {
   try {
-    // CSRF検証 - 公開ページからのアクセスの場合は検証をスキップ
-    const csrfToken = formData.get("csrf_token") as string
-    // CSRFトークンが提供されている場合のみ検証
-    if (csrfToken && !validateCSRFToken(csrfToken)) {
-      throw new Error("セキュリティトークンが無効です")
-    }
-
-    const serviceTypeId = Number(formData.get("service_type_id"))
-    const date = formData.get("date") as string
-
     // 診療種別の情報を取得
     const supabase = createClient()
     const { data: serviceType, error: serviceTypeError } = await supabase

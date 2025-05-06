@@ -1,24 +1,26 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState } from "react"
 import { PhoneVerification } from "@/components/phone-verification"
 import { getAppointmentsByPhone } from "@/app/actions/sms-auth-actions"
 import { AppointmentList } from "@/components/appointment-list"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useSearchParams } from "next/navigation"
 
-// Create a client component that uses useSearchParams
-function PhoneAuthContent() {
+export function PhoneAuthReservationManager() {
   const [isVerified, setIsVerified] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState("")
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // useSearchParams hook
-  const searchParams = useSearchParams()
+  // 電話番号認証が完了したときの処理
+  const handleVerified = async (verifiedPhoneNumber: string) => {
+    setPhoneNumber(verifiedPhoneNumber)
+    setIsVerified(true)
+    await loadAppointments(verifiedPhoneNumber)
+  }
 
-  // 予約一覧を取得する関数
+  // 予約一覧を取得
   const loadAppointments = async (phone: string) => {
     setIsLoading(true)
     setError(null)
@@ -36,21 +38,6 @@ function PhoneAuthContent() {
       setIsLoading(false)
     }
   }
-
-  // 電話番号認証が完了したときの処理
-  const handleVerified = async (verifiedPhoneNumber: string) => {
-    setPhoneNumber(verifiedPhoneNumber)
-    setIsVerified(true)
-    await loadAppointments(verifiedPhoneNumber)
-  }
-
-  // URLから電話番号を取得して自動認証
-  useEffect(() => {
-    const phoneParam = searchParams?.get("phone")
-    if (phoneParam && !isVerified) {
-      handleVerified(phoneParam)
-    }
-  }, [searchParams, isVerified])
 
   return (
     <div className="space-y-6">
@@ -87,14 +74,5 @@ function PhoneAuthContent() {
         </div>
       )}
     </div>
-  )
-}
-
-// Main component that wraps the content in Suspense
-export function PhoneAuthReservationManager() {
-  return (
-    <Suspense fallback={<div className="text-center py-8">読み込み中...</div>}>
-      <PhoneAuthContent />
-    </Suspense>
   )
 }

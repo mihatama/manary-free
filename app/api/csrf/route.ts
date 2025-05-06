@@ -2,8 +2,6 @@
 import { NextResponse } from "next/server"
 import { generateCSRFToken } from "@/lib/csrf"
 
-export const dynamic = "force-dynamic"
-
 export async function GET() {
   const csrfToken = generateCSRFToken()
 
@@ -11,7 +9,7 @@ export async function GET() {
     { csrfToken },
     {
       headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
         Pragma: "no-cache",
         Expires: "0",
       },
