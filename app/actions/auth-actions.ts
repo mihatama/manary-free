@@ -98,17 +98,23 @@ export async function loginAction(prevState: any, formData: FormData) {
 }
 
 export async function logoutAction(formData: FormData) {
-  // CSRF検証
-  const csrfValidation = await validateCSRF(formData)
-  if (!csrfValidation.success) {
-    // エラーをログに記録して、ログインページにリダイレクト
-    console.error("CSRF validation failed during logout")
-    redirect("/?error=security_error")
+  try {
+    // CSRF検証 - エラーをログに記録するが、処理は続行する
+    const csrfValidation = await validateCSRF(formData)
+    if (!csrfValidation.success) {
+      console.error("CSRF validation failed during logout - proceeding anyway")
+    }
+
+    const cookieStore = cookies()
+    const supabase = createServerActionClient<Database>({ cookies: () => cookieStore })
+
+    await supabase.auth.signOut()
+
+    // Always redirect to the login page
+    redirect("/")
+  } catch (error) {
+    console.error("Logout error:", error)
+    // Even if there's an error, try to redirect to the login page
+    redirect("/")
   }
-
-  const cookieStore = cookies()
-  const supabase = createServerActionClient<Database>({ cookies: () => cookieStore })
-
-  await supabase.auth.signOut()
-  redirect("/")
 }

@@ -21,6 +21,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(0)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const { csrfToken, isLoading: isLoadingCSRF } = useCSRF()
 
@@ -33,6 +34,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   // 認証コードを送信
   const handleSendCode = async () => {
     setError(null)
+    setSuccessMessage(null)
 
     if (!isValidPhoneNumber(phoneNumber)) {
       setError("有効な電話番号を入力してください")
@@ -40,7 +42,6 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
     }
 
     setIsSending(true)
-    console.log(`認証コード送信開始: 電話番号=${phoneNumber}`)
 
     try {
       const formData = new FormData()
@@ -49,21 +50,19 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
       // CSRFトークンがある場合のみ追加
       if (csrfToken) {
         formData.append("csrf_token", csrfToken)
-        console.log("CSRFトークンを追加しました")
       }
 
-      console.log("API リクエスト送信: /api/send-verification-code")
       const response = await fetch("/api/send-verification-code", {
         method: "POST",
         body: formData,
       })
 
-      console.log(`API レスポンス受信: ステータス=${response.status}`)
       const data = await response.json()
-      console.log("API レスポンスデータ:", data)
 
       if (data.success) {
         setIsCodeSent(true)
+        setSuccessMessage("認証コードを送信しました。SMSをご確認ください。")
+
         // カウントダウンを開始（60秒）
         setCountdown(60)
         const timer = setInterval(() => {
@@ -76,11 +75,10 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
           })
         }, 1000)
       } else {
-        console.error("認証コード送信エラー:", data.error)
         setError(data.error || "認証コードの送信に失敗しました")
       }
     } catch (err) {
-      console.error("認証コード送信例外:", err)
+      console.error("認証コード送信エラー:", err)
       setError("認証コードの送信に失敗しました")
     } finally {
       setIsSending(false)
@@ -90,6 +88,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   // 認証コードを検証
   const handleVerifyCode = async () => {
     setError(null)
+    setSuccessMessage(null)
 
     if (!verificationCode || verificationCode.length !== 6) {
       setError("6桁の認証コードを入力してください")
@@ -97,9 +96,10 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
     }
 
     setIsVerifying(true)
-    console.log(`認証コード検証開始: 電話番号=${phoneNumber}, コード=${verificationCode}`)
 
     try {
+      console.log("認証コード検証開始: 電話番号=" + phoneNumber + ", コード=" + verificationCode)
+
       const formData = new FormData()
       formData.append("phone_number", phoneNumber)
       formData.append("code", verificationCode)
@@ -116,21 +116,22 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         body: formData,
       })
 
-      console.log(`API レスポンス受信: ステータス=${response.status}`)
+      console.log("API レスポンス受信: ステータス=" + response.status)
       const data = await response.json()
       console.log("API レスポンスデータ:", data)
 
       if (data.success) {
         // 認証成功
-        console.log("認証成功")
-        onVerified(phoneNumber)
+        setSuccessMessage("電話番号認証が完了しました")
+        setTimeout(() => {
+          onVerified(phoneNumber)
+        }, 1000)
       } else {
-        console.error("認証コード検証エラー:", data.error)
         setError(data.error || "認証コードが無効です")
       }
-    } catch (err) {
-      console.error("認証コード検証例外:", err)
-      setError("認証に失敗しました")
+    } catch (err: any) {
+      console.error("認証コード検証エラー:", err.message || err)
+      setError("認証に失敗しました。もう一度お試しください。")
     } finally {
       setIsVerifying(false)
     }
@@ -148,6 +149,12 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {successMessage && (
+          <Alert className="mb-4 bg-green-50 border-green-200">
+            <AlertDescription className="text-green-700">{successMessage}</AlertDescription>
           </Alert>
         )}
 
@@ -173,6 +180,12 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
               >
                 {isSending ? "送信中..." : "認証コードを送信"}
               </Button>
+
+              {process.env.NODE_ENV !== "production" && (
+                <div className="mt-2 p-2 bg-yellow-50 rounded-md border border-yellow-200">
+                  <p className="text-xs text-yellow-700">開発環境では、コンソールに認証コードが表示されます。</p>
+                </div>
+              )}
             </>
           ) : (
             <>
