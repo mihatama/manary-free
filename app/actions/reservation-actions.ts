@@ -259,6 +259,11 @@ export async function createAppointment(formData: FormData) {
   }
 }
 
+// createReservation関数を追加（createAppointmentのエイリアス）
+export async function createReservation(formData: FormData) {
+  return createAppointment(formData)
+}
+
 // トークンで予約を取得
 export async function getAppointmentByToken(token: string) {
   const supabase = createClient()

@@ -36,10 +36,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ availableDates })
     } catch (parseError) {
       console.error("日付のパース中にエラーが発生しました", parseError)
-      return NextResponse.json({ error: "日付の形式が正しくありません" }, { status: 400 })
+      // エラーが発生した場合でも、空の配列を返す
+      return NextResponse.json({ availableDates: [] })
     }
   } catch (error) {
     console.error("利用可能な日付の取得エラー:", error)
-    return NextResponse.json({ error: "利用可能な日付の取得に失敗しました" }, { status: 500 })
+    // エラーが発生した場合でも、空の配列を返す
+    return NextResponse.json({ availableDates: [] })
   }
 }

@@ -1,18 +1,12 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { format } from "date-fns"
-import { ja } from "date-fns/locale"
-import { createAppointment } from "@/app/actions/reservation-actions"
-import { useCSRF } from "@/hooks/use-csrf"
+import { Textarea } from "@/components/ui/textarea"
+import { CSRFForm } from "@/components/csrf-form" // 修正: CsrfForm → CSRFForm
+import { createReservation } from "@/app/actions/reservation-actions"
 
 interface NewReservationFormProps {
   clinicId: number
@@ -31,124 +25,82 @@ export function NewReservationForm({
   endTime,
   phoneNumber,
 }: NewReservationFormProps) {
-  const [patientName, setPatientName] = useState("")
-  const [patientEmail, setPatientEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
   const router = useRouter()
-  const { csrfToken, isLoading: isLoadingCSRF } = useCSRF()
 
-  // 予約を作成
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true)
     setError(null)
 
-    if (!patientName) {
-      setError("お名前を入力してください")
-      return
-    }
-
-    if (!csrfToken) {
-      setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
-      return
-    }
-
-    setIsSubmitting(true)
-
     try {
-      const formData = new FormData()
-      formData.append("csrf_token", csrfToken)
-      formData.append("clinic_id", clinicId.toString())
-      formData.append("service_type_id", serviceTypeId.toString())
-      formData.append("appointment_date", date)
-      formData.append("start_time", startTime)
-      formData.append("end_time", endTime)
-      formData.append("patient_name", patientName)
-      formData.append("patient_phone", phoneNumber)
+      console.log("予約フォーム送信開始", { formData })
 
-      if (patientEmail) {
-        formData.append("patient_email", patientEmail)
+      // 予約データを作成
+      const reservationData = {
+        clinicId,
+        serviceTypeId,
+        date,
+        startTime,
+        endTime,
+        patientName: formData.get("name") as string,
+        phoneNumber,
+        email: formData.get("email") as string,
+        notes: formData.get("notes") as string,
       }
 
-      const result = await createAppointment(formData)
+      console.log("予約データ", reservationData)
 
-      if (result.success) {
-        router.push(`/reservation/confirmation?token=${result.appointment.token}`)
-      } else {
-        setError(result.error || "予約の作成に失敗しました")
+      // 予約を作成
+      const result = await createReservation(reservationData)
+      console.log("予約作成結果", result)
+
+      if (!result.success) {
+        throw new Error(result.error || "予約の作成に失敗しました")
       }
-    } catch (err: any) {
-      console.error("予約作成エラー:", err)
-      setError(err.message || "予約の作成に失敗しました")
+
+      // 予約確認ページにリダイレクト
+      router.push(`/reservation/confirmation?id=${result.reservationId}`)
+    } catch (err) {
+      console.error("予約フォーム送信エラー:", err)
+      setError(err instanceof Error ? err.message : "予約の作成中にエラーが発生しました")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // 日付をフォーマット
-  const formattedDate = format(new Date(date), "yyyy年MM月dd日(EEE)", { locale: ja })
-
   return (
-    <Card className="w-full shadow-md border-gray-100">
-      <CardHeader>
-        <CardTitle className="text-xl text-center text-gray-800">予約情報の確認</CardTitle>
-        <CardDescription className="text-center">以下の内容で予約を確定します</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <CSRFForm action={handleSubmit} className="space-y-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              お名前 <span className="text-red-500">*</span>
+            </label>
+            <Input id="name" name="name" required placeholder="山田 花子" />
+          </div>
 
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="font-medium mb-2">予約内容</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-            <div>
-              <span className="text-gray-500">日付:</span> {formattedDate}
-            </div>
-            <div>
-              <span className="text-gray-500">時間:</span> {startTime} - {endTime}
-            </div>
-            <div>
-              <span className="text-gray-500">電話番号:</span> {phoneNumber}
-            </div>
+          <div className="space-y-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              メールアドレス <span className="text-red-500">*</span>
+            </label>
+            <Input id="email" name="email" type="email" required placeholder="example@email.com" />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+              備考
+            </label>
+            <Textarea id="notes" name="notes" placeholder="予約に関する特別な要望や質問があればご記入ください" />
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">お名前</Label>
-            <Input
-              id="name"
-              value={patientName}
-              onChange={(e) => setPatientName(e.target.value)}
-              placeholder="例: 山田 花子"
-              required
-            />
-          </div>
+        {error && <div className="p-3 bg-red-100 text-red-700 rounded-md">{error}</div>}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">メールアドレス (任意)</Label>
-            <Input
-              id="email"
-              type="email"
-              value={patientEmail}
-              onChange={(e) => setPatientEmail(e.target.value)}
-              placeholder="例: example@example.com"
-            />
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full bg-[#f8a0a0] hover:bg-[#f78989] text-white"
-            disabled={isSubmitting || isLoadingCSRF}
-          >
-            {isSubmitting ? "送信中..." : "予約を確定する"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        <Button type="submit" disabled={isSubmitting} className="w-full bg-[#f8a0a0] hover:bg-[#f78b8b]">
+          {isSubmitting ? "送信中..." : "予約を確定する"}
+        </Button>
+      </CSRFForm>
+    </div>
   )
 }

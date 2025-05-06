@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { validateCSRFToken } from "@/lib/csrf"
-import { sendVerificationCode, verifyCode } from "@/lib/twilio"
+import { sendVerificationCode as sendTwilioVerificationCode, verifyCode as verifyTwilioCode } from "@/lib/twilio"
 
 // 認証コードを送信
 export async function sendVerificationCodeAction(formData: FormData) {
@@ -27,7 +27,7 @@ export async function sendVerificationCodeAction(formData: FormData) {
     }
 
     // 認証コードを送信
-    const success = await sendVerificationCode(phoneNumber)
+    const success = await sendTwilioVerificationCode(phoneNumber)
 
     if (!success) {
       throw new Error("認証コードの送信に失敗しました")
@@ -58,7 +58,7 @@ export async function verifyCodeAction(formData: FormData) {
     }
 
     // 認証コードを検証
-    const isVerified = await verifyCode(phoneNumber, code)
+    const isVerified = await verifyTwilioCode(phoneNumber, code)
 
     if (!isVerified) {
       throw new Error("認証コードが無効です")
@@ -105,5 +105,24 @@ export async function getAppointmentsByPhone(phoneNumber: string) {
   } catch (error) {
     console.error("Error in getAppointmentsByPhone:", error)
     throw new Error("予約情報の取得に失敗しました")
+  }
+}
+
+// エイリアス関数を追加
+export async function sendVerificationCode(phoneNumber: string) {
+  try {
+    return await sendTwilioVerificationCode(phoneNumber)
+  } catch (error) {
+    console.error("認証コード送信エラー:", error)
+    return false
+  }
+}
+
+export async function verifyCode(phoneNumber: string, code: string) {
+  try {
+    return await verifyTwilioCode(phoneNumber, code)
+  } catch (error) {
+    console.error("認証コード検証エラー:", error)
+    return false
   }
 }
