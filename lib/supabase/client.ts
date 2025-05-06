@@ -4,7 +4,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/lib/supabase/database.types"
 
 // グローバル変数としてクライアントインスタンスを保持
-let clientInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
+let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null = null
 
 // クライアントコンポーネント用のSupabaseクライアント
 // シングルトンパターンを使用して一貫したインスタンスを保証
@@ -15,33 +15,20 @@ export const getSupabaseBrowser = () => {
   }
 
   // 既存のインスタンスがあればそれを返す
-  if (clientInstance) {
-    return clientInstance
-  }
-
-  // 新しいインスタンスを作成
-  clientInstance = createClientComponentClient<Database>({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  })
-
-  return clientInstance
-}
-
-// Make sure the client is properly initialized as a singleton
-// Add this check at the top of the createClient function:
-
-let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null = null
-
-// 後方互換性のために残しておくが、内部では getSupabaseBrowser を使用
-export const createClient = () => {
   if (supabaseClient) {
     return supabaseClient
   }
 
-  const client = getSupabaseBrowser()
+  // 新しいインスタンスを作成
+  supabaseClient = createClientComponentClient<Database>({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  })
 
-  // Before returning, store the client
-  supabaseClient = clientInstance
-  return client
+  return supabaseClient
+}
+
+// 後方互換性のために残しておくが、内部では getSupabaseBrowser を使用
+export const createClient = () => {
+  return getSupabaseBrowser()
 }

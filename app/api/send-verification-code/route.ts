@@ -1,98 +1,92 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { validateCSRFToken } from "@/lib/csrf"
-
-// Mock SMS sending for development
-async function mockSendSMS(phoneNumber: string, message: string): Promise<boolean> {
-  console.log(`[DEV] SMS to ${phoneNumber}: ${message}`)
-  return true
-}
+import { generateVerificationCode, sendSMS } from "@/lib/twilio"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("Received verification code request")
+
     const formData = await request.formData()
     const phoneNumber = formData.get("phone_number") as string
     const csrfToken = formData.get("csrf_token") as string | null
 
+    console.log("Phone number received:", phoneNumber)
+
     // CSRFトークンがある場合のみ検証
     if (csrfToken && !validateCSRFToken(csrfToken)) {
+      console.error("CSRF token validation failed")
       return NextResponse.json({ success: false, error: "セキュリティトークンが無効です" }, { status: 403 })
     }
 
     if (!phoneNumber) {
+      console.error("Phone number missing in request")
       return NextResponse.json({ success: false, error: "電話番号が必要です" }, { status: 400 })
     }
 
     // 電話番号のフォーマットをチェック
     const phoneRegex = /^(0[0-9]{9,10}|0[0-9]{1,4}-[0-9]{1,4}-[0-9]{2,4})$/
     if (!phoneRegex.test(phoneNumber)) {
+      console.error("Invalid phone number format:", phoneNumber)
       return NextResponse.json({ success: false, error: "有効な日本の電話番号を入力してください" }, { status: 400 })
     }
 
     // ハイフンを削除して標準化
     const normalizedPhone = phoneNumber.replace(/-/g, "")
+    console.log("Normalized phone:", normalizedPhone)
 
-    // 6桁のランダムな認証コードを生成
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+    // 認証コードを生成
+    const code = generateVerificationCode()
 
-    // 有効期限を設定（10分後）
+    // 認証コードをデータベースに保存
+    const supabase = createClient()
+
+    // 有効期限を設定（10分）
     const expiresAt = new Date()
     expiresAt.setMinutes(expiresAt.getMinutes() + 10)
 
-    try {
-      // Supabaseに認証コードを保存
-      const supabase = createClient()
+    // 既存のコードを削除
+    await supabase.from("verification_codes").delete().eq("phone_number", normalizedPhone)
 
-      // 既存のコードを削除（同じ電話番号に対する古いコードを削除）
-      await supabase.from("verification_codes").delete().eq("phone_number", normalizedPhone)
+    // 新しいコードを保存
+    const { error: dbError } = await supabase.from("verification_codes").insert([
+      {
+        phone_number: normalizedPhone,
+        code: code,
+        expires_at: expiresAt.toISOString(),
+        created_at: new Date().toISOString(),
+      },
+    ])
 
-      // 新しいコードを保存
-      const { error } = await supabase.from("verification_codes").insert([
-        {
-          phone_number: normalizedPhone,
-          code: verificationCode,
-          expires_at: expiresAt.toISOString(),
-        },
-      ])
-
-      if (error) {
-        console.error("認証コード保存エラー:", error)
-        return NextResponse.json({ success: false, error: "認証コードの保存に失敗しました" }, { status: 500 })
-      }
-    } catch (dbError) {
-      console.error("データベースエラー:", dbError)
-      return NextResponse.json({ success: false, error: "データベース操作に失敗しました" }, { status: 500 })
+    if (dbError) {
+      console.error("Database error:", dbError)
+      return NextResponse.json({ success: false, error: "認証コードの保存に失敗しました" }, { status: 500 })
     }
 
-    try {
-      // SMSメッセージを作成
-      const message = `【マナリー】認証コード: ${verificationCode}\nこのコードは10分間有効です。`
-
-      // 開発環境ではモックSMS送信を使用
-      let smsSent = false
-
-      // Always use mock SMS in preview environment
-      smsSent = await mockSendSMS(normalizedPhone, message)
-
-      if (!smsSent) {
-        return NextResponse.json({ success: false, error: "SMSの送信に失敗しました" }, { status: 500 })
-      }
-
-      // 開発環境ではコンソールにコードを表示
-      console.log(`開発環境: 電話番号 ${normalizedPhone} に送信された認証コード: ${verificationCode}`)
-
+    // 開発環境では常にテストモードを使用
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[DEV MODE] Using test verification code:", code)
       return NextResponse.json({
         success: true,
-        message: "認証コードを送信しました",
-        // Only include the code in development/preview for testing
-        devCode: verificationCode,
+        message: `開発環境: テスト認証コード ${code} を使用してください`,
       })
-    } catch (smsError) {
-      console.error("SMS送信エラー:", smsError)
+    }
+
+    // SMSで認証コードを送信
+    const message = `【マナリー】認証コード: ${code}\nこのコードは10分間有効です。`
+    const smsResult = await sendSMS(normalizedPhone, message)
+
+    if (!smsResult.success) {
+      console.error("SMS sending failed:", smsResult.error)
       return NextResponse.json({ success: false, error: "SMSの送信に失敗しました" }, { status: 500 })
     }
+
+    return NextResponse.json({
+      success: true,
+      message: "認証コードを送信しました",
+    })
   } catch (error: any) {
-    console.error("認証コード送信エラー:", error)
+    console.error("Verification code sending error:", error)
     return NextResponse.json(
       {
         success: false,

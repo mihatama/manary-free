@@ -22,7 +22,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   const [error, setError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [devCode, setDevCode] = useState<string | null>(null)
+  const [isDevelopment, setIsDevelopment] = useState(false)
 
   const { csrfToken, isLoading: isLoadingCSRF } = useCSRF()
 
@@ -36,7 +36,6 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   const handleSendCode = async () => {
     setError(null)
     setSuccessMessage(null)
-    setDevCode(null)
 
     if (!isValidPhoneNumber(phoneNumber)) {
       setError("有効な電話番号を入力してください")
@@ -46,6 +45,8 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
     setIsSending(true)
 
     try {
+      console.log("Sending verification code to:", phoneNumber)
+
       const formData = new FormData()
       formData.append("phone_number", phoneNumber)
 
@@ -54,28 +55,32 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         formData.append("csrf_token", csrfToken)
       }
 
+      console.log("Sending request to /api/send-verification-code")
       const response = await fetch("/api/send-verification-code", {
         method: "POST",
         body: formData,
       })
 
-      let data
-      try {
-        data = await response.json()
-      } catch (jsonError) {
-        console.error("JSON parsing error:", jsonError)
-        const text = await response.text()
-        throw new Error(`Response is not valid JSON: ${text.substring(0, 100)}...`)
+      console.log("Response status:", response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Server error response:", errorText)
+        throw new Error(`サーバーエラー: ${response.status}`)
       }
+
+      const data = await response.json()
+      console.log("Response data:", data)
 
       if (data.success) {
         setIsCodeSent(true)
-        setSuccessMessage("認証コードを送信しました。SMSをご確認ください。")
 
-        // If we're in development and have a dev code, show it and auto-fill
-        if (data.devCode) {
-          setDevCode(data.devCode)
-          setVerificationCode(data.devCode)
+        // 開発環境の場合は特別なメッセージを表示
+        if (data.message && data.message.includes("開発環境")) {
+          setSuccessMessage(data.message)
+          setIsDevelopment(true)
+        } else {
+          setSuccessMessage(data.message || "認証コードを送信しました。SMSをご確認ください。")
         }
 
         // カウントダウンを開始（60秒）
@@ -90,12 +95,12 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
           })
         }, 1000)
       } else {
+        console.error("API error:", data.error)
         setError(data.error || "認証コードの送信に失敗しました")
-        console.error("API error details:", data.details || "No details provided")
       }
     } catch (err: any) {
       console.error("認証コード送信エラー:", err)
-      setError(`認証コードの送信に失敗しました: ${err.message || "Unknown error"}`)
+      setError(err.message || "認証コードの送信に失敗しました")
     } finally {
       setIsSending(false)
     }
@@ -114,6 +119,8 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
     setIsVerifying(true)
 
     try {
+      console.log("Verifying code for:", phoneNumber, "Code:", verificationCode)
+
       const formData = new FormData()
       formData.append("phone_number", phoneNumber)
       formData.append("code", verificationCode)
@@ -123,19 +130,22 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         formData.append("csrf_token", csrfToken)
       }
 
+      console.log("Sending request to /api/verify-code")
       const response = await fetch("/api/verify-code", {
         method: "POST",
         body: formData,
       })
 
-      let data
-      try {
-        data = await response.json()
-      } catch (jsonError) {
-        console.error("JSON parsing error:", jsonError)
-        const text = await response.text()
-        throw new Error(`Response is not valid JSON: ${text.substring(0, 100)}...`)
+      console.log("Response status:", response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Server error response:", errorText)
+        throw new Error(`サーバーエラー: ${response.status}`)
       }
+
+      const data = await response.json()
+      console.log("Response data:", data)
 
       if (data.success) {
         // 認証成功
@@ -144,20 +154,14 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
           onVerified(phoneNumber)
         }, 1000)
       } else {
+        console.error("API error:", data.error)
         setError(data.error || "認証コードが無効です")
       }
     } catch (err: any) {
       console.error("認証コード検証エラー:", err)
-      setError(`認証に失敗しました: ${err.message || "Unknown error"}`)
+      setError(err.message || "認証に失敗しました")
     } finally {
       setIsVerifying(false)
-    }
-  }
-
-  // For development: auto-fill the verification code
-  const handleAutoFill = () => {
-    if (devCode) {
-      setVerificationCode(devCode)
     }
   }
 
@@ -179,6 +183,14 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         {successMessage && (
           <Alert className="mb-4 bg-green-50 border-green-200">
             <AlertDescription className="text-green-700">{successMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        {isDevelopment && isCodeSent && (
+          <Alert className="mb-4 bg-blue-50 border-blue-200">
+            <AlertDescription className="text-blue-700">
+              開発環境では認証コード「123456」を使用してください
+            </AlertDescription>
           </Alert>
         )}
 
@@ -237,19 +249,6 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
             </>
           )}
         </div>
-
-        {/* Development mode helper */}
-        {devCode && (
-          <div className="mt-4 p-3 bg-yellow-50 rounded-md border border-yellow-200">
-            <p className="text-sm text-yellow-700 font-medium">開発モード: 認証コード</p>
-            <div className="flex items-center justify-between mt-1">
-              <code className="bg-white px-2 py-1 rounded text-sm">{devCode}</code>
-              <Button variant="outline" size="sm" onClick={handleAutoFill} className="text-xs">
-                自動入力
-              </Button>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
