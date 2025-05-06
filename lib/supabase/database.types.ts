@@ -3,6 +3,37 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          id: string
+          name: string
+          role: string
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id: string
+          name: string
+          role: string
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          role?: string
+          created_at?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinics: {
         Row: {
           id: number
@@ -10,7 +41,7 @@ export interface Database {
           address: string | null
           phone: string | null
           created_at: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           id?: number
@@ -18,7 +49,7 @@ export interface Database {
           address?: string | null
           phone?: string | null
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           id?: number
@@ -26,8 +57,9 @@ export interface Database {
           address?: string | null
           phone?: string | null
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
         }
+        Relationships: []
       }
       service_types: {
         Row: {
@@ -36,8 +68,9 @@ export interface Database {
           name: string
           description: string | null
           duration: number
+          color: string
           created_at: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           id?: number
@@ -45,8 +78,9 @@ export interface Database {
           name: string
           description?: string | null
           duration: number
+          color?: string
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           id?: number
@@ -54,126 +88,152 @@ export interface Database {
           name?: string
           description?: string | null
           duration?: number
+          color?: string
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
         }
-      }
-      schedules: {
-        Row: {
-          id: number
-          clinic_id: number
-          date: string
-          start_time: string
-          end_time: string
-          created_at: string
-          updated_at: string | null
-        }
-        Insert: {
-          id?: number
-          clinic_id: number
-          date: string
-          start_time: string
-          end_time: string
-          created_at?: string
-          updated_at?: string | null
-        }
-        Update: {
-          id?: number
-          clinic_id?: number
-          date?: string
-          start_time?: string
-          end_time?: string
-          created_at?: string
-          updated_at?: string | null
-        }
-      }
-      bookings: {
-        Row: {
-          id: number
-          clinic_id: number
-          service_type_id: number
-          booking_date: string
-          start_time: string
-          end_time: string
-          patient_name: string
-          patient_email: string | null
-          patient_phone: string
-          notes: string | null
-          status: string
-          access_token: string
-          created_at: string
-          updated_at: string | null
-        }
-        Insert: {
-          id?: number
-          clinic_id: number
-          service_type_id: number
-          booking_date: string
-          start_time: string
-          end_time: string
-          patient_name: string
-          patient_email?: string | null
-          patient_phone: string
-          notes?: string | null
-          status: string
-          access_token: string
-          created_at?: string
-          updated_at?: string | null
-        }
-        Update: {
-          id?: number
-          clinic_id?: number
-          service_type_id?: number
-          booking_date?: string
-          start_time?: string
-          end_time?: string
-          patient_name?: string
-          patient_email?: string | null
-          patient_phone?: string
-          notes?: string | null
-          status?: string
-          access_token?: string
-          created_at?: string
-          updated_at?: string | null
-        }
+        Relationships: [
+          {
+            foreignKeyName: "service_types_clinic_id_fkey"
+            columns: ["clinic_id"]
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       availability_settings: {
         Row: {
           id: number
           service_type_id: number
-          day_of_week: number | null
+          day_of_week: number
           specific_date: string | null
           start_time: string
           end_time: string
           is_available: boolean
-          end_date: string | null
           created_at: string
-          updated_at: string | null
+          updated_at: string
+          end_date: string | null
         }
         Insert: {
           id?: number
           service_type_id: number
-          day_of_week?: number | null
+          day_of_week: number
           specific_date?: string | null
           start_time: string
           end_time: string
           is_available?: boolean
-          end_date?: string | null
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
+          end_date?: string | null
         }
         Update: {
           id?: number
           service_type_id?: number
-          day_of_week?: number | null
+          day_of_week?: number
           specific_date?: string | null
           start_time?: string
           end_time?: string
           is_available?: boolean
-          end_date?: string | null
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
+          end_date?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "availability_settings_service_type_id_fkey"
+            columns: ["service_type_id"]
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointments: {
+        Row: {
+          id: number
+          service_type_id: number
+          clinic_id: number
+          appointment_date: string
+          start_time: string
+          end_time: string
+          patient_name: string
+          patient_phone: string
+          patient_email: string | null
+          anonymous_user_id: string | null
+          token: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          service_type_id: number
+          clinic_id: number
+          appointment_date: string
+          start_time: string
+          end_time: string
+          patient_name: string
+          patient_phone: string
+          patient_email?: string | null
+          anonymous_user_id?: string | null
+          token: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          service_type_id?: number
+          clinic_id?: number
+          appointment_date?: string
+          start_time?: string
+          end_time?: string
+          patient_name?: string
+          patient_phone?: string
+          patient_email?: string | null
+          anonymous_user_id?: string | null
+          token?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_service_type_id_fkey"
+            columns: ["service_type_id"]
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      verification_codes: {
+        Row: {
+          id: number
+          phone_number: string
+          code: string
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          phone_number: string
+          code: string
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          phone_number?: string
+          code?: string
+          expires_at?: string
+          created_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

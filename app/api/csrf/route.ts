@@ -1,13 +1,9 @@
+// CSRFトークンを提供するAPIエンドポイントを作成
 import { NextResponse } from "next/server"
 import { generateCSRFToken } from "@/lib/csrf"
 
 export async function GET() {
-  try {
-    const csrfToken = await generateCSRFToken()
+  const csrfToken = generateCSRFToken()
 
-    return NextResponse.json({ csrfToken })
-  } catch (error) {
-    console.error("Error generating CSRF token:", error)
-    return NextResponse.json({ error: "CSRFトークンの生成に失敗しました" }, { status: 500 })
-  }
+  return NextResponse.json({ csrfToken })
 }

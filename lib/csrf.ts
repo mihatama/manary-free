@@ -1,48 +1,31 @@
-import { createHash, randomBytes } from "crypto"
+// 新しいCSRF保護ライブラリを作成
 import { cookies } from "next/headers"
-
-const CSRF_SECRET = process.env.CSRF_SECRET || "default-csrf-secret-key-change-in-production"
-const CSRF_COOKIE_NAME = "csrf_token"
-const CSRF_COOKIE_MAX_AGE = 60 * 60 // 1時間
+import crypto from "crypto"
 
 // CSRFトークンを生成
-export async function generateCSRFToken(): Promise<string> {
+export function generateCSRFToken(): string {
+  const token = crypto.randomBytes(32).toString("hex")
   const cookieStore = cookies()
 
-  // ランダムなトークンを生成
-  const token = randomBytes(32).toString("hex")
-
-  // トークンをハッシュ化してクッキーに保存
-  const hashedToken = createHash("sha256").update(`${token}${CSRF_SECRET}`).digest("hex")
-
-  cookieStore.set({
-    name: CSRF_COOKIE_NAME,
-    value: hashedToken,
+  // HTTPOnly, Secure, SameSiteフラグ付きでCookieを設定
+  cookieStore.set("csrf_token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
-    maxAge: CSRF_COOKIE_MAX_AGE,
+    maxAge: 60 * 60, // 1時間
   })
 
   return token
 }
 
 // CSRFトークンを検証
-export async function validateCSRFToken(token: string): Promise<boolean> {
+export function validateCSRFToken(token: string): boolean {
   const cookieStore = cookies()
-  const storedHash = cookieStore.get(CSRF_COOKIE_NAME)?.value
+  const storedToken = cookieStore.get("csrf_token")?.value
 
-  if (!storedHash) {
-    throw new Error("CSRFトークンが見つかりません")
-  }
-
-  // 送信されたトークンをハッシュ化
-  const hashedToken = createHash("sha256").update(`${token}${CSRF_SECRET}`).digest("hex")
-
-  // ハッシュ値を比較
-  if (hashedToken !== storedHash) {
-    throw new Error("CSRFトークンが一致しません")
+  if (!storedToken || !token || token !== storedToken) {
+    return false
   }
 
   return true
