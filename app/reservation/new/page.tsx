@@ -1,5 +1,5 @@
-import { PhoneVerification } from "@/components/phone-verification"
 import { MedicalQuestionnaireForm } from "@/components/medical-questionnaire-form"
+import { PhoneVerificationWrapper } from "@/components/phone-verification-wrapper"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -102,11 +102,12 @@ export default function NewReservationPage({ searchParams }: NewReservationPageP
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">電話番号認証</h1>
-          <PhoneVerification
-            onVerified={(phoneNumber) => {
-              // 認証完了後、同じページに電話番号を付けてリダイレクト
-              window.location.href = `/reservation/new?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&date=${date}&startTime=${startTime}&endTime=${endTime}&phone=${phoneNumber}&verified=true`
-            }}
+          <PhoneVerificationWrapper
+            clinicId={clinicId}
+            serviceTypeId={serviceTypeId}
+            date={date}
+            startTime={startTime}
+            endTime={endTime}
             buttonText="次へ進む"
           />
         </div>
