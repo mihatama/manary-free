@@ -35,8 +35,10 @@ export function formatJapanesePhoneNumber(phoneNumber: string): string {
 export async function sendSMS(phoneNumber: string, message: string): Promise<boolean> {
   try {
     // 開発環境ではコンソールに出力するだけ
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[DEV] SMS to ${phoneNumber}: ${message}`)
+    // Use NEXT_PUBLIC_ prefix for client-side environment variables
+    if (typeof window !== "undefined") {
+      // We're on the client side
+      console.log(`[CLIENT] Would send SMS to ${phoneNumber}: ${message}`)
       return true
     }
 

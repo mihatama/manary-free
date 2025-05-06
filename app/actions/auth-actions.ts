@@ -1,6 +1,4 @@
 "use server"
-
-import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
 import type { AuthError } from "@/lib/auth"
@@ -110,11 +108,11 @@ export async function logoutAction(formData: FormData) {
 
     await supabase.auth.signOut()
 
-    // Always redirect to the login page
-    redirect("/")
+    // Return success instead of redirecting directly
+    return { success: true }
   } catch (error) {
     console.error("Logout error:", error)
-    // Even if there's an error, try to redirect to the login page
-    redirect("/")
+    // Return error instead of redirecting directly
+    return { success: false, error: "ログアウトに失敗しました" }
   }
 }

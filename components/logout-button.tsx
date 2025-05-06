@@ -27,7 +27,15 @@ export function LogoutButton() {
 
     startTransition(async () => {
       try {
-        await logoutAction(formData)
+        const result = await logoutAction(formData)
+        if (result.success) {
+          // Handle successful logout on the client side
+          router.push("/")
+        } else {
+          console.error("Logout failed:", result.error)
+          // Fallback to client-side redirect
+          window.location.href = "/"
+        }
       } catch (error) {
         console.error("Logout failed:", error)
         // If server action fails, fallback to client-side redirect

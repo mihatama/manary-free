@@ -21,35 +21,50 @@ export async function POST(request: NextRequest) {
     // ハイフンを削除して標準化
     const normalizedPhone = phoneNumber.replace(/-/g, "")
 
-    // 開発環境では、コード "123456" を常に有効とする（テスト用）
-    if (process.env.NODE_ENV !== "production" && code === "123456") {
+    try {
+      const supabase = createClient()
+
+      // データベースから認証コードを取得
+      const { data, error } = await supabase
+        .from("verification_codes")
+        .select("*")
+        .eq("phone_number", normalizedPhone)
+        .eq("code", code)
+        .single()
+
+      if (error || !data) {
+        console.error("認証コード検証エラー:", error)
+        return NextResponse.json({ success: false, error: "認証コードが無効です" }, { status: 400 })
+      }
+
+      // 有効期限をチェック
+      const expiresAt = new Date(data.expires_at)
+      if (expiresAt < new Date()) {
+        return NextResponse.json({ success: false, error: "認証コードの有効期限が切れています" }, { status: 400 })
+      }
+
+      // 認証成功
       return NextResponse.json({ success: true })
+    } catch (dbError: any) {
+      console.error("データベースエラー:", dbError)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "データベース操作に失敗しました",
+          details: dbError.message || "Unknown database error",
+        },
+        { status: 500 },
+      )
     }
-
-    // Supabaseから認証コードを取得
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("verification_codes")
-      .select("*")
-      .eq("phone_number", normalizedPhone)
-      .eq("code", code)
-      .gt("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false })
-      .limit(1)
-
-    if (error) {
-      console.error("認証コード検証エラー:", error)
-      return NextResponse.json({ success: false, error: "認証コードの検証に失敗しました" }, { status: 500 })
-    }
-
-    if (!data || data.length === 0) {
-      return NextResponse.json({ success: false, error: "無効な認証コードまたは期限切れです" }, { status: 400 })
-    }
-
-    // 認証成功
-    return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error("認証コード検証エラー:", error)
-    return NextResponse.json({ success: false, error: "認証コードの検証に失敗しました" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "認証に失敗しました",
+        details: error.message || "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

@@ -28,7 +28,20 @@ export const getSupabaseBrowser = () => {
   return clientInstance
 }
 
+// Make sure the client is properly initialized as a singleton
+// Add this check at the top of the createClient function:
+
+let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null = null
+
 // 後方互換性のために残しておくが、内部では getSupabaseBrowser を使用
 export const createClient = () => {
-  return getSupabaseBrowser()
+  if (supabaseClient) {
+    return supabaseClient
+  }
+
+  const client = getSupabaseBrowser()
+
+  // Before returning, store the client
+  supabaseClient = clientInstance
+  return client
 }
