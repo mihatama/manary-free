@@ -57,22 +57,6 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         body: formData,
       })
 
-      // レスポンスのステータスコードをチェック
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("API error response:", errorText)
-
-        // JSONとして解析できるか試みる
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.error || `サーバーエラー: ${response.status}`)
-        } catch (e) {
-          // JSONとして解析できない場合
-          throw new Error(`サーバーエラー: ${response.status} - ${errorText.substring(0, 100)}`)
-        }
-      }
-
-      // JSONレスポンスを解析
       const data = await response.json()
 
       if (data.success) {
@@ -93,9 +77,9 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
       } else {
         setError(data.error || "認証コードの送信に失敗しました")
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("認証コード送信エラー:", err)
-      setError(err.message || "認証コードの送信に失敗しました")
+      setError("認証コードの送信に失敗しました")
     } finally {
       setIsSending(false)
     }
@@ -128,22 +112,6 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
         body: formData,
       })
 
-      // レスポンスのステータスコードをチェック
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("API error response:", errorText)
-
-        // JSONとして解析できるか試みる
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.error || `サーバーエラー: ${response.status}`)
-        } catch (e) {
-          // JSONとして解析できない場合
-          throw new Error(`サーバーエラー: ${response.status} - ${errorText.substring(0, 100)}`)
-        }
-      }
-
-      // JSONレスポンスを解析
       const data = await response.json()
 
       if (data.success) {
@@ -155,9 +123,9 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
       } else {
         setError(data.error || "認証コードが無効です")
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("認証コード検証エラー:", err)
-      setError(err.message || "認証に失敗しました")
+      setError("認証に失敗しました")
     } finally {
       setIsVerifying(false)
     }
@@ -210,7 +178,6 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
               {process.env.NODE_ENV !== "production" && (
                 <div className="mt-2 p-2 bg-yellow-50 rounded-md border border-yellow-200">
                   <p className="text-xs text-yellow-700">開発環境では、コンソールに認証コードが表示されます。</p>
-                  <p className="text-xs text-yellow-700 mt-1">開発環境では、コード "123456" を使用できます。</p>
                 </div>
               )}
             </>

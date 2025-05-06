@@ -5,22 +5,35 @@ import { Button } from "@/components/ui/button"
 import { logoutAction } from "@/app/actions/auth-actions"
 import { LogOut } from "lucide-react"
 import { useCSRF } from "@/hooks/use-csrf"
+import { useRouter } from "next/navigation"
 
 export function LogoutButton() {
   const [isPending, startTransition] = useTransition()
   const { csrfToken, isLoading, error } = useCSRF()
+  const router = useRouter()
 
   // ログアウトボタンのエラーハンドリングを一貫させる
   const handleLogout = () => {
     if (!csrfToken) {
       console.error("Security token not available")
+      // Even if CSRF token is not available, attempt to logout
+      // This is a fallback mechanism
+      window.location.href = "/"
       return
     }
 
     const formData = new FormData()
     formData.append("csrf_token", csrfToken)
 
-    startTransition(() => logoutAction(formData))
+    startTransition(async () => {
+      try {
+        await logoutAction(formData)
+      } catch (error) {
+        console.error("Logout failed:", error)
+        // If server action fails, fallback to client-side redirect
+        window.location.href = "/"
+      }
+    })
   }
 
   if (isLoading) {
@@ -28,14 +41,6 @@ export function LogoutButton() {
       <Button variant="outline" size="sm" disabled>
         <span className="h-4 w-4 mr-1 animate-spin">⏳</span>
         読み込み中
-      </Button>
-    )
-  }
-
-  if (error) {
-    return (
-      <Button variant="outline" size="sm" disabled className="text-red-500">
-        エラー
       </Button>
     )
   }

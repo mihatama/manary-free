@@ -40,34 +40,27 @@ export async function sendSMS(phoneNumber: string, message: string): Promise<boo
       return true
     }
 
-    // 環境変数のチェック
+    const client = getTwilioClient()
     const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER
+
     if (!twilioPhoneNumber) {
-      console.error("Twilio phone number is not configured")
       throw new Error("Twilio phone number is not configured")
     }
 
-    try {
-      const client = getTwilioClient()
+    // 電話番号を国際形式に変換
+    const formattedPhoneNumber = formatJapanesePhoneNumber(phoneNumber)
 
-      // 電話番号を国際形式に変換
-      const formattedPhoneNumber = formatJapanesePhoneNumber(phoneNumber)
+    // SMSを送信
+    const result = await client.messages.create({
+      body: message,
+      from: twilioPhoneNumber,
+      to: formattedPhoneNumber,
+    })
 
-      // SMSを送信
-      const result = await client.messages.create({
-        body: message,
-        from: twilioPhoneNumber,
-        to: formattedPhoneNumber,
-      })
-
-      console.log(`SMS sent with SID: ${result.sid}`)
-      return true
-    } catch (twilioError: any) {
-      console.error("Twilio API error:", twilioError)
-      throw new Error(`Twilio API error: ${twilioError.message || "Unknown error"}`)
-    }
-  } catch (error: any) {
+    console.log(`SMS sent with SID: ${result.sid}`)
+    return true
+  } catch (error) {
     console.error("Failed to send SMS:", error)
-    throw error
+    return false
   }
 }

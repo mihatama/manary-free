@@ -11,9 +11,9 @@ export function generateCSRFToken(): string {
   cookieStore.set("csrf_token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
     path: "/",
-    maxAge: 60 * 60, // 1時間
+    maxAge: 60 * 60 * 24, // Extended to 24 hours for longer sessions
   })
 
   return token
@@ -21,12 +21,23 @@ export function generateCSRFToken(): string {
 
 // CSRFトークンを検証
 export function validateCSRFToken(token: string): boolean {
-  const cookieStore = cookies()
-  const storedToken = cookieStore.get("csrf_token")?.value
+  try {
+    const cookieStore = cookies()
+    const storedToken = cookieStore.get("csrf_token")?.value
 
-  if (!storedToken || !token || token !== storedToken) {
+    if (!storedToken || !token) {
+      console.warn("CSRF validation failed: Missing token")
+      return false
+    }
+
+    if (token !== storedToken) {
+      console.warn("CSRF validation failed: Token mismatch")
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("CSRF validation error:", error)
     return false
   }
-
-  return true
 }

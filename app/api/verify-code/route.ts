@@ -26,42 +26,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
-    try {
-      // Supabaseから認証コードを取得
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("verification_codes")
-        .select("*")
-        .eq("phone_number", normalizedPhone)
-        .eq("code", code)
-        .gt("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
-        .limit(1)
+    // Supabaseから認証コードを取得
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("verification_codes")
+      .select("*")
+      .eq("phone_number", normalizedPhone)
+      .eq("code", code)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
 
-      if (error) {
-        console.error("認証コード検証エラー:", error)
-        return NextResponse.json({ success: false, error: "認証コードの検証に失敗しました" }, { status: 500 })
-      }
-
-      if (!data || data.length === 0) {
-        return NextResponse.json({ success: false, error: "無効な認証コードまたは期限切れです" }, { status: 400 })
-      }
-
-      // 認証成功
-      return NextResponse.json({ success: true })
-    } catch (dbError) {
-      console.error("データベースエラー:", dbError)
-      return NextResponse.json({ success: false, error: "データベース操作に失敗しました" }, { status: 500 })
+    if (error) {
+      console.error("認証コード検証エラー:", error)
+      return NextResponse.json({ success: false, error: "認証コードの検証に失敗しました" }, { status: 500 })
     }
-  } catch (error: any) {
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ success: false, error: "無効な認証コードまたは期限切れです" }, { status: 400 })
+    }
+
+    // 認証成功
+    return NextResponse.json({ success: true })
+  } catch (error) {
     console.error("認証コード検証エラー:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "認証コードの検証に失敗しました",
-        details: error.message || "不明なエラー",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, error: "認証コードの検証に失敗しました" }, { status: 500 })
   }
 }

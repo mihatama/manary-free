@@ -59,10 +59,10 @@
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
     "@supabase/supabase-js": "latest",
-    "crypto": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
     "react-big-calendar": "latest",
     "moment": "latest",
+    "crypto": "latest",
     "twilio": "latest"
   },
   "devDependencies": {
