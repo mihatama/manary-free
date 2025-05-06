@@ -34,6 +34,7 @@ export default function ManagePage() {
             />
           )}
 
+          {/* Suspense boundary is now inside the PhoneAuthReservationManager component */}
           <PhoneAuthReservationManager />
         </div>
       </main>

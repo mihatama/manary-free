@@ -1,20 +1,21 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { PhoneVerification } from "@/components/phone-verification"
 import { getAppointmentsByPhone } from "@/app/actions/sms-auth-actions"
 import { AppointmentList } from "@/components/appointment-list"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useSearchParams } from "next/navigation"
 
-export function PhoneAuthReservationManager() {
+// Create a client component that uses useSearchParams
+function PhoneAuthContent() {
   const [isVerified, setIsVerified] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState("")
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 追加: useSearchParams を使用してURLパラメータを取得
+  // useSearchParams hook
   const searchParams = useSearchParams()
 
   // 予約一覧を取得する関数
@@ -43,7 +44,7 @@ export function PhoneAuthReservationManager() {
     await loadAppointments(verifiedPhoneNumber)
   }
 
-  // 追加: URLから電話番号を取得して自動認証
+  // URLから電話番号を取得して自動認証
   useEffect(() => {
     const phoneParam = searchParams?.get("phone")
     if (phoneParam && !isVerified) {
@@ -86,5 +87,14 @@ export function PhoneAuthReservationManager() {
         </div>
       )}
     </div>
+  )
+}
+
+// Main component that wraps the content in Suspense
+export function PhoneAuthReservationManager() {
+  return (
+    <Suspense fallback={<div className="text-center py-8">読み込み中...</div>}>
+      <PhoneAuthContent />
+    </Suspense>
   )
 }
