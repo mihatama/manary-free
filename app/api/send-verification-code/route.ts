@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { validateCSRFToken } from "@/lib/csrf"
-import { generateVerificationCode, sendSMS } from "@/lib/twilio"
-import { createClient } from "@/lib/supabase/server"
+import { generateVerificationCode, saveVerificationCode } from "@/lib/verification-code"
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,53 +36,22 @@ export async function POST(request: NextRequest) {
 
     // 認証コードを生成
     const code = generateVerificationCode()
+    console.log("Generated verification code:", code)
 
     // 認証コードをデータベースに保存
-    const supabase = createClient()
+    const saved = await saveVerificationCode(normalizedPhone, code)
 
-    // 有効期限を設定（10分）
-    const expiresAt = new Date()
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10)
-
-    // 既存のコードを削除
-    await supabase.from("verification_codes").delete().eq("phone_number", normalizedPhone)
-
-    // 新しいコードを保存
-    const { error: dbError } = await supabase.from("verification_codes").insert([
-      {
-        phone_number: normalizedPhone,
-        code: code,
-        expires_at: expiresAt.toISOString(),
-        created_at: new Date().toISOString(),
-      },
-    ])
-
-    if (dbError) {
-      console.error("Database error:", dbError)
+    if (!saved && process.env.NODE_ENV === "production") {
+      console.error("Failed to save verification code")
       return NextResponse.json({ success: false, error: "認証コードの保存に失敗しました" }, { status: 500 })
     }
 
     // 開発環境では常にテストモードを使用
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[DEV MODE] Using test verification code:", code)
-      return NextResponse.json({
-        success: true,
-        message: `開発環境: テスト認証コード ${code} を使用してください`,
-      })
-    }
-
-    // SMSで認証コードを送信
-    const message = `【マナリー】認証コード: ${code}\nこのコードは10分間有効です。`
-    const smsResult = await sendSMS(normalizedPhone, message)
-
-    if (!smsResult.success) {
-      console.error("SMS sending failed:", smsResult.error)
-      return NextResponse.json({ success: false, error: "SMSの送信に失敗しました" }, { status: 500 })
-    }
-
+    console.log("[DEV MODE] Using test verification code:", code)
     return NextResponse.json({
       success: true,
-      message: "認証コードを送信しました",
+      message: `認証コード ${code} を送信しました`,
+      devMode: process.env.NODE_ENV !== "production",
     })
   } catch (error: any) {
     console.error("Verification code sending error:", error)

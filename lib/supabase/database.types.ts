@@ -216,22 +216,22 @@ export interface Database {
           id: number
           phone_number: string
           code: string
-          expires_at: string
           created_at: string
+          expires_at: string
         }
         Insert: {
           id?: number
           phone_number: string
           code: string
-          expires_at: string
           created_at?: string
+          expires_at: string
         }
         Update: {
           id?: number
           phone_number?: string
           code?: string
-          expires_at?: string
           created_at?: string
+          expires_at?: string
         }
         Relationships: []
       }

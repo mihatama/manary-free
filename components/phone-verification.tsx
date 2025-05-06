@@ -22,7 +22,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   const [error, setError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [isDevelopment, setIsDevelopment] = useState(false)
+  const [testCode, setTestCode] = useState<string | null>(null)
 
   const { csrfToken, isLoading: isLoadingCSRF } = useCSRF()
 
@@ -36,6 +36,7 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
   const handleSendCode = async () => {
     setError(null)
     setSuccessMessage(null)
+    setTestCode(null)
 
     if (!isValidPhoneNumber(phoneNumber)) {
       setError("有効な電話番号を入力してください")
@@ -63,10 +64,20 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
 
       console.log("Response status:", response.status)
 
+      // レスポンスが正常でない場合のエラーハンドリング
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("Server error response:", errorText)
-        throw new Error(`サーバーエラー: ${response.status}`)
+        let errorMessage = "認証コードの送信に失敗しました"
+
+        try {
+          const errorData = await response.json()
+          if (errorData && errorData.error) {
+            errorMessage = errorData.error
+          }
+        } catch (e) {
+          // JSONパースに失敗した場合はデフォルトのエラーメッセージを使用
+        }
+
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
@@ -75,13 +86,15 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
       if (data.success) {
         setIsCodeSent(true)
 
-        // 開発環境の場合は特別なメッセージを表示
-        if (data.message && data.message.includes("開発環境")) {
-          setSuccessMessage(data.message)
-          setIsDevelopment(true)
-        } else {
-          setSuccessMessage(data.message || "認証コードを送信しました。SMSをご確認ください。")
+        // 開発環境の場合はコードを表示
+        if (data.devMode && data.message) {
+          const codeMatch = data.message.match(/\d{6}/)
+          if (codeMatch) {
+            setTestCode(codeMatch[0])
+          }
         }
+
+        setSuccessMessage(data.message || "認証コードを送信しました。SMSをご確認ください。")
 
         // カウントダウンを開始（60秒）
         setCountdown(60)
@@ -138,10 +151,20 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
 
       console.log("Response status:", response.status)
 
+      // レスポンスが正常でない場合のエラーハンドリング
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error("Server error response:", errorText)
-        throw new Error(`サーバーエラー: ${response.status}`)
+        let errorMessage = "認証に失敗しました"
+
+        try {
+          const errorData = await response.json()
+          if (errorData && errorData.error) {
+            errorMessage = errorData.error
+          }
+        } catch (e) {
+          // JSONパースに失敗した場合はデフォルトのエラーメッセージを使用
+        }
+
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
@@ -186,10 +209,10 @@ export function PhoneVerification({ onVerified, buttonText = "認証する" }: P
           </Alert>
         )}
 
-        {isDevelopment && isCodeSent && (
+        {testCode && (
           <Alert className="mb-4 bg-blue-50 border-blue-200">
             <AlertDescription className="text-blue-700">
-              開発環境では認証コード「123456」を使用してください
+              開発環境: テスト認証コード「{testCode}」を使用してください
             </AlertDescription>
           </Alert>
         )}
