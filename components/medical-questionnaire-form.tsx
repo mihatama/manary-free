@@ -33,6 +33,7 @@ interface MedicalQuestionnaireFormProps {
 }
 
 export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: MedicalQuestionnaireFormProps) {
+  console.log("MedicalQuestionnaireForm レンダリング", { phoneNumber, reservationData })
   const [birthdate, setBirthdate] = useState<Date | undefined>()
   const [lastMenstruation, setLastMenstruation] = useState<Date | undefined>()
   const [height, setHeight] = useState("")
@@ -58,14 +59,17 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("問診票フォーム送信開始")
     setError(null)
 
     if (!patientName && reservationData) {
+      console.error("患者名が入力されていません")
       setError("お名前を入力してください")
       return
     }
 
     if (!csrfToken) {
+      console.error("CSRFトークンが利用できません")
       setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
       return
     }
@@ -73,6 +77,7 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
     setIsSubmitting(true)
 
     try {
+      console.log("フォームデータの準備")
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
       formData.append("phone_number", phoneNumber)
@@ -99,6 +104,7 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
 
       // 予約データがある場合は追加
       if (reservationData) {
+        console.log("予約データの追加", reservationData)
         formData.append("clinicId", reservationData.clinicId.toString())
         formData.append("serviceTypeId", reservationData.serviceTypeId.toString())
         formData.append("date", reservationData.date)
@@ -112,17 +118,22 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
 
       // フォームデータをサーバーに送信
       try {
+        console.log("問診票送信開始")
         const result = await submitQuestionnaire(formData)
+        console.log("問診票送信結果", result)
 
         if (result.success) {
           if (result.token) {
             // 予約確認ページにリダイレクト
+            console.log("予約確認ページへリダイレクト", { token: result.token })
             router.push(`/reservation/confirmation?token=${result.token}`)
           } else {
             // 問診票のみ送信成功
+            console.log("問診票のみ送信成功")
             router.push("/reservation?success=questionnaire")
           }
         } else {
+          console.error("問診票送信失敗", result.error)
           setError(result.error || "問診票の送信に失敗しました")
         }
       } catch (err: any) {
@@ -131,6 +142,7 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
 
         // テスト用：エラーが発生しても予約ページに進む
         if (reservationData) {
+          console.log("テスト用：エラーが発生しても予約ページに進みます")
           router.push(
             `/reservation/new?clinicId=${reservationData.clinicId}&serviceTypeId=${reservationData.serviceTypeId}&date=${reservationData.date}&startTime=${reservationData.startTime}&endTime=${reservationData.endTime}&phone=${phoneNumber}&verified=true&skipQuestionnaire=true`,
           )

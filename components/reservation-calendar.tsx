@@ -36,6 +36,7 @@ export function ReservationCalendar({
   selectedDate,
   selectedTime,
 }: ReservationCalendarProps) {
+  console.log("ReservationCalendar レンダリング", { clinicId, serviceTypeId })
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [isLoadingDates, setIsLoadingDates] = useState(false)
@@ -51,6 +52,7 @@ export function ReservationCalendar({
 
   // カレンダーの日付を生成
   useEffect(() => {
+    console.log("カレンダー日付生成", { month: format(currentMonth, "yyyy-MM") })
     const start = startOfMonth(currentMonth)
     const end = endOfMonth(currentMonth)
 
@@ -68,28 +70,53 @@ export function ReservationCalendar({
       (_, i) => addDays(end, i + 1),
     )
 
-    setCalendarDays([...prevDays, ...daysInMonth, ...nextDays])
+    const allDays = [...prevDays, ...daysInMonth, ...nextDays]
+    console.log("カレンダー日付生成完了", { count: allDays.length })
+    setCalendarDays(allDays)
   }, [currentMonth])
 
   // 利用可能な日付を取得
   useEffect(() => {
-    if (!clinicId || !serviceTypeId) return
+    if (!clinicId || !serviceTypeId) {
+      console.log("clinicIdまたはserviceTypeIdが不足しているため、利用可能日付の取得をスキップします")
+      return
+    }
 
     const fetchAvailableDates = async () => {
+      console.log("利用可能な日付の取得開始")
       try {
         setIsLoadingDates(true)
         setError(null)
 
         const start = format(startOfMonth(currentMonth), "yyyy-MM-dd")
         const end = format(endOfMonth(currentMonth), "yyyy-MM-dd")
+        console.log("日付範囲", { start, end })
 
-        // テスト用に、すべての日付を利用可能とする
-        const allDates = eachDayOfInterval({
-          start: startOfMonth(currentMonth),
-          end: endOfMonth(currentMonth),
-        }).map((date) => format(date, "yyyy-MM-dd"))
+        try {
+          console.log("APIリクエスト開始", { clinicId, serviceTypeId, start, end })
+          // APIから利用可能な日付を取得
+          const response = await fetch(
+            `/api/available-dates?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&start=${start}&end=${end}`,
+          )
 
-        setAvailableDates(allDates)
+          if (!response.ok) {
+            console.error("APIレスポンスエラー", { status: response.status, statusText: response.statusText })
+            throw new Error("利用可能な日付の取得に失敗しました")
+          }
+
+          const data = await response.json()
+          console.log("APIレスポンス", data)
+          setAvailableDates(data.availableDates || [])
+        } catch (apiError) {
+          console.error("API呼び出しエラー", apiError)
+          // エラーが発生した場合は、すべての日付を利用可能とする（テスト用）
+          console.log("テスト用に全日付を利用可能とします")
+          const allDates = eachDayOfInterval({
+            start: startOfMonth(currentMonth),
+            end: endOfMonth(currentMonth),
+          }).map((date) => format(date, "yyyy-MM-dd"))
+          setAvailableDates(allDates)
+        }
       } catch (err) {
         console.error("利用可能な日付の取得エラー:", err)
         // エラーが発生した場合は、すべての日付を利用可能とする（テスト用）
@@ -108,14 +135,23 @@ export function ReservationCalendar({
 
   // 選択された日付の利用可能な時間枠を取得
   useEffect(() => {
-    if (!clinicId || !serviceTypeId || !selectedDateInternal) return
+    if (!clinicId || !serviceTypeId || !selectedDateInternal) {
+      console.log("時間枠取得に必要なパラメータが不足しています", {
+        clinicId,
+        serviceTypeId,
+        selectedDate: selectedDateInternal,
+      })
+      return
+    }
 
     const fetchTimeSlots = async () => {
+      console.log("時間枠取得開始", { date: format(selectedDateInternal, "yyyy-MM-dd") })
       try {
         setIsLoadingTimeSlots(true)
         setError(null)
 
         // テスト用のデータを設定
+        console.log("テスト用の時間枠データを設定します")
         setAvailableTimeSlots([
           { startTime: "09:00", endTime: "10:00", available: true },
           { startTime: "10:00", endTime: "11:00", available: true },
@@ -137,27 +173,33 @@ export function ReservationCalendar({
 
   // 前月へ
   const goToPreviousMonth = () => {
+    console.log("前月へ移動")
     setCurrentMonth(subMonths(currentMonth, 1))
   }
 
   // 次月へ
   const goToNextMonth = () => {
+    console.log("次月へ移動")
     setCurrentMonth(addMonths(currentMonth, 1))
   }
 
   // 日付を選択
   const handleSelectDate = (date: Date) => {
+    console.log("日付選択", { date: format(date, "yyyy-MM-dd") })
     setSelectedDateInternal(date)
   }
 
   // 時間枠を選択
   const handleSelectTimeSlot = (startTime: string, endTime: string) => {
+    console.log("時間枠選択", { startTime, endTime })
     if (onSelectDateTime && selectedDateInternal) {
+      console.log("親コンポーネントのコールバックを呼び出します")
       onSelectDateTime(selectedDateInternal, startTime, endTime)
     } else {
       // 直接予約フローに進む
       if (selectedDateInternal) {
         const formattedDate = format(selectedDateInternal, "yyyy-MM-dd")
+        console.log("予約ページへ遷移します", { date: formattedDate, startTime, endTime })
         router.push(
           `/reservation/new?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&date=${formattedDate}&startTime=${startTime}&endTime=${endTime}`,
         )
