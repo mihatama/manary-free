@@ -5,13 +5,12 @@ import { cookies } from "next/headers"
 import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
 import type { AuthError } from "@/lib/auth"
 import type { Database } from "@/lib/supabase/database.types"
-import { validateCSRFToken } from "@/lib/csrf" // Corrected import name
+import { validateCSRFToken } from "@/lib/csrf"
 
 // CSRF検証を行うヘルパー関数
 async function validateCSRF(formData: FormData) {
   const csrfToken = formData.get("csrf_token") as string
-  if (!(await validateCSRFToken(csrfToken))) {
-    // Corrected usage
+  if (!validateCSRFToken(csrfToken)) {
     return {
       success: false,
       error: "セキュリティトークンが無効です。ページを再読み込みしてください。",
