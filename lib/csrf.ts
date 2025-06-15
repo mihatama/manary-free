@@ -1,43 +1,72 @@
-// 新しいCSRF保護ライブラリを作成
 import { cookies } from "next/headers"
-import crypto from "crypto"
 
-// CSRFトークンを生成
-export function generateCSRFToken(): string {
-  const token = crypto.randomBytes(32).toString("hex")
-  const cookieStore = cookies()
+const SECRET_LENGTH = 32
+const CSRF_DATA_TO_SIGN = "manary-csrf-token" // Constant data to sign for HMAC
 
-  // HTTPOnly, Secure, SameSiteフラグ付きでCookieを設定
-  cookieStore.set("csrf_token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
-    path: "/",
-    maxAge: 60 * 60 * 24, // Extended to 24 hours for longer sessions
-  })
-
-  return token
+// Helper to convert ArrayBuffer to hex string
+function bufferToHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
 }
 
-// CSRFトークンを検証
-export function validateCSRFToken(token: string): boolean {
+// Helper to create HMAC signature using Web Crypto API
+async function createHmacSignature(secret: BufferSource, data: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data))
+  return bufferToHex(signature)
+}
+
+// This function gets the secret, or creates and sets it as an HTTPOnly cookie if not present.
+function getSecret(): Buffer {
+  const cookieStore = cookies()
+  const secretCookie = cookieStore.get("csrf_secret")
+  if (secretCookie && secretCookie.value) {
+    return Buffer.from(secretCookie.value, "hex")
+  }
+
+  const newSecretBytes = new Uint8Array(SECRET_LENGTH)
+  crypto.getRandomValues(newSecretBytes)
+  const newSecret = Buffer.from(newSecretBytes)
+
+  cookieStore.set("csrf_secret", newSecret.toString("hex"), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    sameSite: "strict",
+    maxAge: 60 * 60 * 24, // 24 hours
+  })
+  return newSecret
+}
+
+export async function generateCSRFToken(): Promise<string> {
+  const secret = getSecret() // Ensures csrf_secret cookie is set
+  const token = await createHmacSignature(secret, CSRF_DATA_TO_SIGN)
+  return token // Returns only the token string
+}
+
+export async function validateCSRFToken(token: string): Promise<boolean> {
   try {
     const cookieStore = cookies()
-    const storedToken = cookieStore.get("csrf_token")?.value
+    const secretCookie = cookieStore.get("csrf_secret")
+    if (!secretCookie || !secretCookie.value) {
+      console.error("CSRF secret cookie not found for validation.")
+      return false
+    }
+    const secret = Buffer.from(secretCookie.value, "hex")
+    const expectedToken = await createHmacSignature(secret, CSRF_DATA_TO_SIGN)
 
-    if (!storedToken || !token) {
-      console.warn("CSRF validation failed: Missing token")
+    if (token.length !== expectedToken.length) {
       return false
     }
 
-    if (token !== storedToken) {
-      console.warn("CSRF validation failed: Token mismatch")
-      return false
+    let result = 0
+    for (let i = 0; i < token.length; i++) {
+      result |= token.charCodeAt(i) ^ expectedToken.charCodeAt(i)
     }
-
-    return true
+    return result === 0
   } catch (error) {
-    console.error("CSRF validation error:", error)
+    console.error("Error validating CSRF token:", error)
     return false
   }
 }
