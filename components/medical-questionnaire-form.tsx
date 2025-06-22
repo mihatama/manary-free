@@ -10,16 +10,17 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { CSRFForm } from "@/components/csrf-form"
 import { createQuestionnaireAndReservation } from "@/app/actions/questionnaire-actions"
+import { useCSRF } from "@/hooks/use-csrf" // CSRFフックをインポート
 
 interface MedicalQuestionnaireFormProps {
   phoneNumber: string
   reservationData: {
     clinicId: number
     serviceTypeId: number
-    date: string
-    startTime: string
-    endTime: string
-    patientName: string
+    date: string // YYYY-MM-DD
+    startTime: string // HH:MM
+    endTime: string // HH:MM
+    patientName: string // この名前が予約者名として使われる
   }
 }
 
@@ -27,77 +28,95 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const csrfToken = useCSRF() // CSRFトークンを取得
 
   const handleSubmit = async (formData: FormData) => {
     setIsSubmitting(true)
     setError(null)
 
+    if (!csrfToken) {
+      setError("セキュリティトークンの読み込みに失敗しました。ページを再読み込みしてください。")
+      setIsSubmitting(false)
+      return
+    }
+
     try {
-      console.log("問診票送信開始", { phoneNumber, formData })
+      console.log("問診票送信開始", { phoneNumber, reservationData, formData })
 
-      // 問診票データを作成
-      const questionnaireData = {
-        phoneNumber,
-
-        // 受診場所
+      // アクションに渡すデータを作成
+      const questionnaireAndReservationData = {
+        // 問診票のフィールド
         locationNishinomiya: formData.get("locationNishinomiya") === "on",
         locationTakarazuka: formData.get("locationTakarazuka") === "on",
         locationNihonbashi: formData.get("locationNihonbashi") === "on",
         locationAichi: formData.get("locationAichi") === "on",
         locationVisit: formData.get("locationVisit") === "on",
-
-        // ママ情報
         motherLastName: formData.get("motherLastName") as string,
         motherFirstName: formData.get("motherFirstName") as string,
         motherLastNameKana: formData.get("motherLastNameKana") as string,
         motherFirstNameKana: formData.get("motherFirstNameKana") as string,
-        motherBirthYear: Number.parseInt(formData.get("motherBirthYear") as string) || null,
-        motherBirthMonth: Number.parseInt(formData.get("motherBirthMonth") as string) || null,
-        motherBirthDay: Number.parseInt(formData.get("motherBirthDay") as string) || null,
-
-        // お子様情報
+        motherBirthYear: formData.get("motherBirthYear")
+          ? Number.parseInt(formData.get("motherBirthYear") as string)
+          : null,
+        motherBirthMonth: formData.get("motherBirthMonth")
+          ? Number.parseInt(formData.get("motherBirthMonth") as string)
+          : null,
+        motherBirthDay: formData.get("motherBirthDay")
+          ? Number.parseInt(formData.get("motherBirthDay") as string)
+          : null,
         childLastName: formData.get("childLastName") as string,
         childFirstName: formData.get("childFirstName") as string,
         childLastNameKana: formData.get("childLastNameKana") as string,
         childFirstNameKana: formData.get("childFirstNameKana") as string,
-        childBirthYear: Number.parseInt(formData.get("childBirthYear") as string) || null,
-        childBirthMonth: Number.parseInt(formData.get("childBirthMonth") as string) || null,
-        childBirthDay: Number.parseInt(formData.get("childBirthDay") as string) || null,
-        childNumber: Number.parseInt(formData.get("childNumber") as string) || null,
+        childBirthYear: formData.get("childBirthYear")
+          ? Number.parseInt(formData.get("childBirthYear") as string)
+          : null,
+        childBirthMonth: formData.get("childBirthMonth")
+          ? Number.parseInt(formData.get("childBirthMonth") as string)
+          : null,
+        childBirthDay: formData.get("childBirthDay") ? Number.parseInt(formData.get("childBirthDay") as string) : null,
+        childNumber: formData.get("childNumber") ? Number.parseInt(formData.get("childNumber") as string) : null,
         childGender: formData.get("childGender") as string,
-
-        // お仕事について
         occupation: formData.get("occupation") as string,
         isOnMaternityLeave: formData.get("isOnMaternityLeave") === "on",
         hasResigned: formData.get("hasResigned") === "on",
+        email: formData.get("email") as string, // 問診票のメールアドレス
+        notes: formData.get("notes") as string, // 問診票の備考
 
-        // 予約関連情報
-        email: formData.get("email") as string,
-        notes: formData.get("notes") as string,
+        // 予約固有のフィールド
+        clinic_id: reservationData.clinicId,
+        service_type_id: reservationData.serviceTypeId,
+        date: reservationData.date,
+        start_time: reservationData.startTime,
+        end_time: reservationData.endTime,
+        patient_name: reservationData.patientName, // 予約者名
+        patient_phone: phoneNumber, // 認証済み電話番号
+        // reservation_notes: formData.get("reservation_notes") as string, // 予約固有の備考があれば (今回は問診票のnotesを使用)
 
-        // 予約データ
-        reservationData,
+        // CSRFトークン
+        csrf_token: csrfToken,
       }
 
-      console.log("問診票データ", questionnaireData)
+      console.log("アクションに渡すデータ:", questionnaireAndReservationData)
 
-      // 問診票と予約を同時に作成
-      const result = await createQuestionnaireAndReservation(questionnaireData)
-      console.log("問診票と予約の作成結果", result)
+      const result = await createQuestionnaireAndReservation(questionnaireAndReservationData)
+      console.log("問診票と予約の作成結果:", result)
 
       if (!result.success) {
         throw new Error(result.error || "問診票と予約の作成に失敗しました")
       }
 
-      // 予約確認ページにリダイレクト
-      router.push(`/reservation/confirmation?id=${result.reservationId}`)
+      // 予約確認ページにリダイレクト (予約IDと予約トークンを渡す)
+      router.push(`/reservation/confirmation?id=${result.reservationId}&token=${result.appointmentToken}`)
     } catch (err) {
       console.error("問診票送信エラー:", err)
       setError(err instanceof Error ? err.message : "問診票の送信中にエラーが発生しました")
 
-      // エラーが発生しても、テスト用に予約確認ページにリダイレクト
-      // 本番環境では削除してください
-      router.push(`/reservation/confirmation?id=test-reservation-id`)
+      // TODO: 本番環境では以下のテスト用リダイレクトは削除してください。
+      // エラーが発生した場合、ユーザーにエラーメッセージを表示し、フォームに留まるべきです。
+      // if (process.env.NODE_ENV !== 'production') {
+      //   router.push(`/reservation/confirmation?id=test-error-id&token=test-error-token`);
+      // }
     } finally {
       setIsSubmitting(false)
     }
@@ -338,7 +357,7 @@ export function MedicalQuestionnaireForm({ phoneNumber, reservationData }: Medic
 
         {error && <div className="p-3 bg-red-100 text-red-700 rounded-md">{error}</div>}
 
-        <Button type="submit" disabled={isSubmitting} className="w-full bg-[#f8a0a0] hover:bg-[#f78b8b]">
+        <Button type="submit" disabled={isSubmitting || !csrfToken} className="w-full bg-[#f8a0a0] hover:bg-[#f78b8b]">
           {isSubmitting ? "送信中..." : "送信して予約を確定する"}
         </Button>
       </CSRFForm>

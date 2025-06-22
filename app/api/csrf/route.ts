@@ -1,21 +1,23 @@
+// CSRFトークンを提供するAPIエンドポイントを作成
 import { NextResponse } from "next/server"
-import { generateCSRFToken } from "@/lib/csrf" // Corrected import
-
-// Removed 'cookies' import as it's not directly used here anymore for setting the secret.
-// The csrf_secret cookie is now managed by the getSecret() function within lib/csrf.ts
+import { generateCSRFToken } from "@/lib/csrf"
 
 export async function GET() {
   try {
-    // generateCSRFToken will call getSecret internally,
-    // which handles getting or creating the secret and setting the csrf_secret cookie.
-    const token = await generateCSRFToken()
+    const csrfToken = await generateCSRFToken() // Ensure await is used
 
-    // The csrf_secret cookie is set by getSecret() in lib/csrf.ts
-    // No need to set it here explicitly.
-
-    return NextResponse.json({ csrfToken: token })
+    return NextResponse.json(
+      { csrfToken },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      },
+    )
   } catch (error) {
-    console.error("Error in /api/csrf route:", error)
+    console.error("Error generating CSRF token in API route:", error)
     return NextResponse.json({ error: "Failed to generate CSRF token" }, { status: 500 })
   }
 }
