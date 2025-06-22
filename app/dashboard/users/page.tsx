@@ -1,9 +1,25 @@
+// app/dashboard/users/page.tsx
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Users } from "lucide-react"
+
 export default function UsersPage() {
   return (
-    <div className="p-4 md:p-8">
-      <h1 className="text-2xl font-semibold text-gray-800">利用者管理</h1>
-      <p className="mt-2 text-gray-600">このページでは、システムの利用者を管理します。</p>
-      {/* TODO: Implement user management functionality */}
+    <div className="container mx-auto py-8">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-2xl font-bold">User Management</CardTitle>
+          <Users className="h-6 w-6 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">This is where you will manage your application's users.</p>
+          {/* Placeholder for user list or management tools */}
+          <div className="mt-4 p-4 border rounded-md bg-gray-50 dark:bg-gray-800">
+            <p className="text-center text-gray-500 dark:text-gray-400">
+              User list and management features will be implemented here.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

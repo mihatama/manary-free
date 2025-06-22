@@ -12,11 +12,8 @@ function bufferToHex(buffer: ArrayBuffer): string {
 
 // Helper to create HMAC signature using Web Crypto API
 async function createHmacSignature(secret: BufferSource, data: string): Promise<string> {
-  // Ensure crypto is available (for environments like Node.js during SSR if needed, or browser)
-  const cryptoRef = typeof window !== "undefined" ? window.crypto : require("crypto").webcrypto
-
-  const key = await cryptoRef.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
-  const signature = await cryptoRef.subtle.sign("HMAC", key, new TextEncoder().encode(data))
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data))
   return bufferToHex(signature)
 }
 
@@ -28,11 +25,8 @@ function getSecret(): Buffer {
     return Buffer.from(secretCookie.value, "hex")
   }
 
-  // Ensure crypto is available
-  const cryptoRef = typeof window !== "undefined" ? window.crypto : require("crypto").webcrypto
-
   const newSecretBytes = new Uint8Array(SECRET_LENGTH)
-  cryptoRef.getRandomValues(newSecretBytes)
+  crypto.getRandomValues(newSecretBytes)
   const newSecret = Buffer.from(newSecretBytes)
 
   cookieStore.set("csrf_secret", newSecret.toString("hex"), {
@@ -48,7 +42,7 @@ function getSecret(): Buffer {
 export async function generateCSRFToken(): Promise<string> {
   const secret = getSecret() // Ensures csrf_secret cookie is set
   const token = await createHmacSignature(secret, CSRF_DATA_TO_SIGN)
-  return token
+  return token // Returns only the token string
 }
 
 export async function validateCSRFToken(token: string): Promise<boolean> {
@@ -66,7 +60,6 @@ export async function validateCSRFToken(token: string): Promise<boolean> {
       return false
     }
 
-    // Constant-time comparison for security
     let result = 0
     for (let i = 0; i < token.length; i++) {
       result |= token.charCodeAt(i) ^ expectedToken.charCodeAt(i)

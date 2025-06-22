@@ -12,7 +12,6 @@ export function useCSRF() {
     const fetchCSRFToken = async () => {
       try {
         setIsLoading(true)
-        // Add a cache-busting parameter to prevent caching
         const response = await fetch(`/api/csrf?t=${Date.now()}`, {
           cache: "no-store",
           headers: {
@@ -22,17 +21,22 @@ export function useCSRF() {
         })
 
         if (!response.ok) {
-          throw new Error("CSRFトークンの取得に失敗しました")
+          const errorData = await response.json().catch(() => ({}))
+          console.error("CSRF API response not OK:", response.status, errorData)
+          throw new Error(errorData.error || "CSRFトークンの取得に失敗しました")
         }
 
         const data = await response.json()
+        if (!data.csrfToken) {
+          console.error("CSRF token missing in API response:", data)
+          throw new Error("CSRFトークンがレスポンスに含まれていません")
+        }
         setCsrfToken(data.csrfToken)
         setError(null)
-      } catch (err) {
-        console.error("Failed to fetch CSRF token:", err)
-        setError("セキュリティトークンの取得に失敗しました")
+      } catch (err: any) {
+        console.error("Failed to fetch CSRF token hook:", err)
+        setError(err.message || "セキュリティトークンの取得に失敗しました")
 
-        // Retry up to 3 times with exponential backoff
         if (retryCount < 3) {
           const timeout = Math.pow(2, retryCount) * 1000
           setTimeout(() => {
