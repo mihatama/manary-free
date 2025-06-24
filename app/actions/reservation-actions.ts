@@ -211,8 +211,13 @@ export async function createAppointment(formData: FormData) {
     const patientName = formData.get("patient_name") as string
     const patientPhone = formData.get("patient_phone") as string
     const patientEmail = (formData.get("patient_email") as string) || null
+    const notes = (formData.get("notes") as string) || null // 予約時の備考を取得
+    const questionnaireIdString = formData.get("questionnaire_id") as string | null // 問診票IDを文字列として取得
 
-    // 入力検証
+    // questionnaire_id を数値に変換、存在しない場合は null
+    const questionnaireId = questionnaireIdString ? Number.parseInt(questionnaireIdString, 10) : null
+
+    // 入力検証 (questionnaireId はオプショナルなのでここでは検証しない)
     if (!clinicId || !serviceTypeId || !appointmentDate || !startTime || !endTime || !patientName || !patientPhone) {
       throw new Error("必須項目が入力されていません")
     }
@@ -221,12 +226,8 @@ export async function createAppointment(formData: FormData) {
     const supabase = createClient()
     const token = await generateUniqueToken(supabase)
 
-    // const token = uuidv4()
-
-    const supabase2 = createClient()
-
     // 予約を作成
-    const { data, error } = await supabase2
+    const { data, error } = await supabase
       .from("appointments")
       .insert([
         {
@@ -238,21 +239,28 @@ export async function createAppointment(formData: FormData) {
           patient_name: patientName,
           patient_phone: patientPhone,
           patient_email: patientEmail,
+          notes: notes, // 備考を保存
+          questionnaire_id: questionnaireId, // 問診票IDを保存
           token: token,
           status: "confirmed",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
       ])
-      .select()
+      .select() // select() で挿入されたレコードを返す
 
     if (error) {
       console.error("予約作成エラー:", error)
       throw new Error("予約の作成に失敗しました")
     }
 
-    revalidatePath("/reservation")
-    return { success: true, appointment: data[0] }
+    if (!data || data.length === 0) {
+      throw new Error("予約の作成に成功しましたが、データが返されませんでした。")
+    }
+
+    revalidatePath("/reservation") // 予約カレンダーページなどを再検証
+    revalidatePath("/dashboard/appointments") // 管理者用予約一覧も再検証
+    return { success: true, appointment: data[0] } // 成功時、作成された予約情報を返す
   } catch (error: any) {
     console.error("Error in createAppointment:", error)
     return { success: false, error: error.message || "予約の作成に失敗しました" }
@@ -260,6 +268,7 @@ export async function createAppointment(formData: FormData) {
 }
 
 // createReservation関数を追加（createAppointmentのエイリアス）
+// こちらも createAppointment を呼び出すように統一
 export async function createReservation(formData: FormData) {
   return createAppointment(formData)
 }
@@ -281,6 +290,9 @@ export async function getAppointmentByToken(token: string) {
           name,
           address,
           phone
+        ),
+        questionnaires (
+          * 
         )
       `)
       .eq("token", token)
@@ -311,6 +323,7 @@ export async function updateAppointment(formData: FormData) {
     const patientName = formData.get("patient_name") as string
     const patientPhone = formData.get("patient_phone") as string
     const patientEmail = (formData.get("patient_email") as string) || null
+    const notes = (formData.get("notes") as string) || null // 備考を取得
 
     // 入力検証
     if (!token || !appointmentDate || !startTime || !endTime || !patientName || !patientPhone) {
@@ -329,6 +342,7 @@ export async function updateAppointment(formData: FormData) {
         patient_name: patientName,
         patient_phone: patientPhone,
         patient_email: patientEmail,
+        notes: notes, // 備考を更新
         updated_at: new Date().toISOString(),
       })
       .eq("token", token)
@@ -337,6 +351,10 @@ export async function updateAppointment(formData: FormData) {
     if (error) {
       console.error("予約更新エラー:", error)
       throw new Error("予約の更新に失敗しました")
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error("予約の更新に成功しましたが、データが返されませんでした。")
     }
 
     revalidatePath("/reservation/manage")
@@ -377,6 +395,10 @@ export async function cancelAppointment(formData: FormData) {
       throw new Error("予約のキャンセルに失敗しました")
     }
 
+    if (!data || data.length === 0) {
+      throw new Error("予約のキャンセルに成功しましたが、データが返されませんでした。")
+    }
+
     revalidatePath("/reservation/manage")
     return { success: true, appointment: data[0] }
   } catch (error: any) {
@@ -402,6 +424,9 @@ export async function getAllAppointments() {
           name,
           address,
           phone
+        ),
+        questionnaires (
+          *
         )
       `)
       .order("appointment_date", { ascending: true })
