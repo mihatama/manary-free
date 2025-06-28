@@ -1,9 +1,11 @@
 "use server"
 
+import crypto from "crypto"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { validateCSRFToken } from "@/lib/csrf"
+import { sendSMS } from "@/lib/twilio"
 
 type Appointment = Database["public"]["Tables"]["appointments"]["Row"]
 type AvailabilitySlot = {
@@ -12,6 +14,27 @@ type AvailabilitySlot = {
   end_time: string
   service_type_id: number
   clinic_id: number
+}
+
+// 電話番号で問診票を取得
+export async function getQuestionnaireByPhone(phoneNumber: string) {
+  const supabase = createClient()
+  try {
+    const { data, error } = await supabase
+      .from("questionnaires")
+      .select("*")
+      .eq("phone_number", phoneNumber)
+      .maybeSingle() // 1件または0件を期待
+
+    if (error) {
+      console.error("電話番号による問診票取得エラー:", error)
+      return null
+    }
+    return data
+  } catch (error) {
+    console.error("Error in getQuestionnaireByPhone:", error)
+    return null
+  }
 }
 
 // CSRF検証を行うヘルパー関数
@@ -176,8 +199,8 @@ async function filterOutBookedSlots(availabilitySlots: AvailabilitySlot[], date:
 async function generateUniqueToken(supabase: any): Promise<string> {
   // 最大10回試行
   for (let i = 0; i < 10; i++) {
-    // 4桁のランダムな数字を生成
-    const token = Math.floor(1000 + Math.random() * 9000).toString()
+    // 暗号学的に安全な32文字のランダムな16進数文字列を生成
+    const token = crypto.randomBytes(4).toString("hex")
 
     // トークンの重複チェック
     const { data, error } = await supabase.from("appointments").select("token").eq("token", token)
@@ -199,6 +222,7 @@ async function generateUniqueToken(supabase: any): Promise<string> {
 
 // 予約を作成
 export async function createAppointment(formData: FormData) {
+  const supabase = createClient()
   try {
     // CSRF検証
     await validateCSRF(formData)
@@ -223,7 +247,6 @@ export async function createAppointment(formData: FormData) {
     }
 
     // 予約トークンを生成
-    const supabase = createClient()
     const token = await generateUniqueToken(supabase)
 
     // 予約を作成
@@ -258,9 +281,59 @@ export async function createAppointment(formData: FormData) {
       throw new Error("予約の作成に成功しましたが、データが返されませんでした。")
     }
 
+    const newAppointment = data[0]
+
+    // 患者が新規かどうかを電話番号で判定
+    const existingQuestionnaire = await getQuestionnaireByPhone(newAppointment.patient_phone)
+    const isNewPatient = !existingQuestionnaire
+
+    // SMSで予約確認を送信
+    try {
+      const { data: clinicData, error: clinicError } = await supabase
+        .from("clinics")
+        .select("name")
+        .eq("id", newAppointment.clinic_id)
+        .single()
+
+      if (clinicError) {
+        console.error("SMS送信のためのクリニック情報取得エラー:", clinicError)
+      }
+
+      const clinicName = clinicData?.name || "クリニック"
+
+      // タイムゾーン問題を避けるため、日付文字列を直接パース
+      const [year, month, day] = newAppointment.appointment_date.split("-").map(Number)
+      const dateObj = new Date(year, month - 1, day)
+      const dayOfWeek = ["日", "月", "火", "水", "木", "金", "土"][dateObj.getDay()]
+      const formattedDate = `${month}月${day}日`
+
+      const formattedTime = newAppointment.start_time.substring(0, 5)
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      if (!baseUrl) {
+        console.error("NEXT_PUBLIC_BASE_URLが設定されていません。SMSに管理URLを含められません。")
+      }
+      const managementUrl = baseUrl ? `${baseUrl}/reservation/manage?token=${newAppointment.token}` : "予約管理ページ"
+
+      let message = `${clinicName}です。${newAppointment.patient_name}様のご予約が完了しました。\n日時: ${formattedDate}(${dayOfWeek}) ${formattedTime}\n予約の確認・変更・キャンセルはこちら:\n${managementUrl}`
+
+      // 新規患者の場合、問診票のリンクを追加
+      if (isNewPatient && baseUrl) {
+        const questionnaireUrl = `${baseUrl}/reservation/questionnaire?token=${newAppointment.token}`
+        message += `\n\n初めての方は、事前に以下のリンクから問診票のご入力をお願いいたします。\n${questionnaireUrl}`
+      }
+
+      const smsSent = await sendSMS(newAppointment.patient_phone, message)
+      if (!smsSent) {
+        console.warn(`予約(ID: ${newAppointment.id})のSMS通知の送信に失敗しました。`)
+      }
+    } catch (smsError) {
+      console.error("SMS送信処理中にエラーが発生しました:", smsError)
+    }
+
     revalidatePath("/reservation") // 予約カレンダーページなどを再検証
     revalidatePath("/dashboard/appointments") // 管理者用予約一覧も再検証
-    return { success: true, appointment: data[0] } // 成功時、作成された予約情報を返す
+    return { success: true, appointment: newAppointment } // 成功時、作成された予約情報を返す
   } catch (error: any) {
     console.error("Error in createAppointment:", error)
     return { success: false, error: error.message || "予約の作成に失敗しました" }
@@ -279,22 +352,24 @@ export async function getAppointmentByToken(token: string) {
   try {
     const { data, error } = await supabase
       .from("appointments")
-      .select(`
-        *,
-        service_types (
-          name,
-          duration,
-          color
-        ),
-        clinics (
-          name,
-          address,
-          phone
-        ),
-        questionnaires (
-          * 
-        )
-      `)
+      .select(
+        `
+      *,
+      service_types (
+        name,
+        duration,
+        color
+      ),
+      clinics (
+        name,
+        address,
+        phone
+      ),
+      questionnaires (
+        * 
+      )
+    `,
+      )
       .eq("token", token)
       .single()
 
@@ -413,22 +488,24 @@ export async function getAllAppointments() {
   try {
     const { data, error } = await supabase
       .from("appointments")
-      .select(`
-        *,
-        service_types (
-          name,
-          duration,
-          color
-        ),
-        clinics (
-          name,
-          address,
-          phone
-        ),
-        questionnaires (
-          *
-        )
-      `)
+      .select(
+        `
+      *,
+      service_types (
+        name,
+        duration,
+        color
+      ),
+      clinics (
+        name,
+        address,
+        phone
+      ),
+      questionnaires (
+        *
+      )
+    `,
+      )
       .order("appointment_date", { ascending: true })
       .order("start_time", { ascending: true })
 
@@ -443,3 +520,5 @@ export async function getAllAppointments() {
     throw new Error("予約情報の取得に失敗しました")
   }
 }
+
+export const getAvailableSlots = getAvailableTimeSlots

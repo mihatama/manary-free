@@ -1,9 +1,20 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, momentLocalizer, type SlotInfo } from "react-big-calendar"
-import moment from "moment"
-import "moment/locale/ja"
+import { Calendar, dateFnsLocalizer, type SlotInfo } from "react-big-calendar"
+import {
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  subMonths,
+  addMonths,
+  parseISO,
+} from "date-fns"
+import { ja } from "date-fns/locale"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -39,13 +50,20 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useCSRF } from "@/hooks/use-csrf"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
-import { ja } from "date-fns/locale"
 import { Switch } from "@/components/ui/switch"
+import { Calendar as ShadCalendar } from "@/components/ui/calendar"
 
-// 日本語ロケールを設定
-moment.locale("ja")
-const localizer = momentLocalizer(moment)
+// date-fns localizer setup
+const locales = {
+  ja: ja,
+}
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: (date) => startOfWeek(date, { locale: ja }),
+  getDay,
+  locales,
+})
 
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 type AvailabilitySetting = Database["public"]["Tables"]["availability_settings"]["Row"]
@@ -102,7 +120,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
   const [editIsRecurring, setEditIsRecurring] = useState<boolean>(true)
   const [editSpecificDate, setEditSpecificDate] = useState<Date | undefined>(undefined)
 
-  const { csrfToken, isLoading: isLoadingCSRF, error: csrfError } = useCSRF()
+  const { csrfToken } = useCSRF()
 
   // 診療種別を取得
   useEffect(() => {
@@ -164,43 +182,38 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
       return
     }
 
-    // 現在の月の最初と最後の日を取得
-    const firstDay = moment(currentDate).startOf("month").toDate()
-    const lastDay = moment(currentDate).endOf("month").toDate()
+    const firstDay = startOfMonth(currentDate)
+    const lastDay = endOfMonth(currentDate)
 
-    // 新しいイベント配列を作成（古いイベントは完全に破棄）
     const newEvents: CalendarEvent[] = []
 
-    // 特定の日付の設定を先に処理
     const specificDateSettings = availabilitySettings.filter((setting) => setting.specific_date)
-
-    // デバッグ用
-    console.log("特定日の設定数:", specificDateSettings.length)
-    if (specificDateSettings.length > 0) {
-      console.log("特定日の設定例:", specificDateSettings[0])
-    }
 
     specificDateSettings.forEach((setting) => {
       const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
-      if (!serviceType) return
+      if (!serviceType || !setting.specific_date) return
 
-      // 日付文字列を確実にパースするためにmomentを使用
-      const specificDate = moment(setting.specific_date).toDate()
+      const specificDate = parseISO(setting.specific_date)
 
-      // デバッグ用
-      console.log("処理中の特定日:", setting.specific_date, "パース結果:", specificDate)
-
-      // 現在の月の範囲内かチェック
       if (specificDate >= firstDay && specificDate <= lastDay) {
-        // 開始時間と終了時間を解析
         const [startHour, startMinute] = setting.start_time.split(":").map(Number)
         const [endHour, endMinute] = setting.end_time.split(":").map(Number)
 
-        // イベントの開始時間と終了時間を設定
-        const start = moment(specificDate).hour(startHour).minute(startMinute).second(0).toDate()
-        const end = moment(specificDate).hour(endHour).minute(endMinute).second(0).toDate()
+        const start = new Date(
+          specificDate.getFullYear(),
+          specificDate.getMonth(),
+          specificDate.getDate(),
+          startHour,
+          startMinute,
+        )
+        const end = new Date(
+          specificDate.getFullYear(),
+          specificDate.getMonth(),
+          specificDate.getDate(),
+          endHour,
+          endMinute,
+        )
 
-        // 一意のIDを生成
         const uniqueId = `specific-${setting.id}`
 
         newEvents.push({
@@ -212,51 +225,39 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
           color: serviceType.color,
           availabilityId: setting.id,
           isRecurring: false,
-          dayOfWeek: specificDate.getDay(),
+          dayOfWeek: getDay(specificDate),
           specificDate: setting.specific_date,
         })
-
-        // デバッグ用
-        console.log("特定日のイベントを追加:", start, end, serviceType.name)
       }
     })
 
-    // 曜日ベースの設定を処理
     const weeklySettings = availabilitySettings.filter((setting) => !setting.specific_date)
+    const daysInMonth = eachDayOfInterval({ start: firstDay, end: lastDay })
 
-    // 現在の月の各日について
-    for (let day = moment(firstDay); day.isSameOrBefore(lastDay); day.add(1, "days")) {
-      const dayOfWeek = day.day() // 0: 日曜日, 1: 月曜日, ...
-      const currentDateStr = day.format("YYYY-MM-DD")
+    daysInMonth.forEach((day) => {
+      const dayOfWeek = getDay(day)
+      const currentDateStr = format(day, "yyyy-MM-dd")
 
-      // その日に特定の日付設定があるかチェック
       const hasSpecificDateSetting = specificDateSettings.some((setting) => setting.specific_date === currentDateStr)
 
-      // 特定の日付設定がない場合のみ、曜日ベースの設定を適用
       if (!hasSpecificDateSetting) {
-        // その曜日の予約可能時間を取得
         const daySettings = weeklySettings.filter((setting) => setting.day_of_week === dayOfWeek)
 
-        // 各予約可能時間をイベントに変換
         daySettings.forEach((setting) => {
           const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
           if (!serviceType) return
 
-          // 終了日のチェックを追加
-          if (setting.end_date && new Date(setting.end_date) < day.toDate()) {
-            return // 終了日を過ぎている場合はスキップ
+          if (setting.end_date && parseISO(setting.end_date) < day) {
+            return
           }
 
-          // 開始時間と終了時間を解析
           const [startHour, startMinute] = setting.start_time.split(":").map(Number)
           const [endHour, endMinute] = setting.end_time.split(":").map(Number)
 
-          // イベントの開始時間と終了時間を設定
-          const start = moment(day).hour(startHour).minute(startMinute).second(0).toDate()
-          const end = moment(day).hour(endHour).minute(endMinute).second(0).toDate()
+          const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour, startMinute)
+          const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour, endMinute)
 
-          // 一意のIDを生成して重複を防ぐ
-          const uniqueId = `weekly-${setting.id}-${day.format("YYYY-MM-DD")}`
+          const uniqueId = `weekly-${setting.id}-${format(day, "yyyy-MM-dd")}`
 
           newEvents.push({
             id: uniqueId,
@@ -271,9 +272,8 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
           })
         })
       }
-    }
+    })
 
-    // 完全に新しい配列で置き換え
     setEvents(newEvents)
   }, [availabilitySettings, currentDate, serviceTypes])
 
@@ -290,8 +290,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
   // カスタムイベントスタイル
   const eventStyleGetter = (event: CalendarEvent) => {
-    // 特定日付の設定は少し濃い色で表示
-    const backgroundColor = event.specificDate ? event.color : `${event.color}CC` // CCは透明度80%
+    const backgroundColor = event.specificDate ? event.color : `${event.color}CC`
 
     return {
       style: {
@@ -308,12 +307,12 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
   // 前月へ
   const goToPreviousMonth = () => {
-    setCurrentDate((prev) => moment(prev).subtract(1, "month").toDate())
+    setCurrentDate((prev) => subMonths(prev, 1))
   }
 
   // 次月へ
   const goToNextMonth = () => {
-    setCurrentDate((prev) => moment(prev).add(1, "month").toDate())
+    setCurrentDate((prev) => addMonths(prev, 1))
   }
 
   // 今月へ
@@ -325,12 +324,12 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
   const handleSelectEvent = (event: CalendarEvent) => {
     setSelectedEvent(event)
     setEditServiceTypeId(event.serviceTypeId.toString())
-    setEditStartTime(moment(event.start).format("HH:mm"))
-    setEditEndTime(moment(event.end).format("HH:mm"))
+    setEditStartTime(format(event.start, "HH:mm"))
+    setEditEndTime(format(event.end, "HH:mm"))
     setEditIsRecurring(event.isRecurring)
 
     if (event.specificDate) {
-      setEditSpecificDate(new Date(event.specificDate))
+      setEditSpecificDate(parseISO(event.specificDate))
     } else {
       setEditSpecificDate(undefined)
     }
@@ -342,9 +341,8 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
   const handleSelectSlot = (slotInfo: SlotInfo) => {
     setNewEventSlot(slotInfo)
 
-    // デフォルト値を設定
-    const startTime = moment(slotInfo.start).format("HH:mm")
-    const endTime = moment(slotInfo.end).format("HH:mm")
+    const startTime = format(slotInfo.start, "HH:mm")
+    const endTime = format(slotInfo.end, "HH:mm")
 
     setEditServiceTypeId(serviceTypes.length > 0 ? serviceTypes[0].id.toString() : "")
     setEditStartTime(startTime)
@@ -363,30 +361,23 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
 
-      // 既存の予約可能時間を削除する
       if (selectedEvent.availabilityId) {
         const deleteFormData = new FormData()
         deleteFormData.append("csrf_token", csrfToken)
         deleteFormData.append("id", selectedEvent.availabilityId.toString())
-
-        // 古い設定を削除
         await deleteAvailabilitySetting(deleteFormData)
       }
 
-      // 新しい予約可能時間を作成する
       formData.append("service_type_id", editServiceTypeId)
 
       if (editIsRecurring) {
-        // 曜日ベースの設定
         formData.append("day_of_week", selectedEvent.dayOfWeek.toString())
-        // specific_dateは送信しない
       } else {
-        // 特定日付の設定
         if (!editSpecificDate) {
           setError("日付を選択してください")
           return
         }
-        formData.append("day_of_week", editSpecificDate.getDay().toString())
+        formData.append("day_of_week", getDay(editSpecificDate).toString())
         formData.append("specific_date", format(editSpecificDate, "yyyy-MM-dd"))
       }
 
@@ -396,14 +387,11 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
       await upsertAvailabilitySetting(formData)
 
-      // 全ての選択された診療種別の予約可能時間を再読み込み
       const allSettings: AvailabilitySetting[] = []
       for (const serviceTypeId of selectedServiceTypes) {
         const settings = await getAvailabilitySettings(serviceTypeId)
         allSettings.push(...settings)
       }
-
-      // 完全に新しい配列で置き換え
       setAvailabilitySettings(allSettings)
 
       setIsEditDialogOpen(false)
@@ -424,14 +412,11 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
       await deleteAvailabilitySetting(formData)
 
-      // 全ての選択された診療種別の予約可能時間を再読み込み
       const allSettings: AvailabilitySetting[] = []
       for (const serviceTypeId of selectedServiceTypes) {
         const settings = await getAvailabilitySettings(serviceTypeId)
         allSettings.push(...settings)
       }
-
-      // 完全に新しい配列で置き換え
       setAvailabilitySettings(allSettings)
 
       setIsDeleteDialogOpen(false)
@@ -452,17 +437,14 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
       formData.append("service_type_id", editServiceTypeId)
 
       if (editIsRecurring) {
-        // 曜日ベースの設定
-        const dayOfWeek = moment(newEventSlot.start).day()
+        const dayOfWeek = getDay(newEventSlot.start)
         formData.append("day_of_week", dayOfWeek.toString())
-        // specific_dateは送信しない
       } else {
-        // 特定日付の設定
         if (!editSpecificDate) {
           setError("日付を選択してください")
           return
         }
-        formData.append("day_of_week", editSpecificDate.getDay().toString())
+        formData.append("day_of_week", getDay(editSpecificDate).toString())
         formData.append("specific_date", format(editSpecificDate, "yyyy-MM-dd"))
       }
 
@@ -472,14 +454,11 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
       await upsertAvailabilitySetting(formData)
 
-      // 全ての選択された診療種別の予約可能時間を再読み込み
       const allSettings: AvailabilitySetting[] = []
       for (const serviceTypeId of selectedServiceTypes) {
         const settings = await getAvailabilitySettings(serviceTypeId)
         allSettings.push(...settings)
       }
-
-      // 完全に新しい配列で置き換え
       setAvailabilitySettings(allSettings)
 
       setIsNewEventDialogOpen(false)
@@ -591,12 +570,15 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                   onSelectEvent={handleSelectEvent}
                   onSelectSlot={handleSelectSlot}
                   selectable={true}
+                  culture="ja"
                   formats={{
-                    monthHeaderFormat: "YYYY年M月",
-                    weekdayFormat: "ddd",
-                    dayHeaderFormat: "M月D日(ddd)",
+                    monthHeaderFormat: (date) => format(date, "yyyy年M月", { locale: ja }),
+                    weekdayFormat: (date) => format(date, "E", { locale: ja }),
+                    dayHeaderFormat: (date) => format(date, "M月d日(E)", { locale: ja }),
                     dayRangeHeaderFormat: ({ start, end }) =>
-                      `${moment(start).format("YYYY年M月D日")} - ${moment(end).format("M月D日")}`,
+                      `${format(start, "yyyy年M月d日", { locale: ja })} - ${format(end, "M月d日", {
+                        locale: ja,
+                      })}`,
                   }}
                   messages={{
                     today: "今日",
@@ -663,7 +645,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     <Button
                       id="edit-specific-date"
                       variant="outline"
-                      className="w-full justify-start text-left font-normal"
+                      className="w-full justify-start text-left font-normal bg-transparent"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {editSpecificDate ? (
@@ -674,7 +656,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <Calendar
+                    <ShadCalendar
                       mode="single"
                       selected={editSpecificDate}
                       onSelect={setEditSpecificDate}
@@ -797,7 +779,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     <Button
                       id="new-specific-date"
                       variant="outline"
-                      className="w-full justify-start text-left font-normal"
+                      className="w-full justify-start text-left font-normal bg-transparent"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {editSpecificDate ? (
@@ -808,7 +790,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <Calendar
+                    <ShadCalendar
                       mode="single"
                       selected={editSpecificDate}
                       onSelect={setEditSpecificDate}

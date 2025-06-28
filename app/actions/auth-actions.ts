@@ -52,7 +52,7 @@ export async function loginAction(prevState: any, formData: FormData) {
 
     if (error) {
       // 詳細なエラーはログにのみ記録 - エラーコードのみを記録し、詳細なメッセージは記録しない
-      console.error("Authentication error occurred")
+      console.error("Authentication error occurred:", error.message)
 
       // ユーザーには一般的なメッセージのみを表示
       return {
@@ -67,7 +67,7 @@ export async function loginAction(prevState: any, formData: FormData) {
     const { data: userData, error: userError } = await supabase.auth.getUser()
 
     if (userError || !userData.user) {
-      console.error("Failed to get authenticated user")
+      console.error("Failed to get authenticated user:", userError?.message)
       return {
         status: "error",
         errors: {
@@ -86,8 +86,8 @@ export async function loginAction(prevState: any, formData: FormData) {
         email: userData.user.email,
       },
     }
-  } catch (error) {
-    console.error("Login process error")
+  } catch (error: any) {
+    console.error("Login process error:", error.message)
     return {
       status: "error",
       errors: {

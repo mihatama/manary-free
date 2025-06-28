@@ -1,330 +1,211 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  format,
-  addMonths,
-  subMonths,
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  isSameMonth,
-  isSameDay,
-  isToday,
-  addDays,
-} from "date-fns"
+import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent } from "react-big-calendar"
+import { format, parse, startOfWeek, getDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
+import "react-big-calendar/lib/css/react-big-calendar.css"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useRouter } from "next/navigation"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import { getAvailableSlots } from "@/app/actions/reservation-actions"
+import type { Database } from "@/lib/supabase/database.types"
+
+// date-fns localizer setup
+const locales = {
+  ja: ja,
+}
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: (date) => startOfWeek(date, { locale: ja }),
+  getDay,
+  locales,
+})
+
+type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
 interface ReservationCalendarProps {
-  clinicId: number | null
-  serviceTypeId: number | null
-  onSelectDateTime?: (date: Date, startTime: string, endTime: string) => void
-  selectedDate?: Date | null
-  selectedTime?: { start: string; end: string } | null
+  serviceType: ServiceType | null
+  onSelectSlot: (slot: Date) => void
+  selectedSlot: Date | null
 }
 
-export function ReservationCalendar({
-  clinicId,
-  serviceTypeId,
-  onSelectDateTime,
-  selectedDate,
-  selectedTime,
-}: ReservationCalendarProps) {
-  console.log("ReservationCalendar レンダリング", { clinicId, serviceTypeId })
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [availableDates, setAvailableDates] = useState<string[]>([])
-  const [isLoadingDates, setIsLoadingDates] = useState(false)
-  const [calendarDays, setCalendarDays] = useState<Date[]>([])
-  const [selectedDateInternal, setSelectedDateInternal] = useState<Date | null>(selectedDate || null)
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<
-    { startTime: string; endTime: string; available: boolean }[]
-  >([])
-  const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false)
+interface CalendarEvent extends BigCalendarEvent {
+  isAvailable: boolean
+}
+
+export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }: ReservationCalendarProps) {
+  const [date, setDate] = useState(new Date())
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<"month" | "week" | "day">("month")
 
-  const router = useRouter()
-
-  // カレンダーの日付を生成
   useEffect(() => {
-    console.log("カレンダー日付生成", { month: format(currentMonth, "yyyy-MM") })
-    const start = startOfMonth(currentMonth)
-    const end = endOfMonth(currentMonth)
-
-    // 月の最初の日の曜日（0: 日曜日, 1: 月曜日, ...）
-    const startDay = start.getDay()
-    // 前月の日を追加
-    const prevDays = Array.from({ length: startDay }).map((_, i) => addDays(start, -startDay + i))
-
-    // 当月の日を追加
-    const daysInMonth = eachDayOfInterval({ start, end })
-
-    // 次月の日を追加（6週間分になるように）
-    const totalDaysShown = 42 // 6週間 = 42日
-    const nextDays = Array.from({ length: Math.max(0, totalDaysShown - prevDays.length - daysInMonth.length) }).map(
-      (_, i) => addDays(end, i + 1),
-    )
-
-    const allDays = [...prevDays, ...daysInMonth, ...nextDays]
-    console.log("カレンダー日付生成完了", { count: allDays.length })
-    setCalendarDays(allDays)
-  }, [currentMonth])
-
-  // 利用可能な日付を取得
-  useEffect(() => {
-    if (!clinicId || !serviceTypeId) {
-      console.log("clinicIdまたはserviceTypeIdが不足しているため、利用可能日付の取得をスキップします")
+    if (!serviceType) {
+      setEvents([])
       return
     }
 
-    const fetchAvailableDates = async () => {
-      console.log("利用可能な日付の取得開始")
+    async function fetchAvailableSlots() {
       try {
-        setIsLoadingDates(true)
+        setIsLoading(true)
         setError(null)
+        const month = format(date, "yyyy-MM")
+        const slots = await getAvailableSlots(serviceType!.id, month)
 
-        const start = format(startOfMonth(currentMonth), "yyyy-MM-dd")
-        const end = format(endOfMonth(currentMonth), "yyyy-MM-dd")
-        console.log("日付範囲", { start, end })
-
-        try {
-          console.log("APIリクエスト開始", { clinicId, serviceTypeId, start, end })
-          // APIから利用可能な日付を取得
-          const response = await fetch(
-            `/api/available-dates?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&start=${start}&end=${end}`,
-          )
-
-          if (!response.ok) {
-            console.error("APIレスポンスエラー", { status: response.status, statusText: response.statusText })
-            throw new Error("利用可能な日付の取得に失敗しました")
+        const calendarEvents: CalendarEvent[] = slots.map((slot) => {
+          const startTime = parseISO(slot.start_time)
+          const endTime = parseISO(slot.end_time)
+          return {
+            title: "予約可能",
+            start: startTime,
+            end: endTime,
+            isAvailable: slot.is_available,
           }
-
-          const data = await response.json()
-          console.log("APIレスポンス", data)
-          setAvailableDates(data.availableDates || [])
-        } catch (apiError) {
-          console.error("API呼び出しエラー", apiError)
-          // エラーが発生した場合は、すべての日付を利用可能とする（テスト用）
-          console.log("テスト用に全日付を利用可能とします")
-          const allDates = eachDayOfInterval({
-            start: startOfMonth(currentMonth),
-            end: endOfMonth(currentMonth),
-          }).map((date) => format(date, "yyyy-MM-dd"))
-          setAvailableDates(allDates)
-        }
+        })
+        setEvents(calendarEvents)
       } catch (err) {
-        console.error("利用可能な日付の取得エラー:", err)
-        // エラーが発生した場合は、すべての日付を利用可能とする（テスト用）
-        const allDates = eachDayOfInterval({
-          start: startOfMonth(currentMonth),
-          end: endOfMonth(currentMonth),
-        }).map((date) => format(date, "yyyy-MM-dd"))
-        setAvailableDates(allDates)
+        console.error("Failed to fetch available slots:", err)
+        setError("予約枠の読み込みに失敗しました。")
       } finally {
-        setIsLoadingDates(false)
+        setIsLoading(false)
       }
     }
 
-    fetchAvailableDates()
-  }, [clinicId, serviceTypeId, currentMonth])
+    fetchAvailableSlots()
+  }, [serviceType, date])
 
-  // 選択された日付の利用可能な時間枠を取得
-  useEffect(() => {
-    if (!clinicId || !serviceTypeId || !selectedDateInternal) {
-      console.log("時間枠取得に必要なパラメータが不足しています", {
-        clinicId,
-        serviceTypeId,
-        selectedDate: selectedDateInternal,
-      })
-      return
-    }
-
-    const fetchTimeSlots = async () => {
-      console.log("時間枠取得開始", { date: format(selectedDateInternal, "yyyy-MM-dd") })
-      try {
-        setIsLoadingTimeSlots(true)
-        setError(null)
-
-        // テスト用のデータを設定
-        console.log("テスト用の時間枠データを設定します")
-        setAvailableTimeSlots([
-          { startTime: "09:00", endTime: "10:00", available: true },
-          { startTime: "10:00", endTime: "11:00", available: true },
-          { startTime: "11:00", endTime: "12:00", available: true },
-          { startTime: "13:00", endTime: "14:00", available: true },
-          { startTime: "14:00", endTime: "15:00", available: true },
-          { startTime: "15:00", endTime: "16:00", available: true },
-        ])
-      } catch (err) {
-        console.error("時間枠取得エラー:", err)
-        setError("利用可能な時間枠の取得に失敗しました")
-      } finally {
-        setIsLoadingTimeSlots(false)
-      }
-    }
-
-    fetchTimeSlots()
-  }, [clinicId, serviceTypeId, selectedDateInternal])
-
-  // 前月へ
-  const goToPreviousMonth = () => {
-    console.log("前月へ移動")
-    setCurrentMonth(subMonths(currentMonth, 1))
+  const handleNavigate = (newDate: Date) => {
+    setDate(newDate)
   }
 
-  // 次月へ
-  const goToNextMonth = () => {
-    console.log("次月へ移動")
-    setCurrentMonth(addMonths(currentMonth, 1))
+  const handleView = (newView: any) => {
+    setView(newView)
   }
 
-  // 日付を選択
-  const handleSelectDate = (date: Date) => {
-    console.log("日付選択", { date: format(date, "yyyy-MM-dd") })
-    setSelectedDateInternal(date)
-  }
-
-  // 時間枠を選択
-  const handleSelectTimeSlot = (startTime: string, endTime: string) => {
-    console.log("時間枠選択", { startTime, endTime })
-    if (onSelectDateTime && selectedDateInternal) {
-      console.log("親コンポーネントのコールバックを呼び出します")
-      onSelectDateTime(selectedDateInternal, startTime, endTime)
+  const handleSelectSlot = (slotInfo: { start: Date }) => {
+    if (view === "month") {
+      setDate(slotInfo.start)
+      setView("day")
     } else {
-      // 直接予約フローに進む
-      if (selectedDateInternal) {
-        const formattedDate = format(selectedDateInternal, "yyyy-MM-dd")
-        console.log("予約ページへ遷移します", { date: formattedDate, startTime, endTime })
-        router.push(
-          `/reservation/new?clinicId=${clinicId}&serviceTypeId=${serviceTypeId}&date=${formattedDate}&startTime=${startTime}&endTime=${endTime}`,
-        )
+      const isAvailable = events.some(
+        (event) =>
+          event.start && event.end && slotInfo.start >= event.start && slotInfo.start < event.end && event.isAvailable,
+      )
+      if (isAvailable) {
+        onSelectSlot(slotInfo.start)
       }
     }
   }
 
-  // 日付が予約可能かどうかを判定
-  const isDateAvailable = (date: Date) => {
-    const formattedDate = format(date, "yyyy-MM-dd")
-    return availableDates.includes(formattedDate)
+  const eventStyleGetter = (event: CalendarEvent) => {
+    const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.getTime()
+    const style = {
+      backgroundColor: isSelected ? "#f78989" : event.isAvailable ? "#a8d8ea" : "#e0e0e0",
+      borderRadius: "5px",
+      opacity: 0.8,
+      color: isSelected ? "white" : "black",
+      border: "0px",
+      display: "block",
+      cursor: event.isAvailable ? "pointer" : "not-allowed",
+    }
+    return {
+      style: style,
+    }
   }
 
-  // 今日より前の日付かどうかを判定
-  const isPastDate = (date: Date) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return date < today
+  const CustomToolbar = (toolbar: any) => {
+    const goToBack = () => {
+      toolbar.onNavigate("PREV")
+    }
+
+    const goToNext = () => {
+      toolbar.onNavigate("NEXT")
+    }
+
+    const goToCurrent = () => {
+      toolbar.onNavigate("TODAY")
+    }
+
+    const label = () => {
+      return format(toolbar.date, "yyyy年 M月", { locale: ja })
+    }
+
+    return (
+      <div className="rbc-toolbar">
+        <span className="rbc-btn-group">
+          <Button onClick={goToBack}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button onClick={goToCurrent}>今日</Button>
+          <Button onClick={goToNext}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </span>
+        <span className="rbc-toolbar-label">{label()}</span>
+        <span className="rbc-btn-group">
+          {["month", "week", "day"].map((viewName) => (
+            <Button
+              key={viewName}
+              onClick={() => toolbar.onView(viewName)}
+              className={toolbar.view === viewName ? "rbc-active" : ""}
+            >
+              {viewName === "month" ? "月" : viewName === "week" ? "週" : "日"}
+            </Button>
+          ))}
+        </span>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">予約カレンダー</h3>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={goToPreviousMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium">{format(currentMonth, "yyyy年M月", { locale: ja })}</span>
-          <Button variant="outline" size="sm" onClick={goToNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">{serviceType ? `${serviceType.name} - 予約日時選択` : "予約日時選択"}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error && <p className="text-red-500">{error}</p>}
+        <div style={{ height: "600px" }}>
+          <Calendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: "100%" }}
+            date={date}
+            onNavigate={handleNavigate}
+            onView={handleView}
+            view={view}
+            onSelectSlot={handleSelectSlot}
+            selectable
+            eventPropGetter={eventStyleGetter}
+            culture="ja"
+            components={{
+              toolbar: CustomToolbar,
+            }}
+            formats={{
+              dayHeaderFormat: (date) => format(date, "M月d日 (E)", { locale: ja }),
+              timeGutterFormat: (date) => format(date, "H:mm"),
+            }}
+            messages={{
+              today: "今日",
+              previous: "前へ",
+              next: "次へ",
+              month: "月",
+              week: "週",
+              day: "日",
+              agenda: "予定",
+              date: "日付",
+              time: "時間",
+              event: "イベント",
+              noEventsInRange: "この期間に予約可能な時間はありません",
+            }}
+          />
         </div>
-      </div>
-
-      {error && <div className="text-sm text-red-500">{error}</div>}
-
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-        <div className="hidden md:grid md:grid-cols-7 md:col-span-7 gap-1 mb-1">
-          {["日", "月", "火", "水", "木", "金", "土"].map((day, i) => (
-            <div
-              key={i}
-              className={cn(
-                "text-center text-sm font-medium h-8 flex items-center justify-center",
-                i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-500",
-              )}
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {isLoadingDates
-          ? // ローディング状態
-            Array.from({ length: 42 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
-          : // カレンダー表示
-            calendarDays.map((date, i) => {
-              const isCurrentMonth = isSameMonth(date, currentMonth)
-              const isSelected = selectedDateInternal ? isSameDay(date, selectedDateInternal) : false
-              const isAvailable = isCurrentMonth && !isPastDate(date) // テスト用に、すべての日付を利用可能とする
-              const isTodayDate = isToday(date)
-              const dayOfWeek = date.getDay()
-
-              return (
-                <Button
-                  key={i}
-                  variant="outline"
-                  className={cn(
-                    "h-10 w-full relative",
-                    !isCurrentMonth && "text-gray-300",
-                    isSelected && "bg-[#f8a0a0] text-white hover:bg-[#f8a0a0] hover:text-white",
-                    isAvailable && !isSelected && "border-[#f8a0a0] text-[#f8a0a0] hover:bg-[#f8a0a0] hover:text-white",
-                    !isAvailable && "cursor-not-allowed opacity-50",
-                    isTodayDate && !isSelected && "border-blue-500",
-                    dayOfWeek === 0 && "text-red-500",
-                    dayOfWeek === 6 && "text-blue-500",
-                  )}
-                  disabled={!isAvailable}
-                  onClick={() => isAvailable && handleSelectDate(date)}
-                >
-                  <span className="text-sm">{format(date, "d")}</span>
-                  {isAvailable && (
-                    <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-[#f8a0a0] rounded-full"></span>
-                  )}
-                </Button>
-              )
-            })}
-      </div>
-
-      {selectedDateInternal && (
-        <Card className="mt-4">
-          <CardContent className="p-4">
-            <h4 className="text-base font-medium mb-2">
-              {format(selectedDateInternal, "yyyy年MM月dd日(EEE)", { locale: ja })}の予約可能時間
-            </h4>
-
-            {isLoadingTimeSlots ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
-            ) : availableTimeSlots.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {availableTimeSlots.map((slot, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    className={cn(
-                      "border-[#f8a0a0] text-[#f8a0a0] hover:bg-[#f8a0a0] hover:text-white",
-                      selectedTime && selectedTime.start === slot.startTime && "bg-[#f8a0a0] text-white",
-                    )}
-                    onClick={() => handleSelectTimeSlot(slot.startTime, slot.endTime)}
-                  >
-                    <Clock className="h-3 w-3 mr-1" />
-                    {slot.startTime}
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500">予約可能な時間がありません</div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {isLoading && <p>予約枠を読み込み中...</p>}
+      </CardContent>
+    </Card>
   )
 }

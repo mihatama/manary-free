@@ -1,242 +1,191 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { revalidatePath } from "next/cache"
 import { validateCSRFToken } from "@/lib/csrf"
-import { createAppointment } from "@/app/actions/reservation-actions" // 実際の予約作成アクションをインポート
+import { createAppointment } from "@/app/actions/reservation-actions"
 
-// CSRF検証を行うヘルパー関数 (これは既存のままで問題ない想定)
-// async function validateCSRF(formData: FormData) {
-//   const csrfToken = formData.get("csrf_token") as string
-//   if (!validateCSRFToken(csrfToken)) {
-//     throw new Error("セキュリティトークンが無効です。ページを再読み込みしてください。")
-//   }
-// }
-
-// 問診票を送信 (これは既存のままで問題ない想定)
-export async function submitQuestionnaire(data: any) {
-  try {
-    const phoneNumber = data.phoneNumber
-
-    if (!phoneNumber) {
-      throw new Error("電話番号が必要です")
-    }
-
-    const questionnaireData = {
-      phone_number: phoneNumber,
-      location_nishinomiya: data.locationNishinomiya || false,
-      location_takarazuka: data.locationTakarazuka || false,
-      location_nihonbashi: data.locationNihonbashi || false,
-      location_aichi: data.locationAichi || false,
-      location_visit: data.locationVisit || false,
-      mother_last_name: data.motherLastName || "",
-      mother_first_name: data.motherFirstName || "",
-      mother_last_name_kana: data.motherLastNameKana || "",
-      mother_first_name_kana: data.motherFirstNameKana || "",
-      mother_birth_year: data.motherBirthYear || null,
-      mother_birth_month: data.motherBirthMonth || null,
-      mother_birth_day: data.motherBirthDay || null,
-      child_last_name: data.childLastName || "",
-      child_first_name: data.childFirstName || "",
-      child_last_name_kana: data.childLastNameKana || "",
-      child_first_name_kana: data.childFirstNameKana || "",
-      child_birth_year: data.childBirthYear || null,
-      child_birth_month: data.childBirthMonth || null,
-      child_birth_day: data.childBirthDay || null,
-      child_number: data.childNumber || null,
-      child_gender: data.childGender || "",
-      occupation: data.occupation || "",
-      is_on_maternity_leave: data.isOnMaternityLeave || false,
-      has_resigned: data.hasResigned || false,
-      email: data.email || "",
-      notes: data.notes || "", // 問診票の備考
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    const supabase = createClient()
-    const { data: questionnaireResult, error: questionnaireError } = await supabase
-      .from("questionnaires")
-      .insert([questionnaireData])
-      .select()
-
-    if (questionnaireError) {
-      console.error("問診票保存エラー:", questionnaireError)
-      throw new Error(questionnaireError.message)
-    }
-
-    console.log("問診票保存成功:", questionnaireResult)
-    return {
-      success: true,
-      message: "問診票が送信されました",
-      data: questionnaireResult[0],
-    }
-  } catch (error: any) {
-    console.error("Error in submitQuestionnaire:", error)
-    return { success: false, error: error.message || "問診票の送信に失敗しました" }
-  }
-}
-
-// 電話番号で問診票を取得 (これは既存のままで問題ない想定)
+// 電話番号で問診票を取得
 export async function getQuestionnaireByPhone(phoneNumber: string) {
+  const supabase = createClient()
   try {
-    const supabase = createClient()
     const { data, error } = await supabase
       .from("questionnaires")
       .select("*")
       .eq("phone_number", phoneNumber)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single()
+      .maybeSingle() // 1件または0件を期待
 
     if (error) {
-      // 該当データがない場合はエラーではなくnullを返すのが一般的
-      if (error.code === "PGRST116") {
-        return null
-      }
-      console.error("問診票取得エラー:", error)
+      console.error("電話番号による問診票取得エラー:", error)
       return null
     }
     return data
   } catch (error) {
-    console.error("問診票取得中のエラー:", error)
+    console.error("Error in getQuestionnaireByPhone:", error)
     return null
   }
 }
 
-// 問診票と予約を同時に作成
-export async function createQuestionnaireAndReservation(questionnaireAndReservationData: {
-  // 問診票データ (submitQuestionnaireが期待する形式)
-  phoneNumber: string
-  locationNishinomiya?: boolean
-  locationTakarazuka?: boolean
-  locationNihonbashi?: boolean
-  locationAichi?: boolean
-  locationVisit?: boolean
-  motherLastName?: string
-  motherFirstName?: string
-  motherLastNameKana?: string
-  motherFirstNameKana?: string
-  motherBirthYear?: number
-  motherBirthMonth?: number
-  motherBirthDay?: number
-  childLastName?: string
-  childFirstName?: string
-  childLastNameKana?: string
-  childFirstNameKana?: string
-  childBirthYear?: number
-  childBirthMonth?: number
-  childBirthDay?: number
-  childNumber?: number
-  childGender?: string
-  occupation?: string
-  isOnMaternityLeave?: boolean
-  hasResigned?: boolean
-  email?: string
-  notes?: string // 問診票の備考
-  csrf_token: string // CSRFトークン
-
-  // 予約固有データ (createAppointmentが期待するFormDataのキーに対応)
-  clinic_id: string
-  service_type_id: string
-  date: string // YYYY-MM-DD
-  start_time: string // HH:MM
-  end_time: string // HH:MM
-  // patient_name は motherLastName と motherFirstName から生成
-  // patient_phone は phoneNumber を使用
-  reservation_notes?: string // 予約時の備考 (問診票のnotesとは別の場合)
-}) {
+// 問診票を送信し、予約に紐付ける
+export async function submitAndLinkQuestionnaire(formData: FormData) {
+  const supabase = createClient()
   try {
-    // CSRFトークンを検証
-    if (!validateCSRFToken(questionnaireAndReservationData.csrf_token)) {
+    // CSRF検証
+    const csrfToken = formData.get("csrf_token") as string
+    if (!validateCSRFToken(csrfToken)) {
       throw new Error("セキュリティトークンが無効です。ページを再読み込みしてください。")
     }
 
-    // 1. 問診票を保存
-    // submitQuestionnaire に渡すデータを選別
-    const questionnaireDataForSubmit = {
-      phoneNumber: questionnaireAndReservationData.phoneNumber,
-      locationNishinomiya: questionnaireAndReservationData.locationNishinomiya,
-      locationTakarazuka: questionnaireAndReservationData.locationTakarazuka,
-      locationNihonbashi: questionnaireAndReservationData.locationNihonbashi,
-      locationAichi: questionnaireAndReservationData.locationAichi,
-      locationVisit: questionnaireAndReservationData.locationVisit,
-      motherLastName: questionnaireAndReservationData.motherLastName,
-      motherFirstName: questionnaireAndReservationData.motherFirstName,
-      motherLastNameKana: questionnaireAndReservationData.motherLastNameKana,
-      motherFirstNameKana: questionnaireAndReservationData.motherFirstNameKana,
-      motherBirthYear: questionnaireAndReservationData.motherBirthYear,
-      motherBirthMonth: questionnaireAndReservationData.motherBirthMonth,
-      motherBirthDay: questionnaireAndReservationData.motherBirthDay,
-      childLastName: questionnaireAndReservationData.childLastName,
-      childFirstName: questionnaireAndReservationData.childFirstName,
-      childLastNameKana: questionnaireAndReservationData.childLastNameKana,
-      childFirstNameKana: questionnaireAndReservationData.childFirstNameKana,
-      childBirthYear: questionnaireAndReservationData.childBirthYear,
-      childBirthMonth: questionnaireAndReservationData.childBirthMonth,
-      childBirthDay: questionnaireAndReservationData.childBirthDay,
-      childNumber: questionnaireAndReservationData.childNumber,
-      childGender: questionnaireAndReservationData.childGender,
-      occupation: questionnaireAndReservationData.occupation,
-      isOnMaternityLeave: questionnaireAndReservationData.isOnMaternityLeave,
-      hasResigned: questionnaireAndReservationData.hasResigned,
-      email: questionnaireAndReservationData.email,
-      notes: questionnaireAndReservationData.notes, // 問診票の備考
-    }
-    const questionnaireResult = await submitQuestionnaire(questionnaireDataForSubmit)
+    const appointmentId = Number(formData.get("appointment_id"))
+    const appointmentToken = formData.get("appointment_token") as string
+    const phoneNumber = formData.get("phone_number") as string
 
-    if (!questionnaireResult.success || !questionnaireResult.data) {
-      throw new Error(questionnaireResult.error || "問診票の保存に失敗しました")
+    if (!appointmentId || !appointmentToken || !phoneNumber) {
+      throw new Error("予約情報が不足しています。")
     }
 
-    const savedQuestionnaire = questionnaireResult.data
+    // 1. 問診票データを作成
+    const { data: questionnaireData, error: questionnaireError } = await supabase
+      .from("questionnaires")
+      .insert([
+        {
+          // フォームから全てのデータを取得してマッピング
+          location_nishinomiya: formData.get("locationNishinomiya") === "on",
+          location_takarazuka: formData.get("locationTakarazuka") === "on",
+          location_nihonbashi: formData.get("locationNihonbashi") === "on",
+          location_aichi: formData.get("locationAichi") === "on",
+          location_visit: formData.get("locationVisit") === "on",
+          mother_last_name: formData.get("motherLastName") as string,
+          mother_first_name: formData.get("motherFirstName") as string,
+          mother_last_name_kana: formData.get("motherLastNameKana") as string,
+          mother_first_name_kana: formData.get("motherFirstNameKana") as string,
+          mother_birth_year: Number(formData.get("motherBirthYear")),
+          mother_birth_month: Number(formData.get("motherBirthMonth")),
+          mother_birth_day: Number(formData.get("motherBirthDay")),
+          child_last_name: formData.get("childLastName") as string,
+          child_first_name: formData.get("childFirstName") as string,
+          child_last_name_kana: formData.get("childLastNameKana") as string,
+          child_first_name_kana: formData.get("childFirstNameKana") as string,
+          child_birth_year: Number(formData.get("childBirthYear")),
+          child_birth_month: Number(formData.get("childBirthMonth")),
+          child_birth_day: Number(formData.get("childBirthDay")),
+          child_number: Number(formData.get("childNumber")),
+          child_gender: formData.get("childGender") as string,
+          occupation: formData.get("occupation") as string,
+          is_on_maternity_leave: formData.get("isOnMaternityLeave") === "on",
+          has_resigned: formData.get("hasResigned") === "on",
+          email: formData.get("email") as string,
+          phone_number: phoneNumber,
+          notes: formData.get("notes") as string,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single()
 
-    // 2. 予約データ用のFormDataを構築
-    const appointmentFormData = new FormData()
-    appointmentFormData.append("clinic_id", questionnaireAndReservationData.clinic_id)
-    appointmentFormData.append("service_type_id", questionnaireAndReservationData.service_type_id)
-    appointmentFormData.append("date", questionnaireAndReservationData.date)
-    appointmentFormData.append("start_time", questionnaireAndReservationData.start_time)
-    appointmentFormData.append("end_time", questionnaireAndReservationData.end_time)
-
-    const patientName =
-      `${questionnaireAndReservationData.motherLastName || ""} ${questionnaireAndReservationData.motherFirstName || ""}`.trim()
-    appointmentFormData.append("patient_name", patientName || "名前未入力")
-    appointmentFormData.append("patient_phone", questionnaireAndReservationData.phoneNumber)
-
-    if (questionnaireAndReservationData.email) {
-      appointmentFormData.append("email", questionnaireAndReservationData.email)
+    if (questionnaireError) {
+      console.error("問診票作成エラー:", questionnaireError)
+      throw new Error("問診票の保存に失敗しました。")
     }
-    // 予約時の備考 (問診票のnotesとは別に設定する場合。なければ問診票のnotesを使うか、空にする)
-    appointmentFormData.append(
-      "notes",
-      questionnaireAndReservationData.reservation_notes || questionnaireAndReservationData.notes || "",
-    )
-    appointmentFormData.append("csrf_token", questionnaireAndReservationData.csrf_token)
-    appointmentFormData.append("questionnaire_id", savedQuestionnaire.id) // 保存した問診票のIDを連携
 
-    // 3. 予約を作成
-    const appointmentResult = await createAppointment(appointmentFormData)
+    // 2. 予約テーブルを更新して問診票IDを紐付ける
+    const { error: appointmentUpdateError } = await supabase
+      .from("appointments")
+      .update({ questionnaire_id: questionnaireData.id })
+      .eq("id", appointmentId)
 
-    if (!appointmentResult.success || !appointmentResult.appointment) {
-      // ここで問診票のロールバック処理を検討することもできるが、まずはエラーを投げる
-      console.error("予約作成失敗:", appointmentResult.error)
-      throw new Error(appointmentResult.error || "予約の作成に失敗しました")
+    if (appointmentUpdateError) {
+      console.error("予約更新エラー:", appointmentUpdateError)
+      // ここでロールバック処理を入れるのが理想だが、簡略化のためエラーを投げる
+      throw new Error("予約情報との紐付けに失敗しました。")
     }
 
-    return {
-      success: true,
-      message: "問診票と予約が正常に作成されました",
-      questionnaireId: savedQuestionnaire.id,
-      appointmentId: appointmentResult.appointment.id,
-      appointmentToken: appointmentResult.appointment.token, // 予約確認に必要なトークン
-    }
+    revalidatePath(`/reservation/manage?token=${appointmentToken}`)
+    revalidatePath(`/reservation/questionnaire?token=${appointmentToken}`)
+    revalidatePath("/dashboard/appointments")
+    return { success: true, questionnaire: questionnaireData }
   } catch (error: any) {
-    console.error("問診票と予約の作成エラー:", error)
-    return {
-      success: false,
-      error: error.message || "問診票と予約の作成中にエラーが発生しました",
-    }
+    console.error("Error in submitAndLinkQuestionnaire:", error)
+    return { success: false, error: error.message || "問診票の送信に失敗しました。" }
   }
 }
 
-// ダミーの createReservation 関数は削除されました
+export async function createQuestionnaireAndReservation(formData: FormData) {
+  const supabase = createClient()
+  try {
+    // CSRF検証
+    const csrfToken = formData.get("csrf_token") as string
+    if (!validateCSRFToken(csrfToken)) {
+      throw new Error("セキュリティトークンが無効です。ページを再読み込みしてください。")
+    }
+
+    const phoneNumber = formData.get("phone_number") as string
+    if (!phoneNumber) {
+      throw new Error("電話番号は必須です。")
+    }
+
+    // 1. 問診票データを作成
+    const { data: questionnaireData, error: questionnaireError } = await supabase
+      .from("questionnaires")
+      .insert([
+        {
+          location_nishinomiya: formData.get("locationNishinomiya") === "on",
+          location_takarazuka: formData.get("locationTakarazuka") === "on",
+          location_nihonbashi: formData.get("locationNihonbashi") === "on",
+          location_aichi: formData.get("locationAichi") === "on",
+          location_visit: formData.get("locationVisit") === "on",
+          mother_last_name: formData.get("motherLastName") as string,
+          mother_first_name: formData.get("motherFirstName") as string,
+          mother_last_name_kana: formData.get("motherLastNameKana") as string,
+          mother_first_name_kana: formData.get("motherFirstNameKana") as string,
+          mother_birth_year: Number(formData.get("motherBirthYear")),
+          mother_birth_month: Number(formData.get("motherBirthMonth")),
+          mother_birth_day: Number(formData.get("motherBirthDay")),
+          child_last_name: formData.get("childLastName") as string,
+          child_first_name: formData.get("childFirstName") as string,
+          child_last_name_kana: formData.get("childLastNameKana") as string,
+          child_first_name_kana: formData.get("childFirstNameKana") as string,
+          child_birth_year: Number(formData.get("childBirthYear")),
+          child_birth_month: Number(formData.get("childBirthMonth")),
+          child_birth_day: Number(formData.get("childBirthDay")),
+          child_number: Number(formData.get("childNumber")),
+          child_gender: formData.get("childGender") as string,
+          occupation: formData.get("occupation") as string,
+          is_on_maternity_leave: formData.get("isOnMaternityLeave") === "on",
+          has_resigned: formData.get("hasResigned") === "on",
+          email: formData.get("email") as string,
+          phone_number: phoneNumber,
+          notes: formData.get("notes") as string,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single()
+
+    if (questionnaireError) {
+      console.error("問診票作成エラー:", questionnaireError)
+      throw new Error("問診票の保存に失敗しました。")
+    }
+
+    // 2. 予約を作成するために、formDataを準備
+    formData.set("questionnaire_id", questionnaireData.id.toString())
+    const childName = `${formData.get("childLastName") as string} ${formData.get("childFirstName") as string}`
+    formData.set("patient_name", childName)
+    formData.set("patient_phone", phoneNumber)
+    formData.set("patient_email", formData.get("email") as string)
+
+    // 3. 予約作成アクションを呼び出す
+    const reservationResult = await createAppointment(formData)
+
+    if (!reservationResult.success) {
+      // TODO: Consider rolling back the questionnaire creation
+      throw new Error(reservationResult.error || "予約の作成に失敗しました。")
+    }
+
+    revalidatePath("/reservation/new") // Revalidate the page where this might be used
+    return { success: true, questionnaire: questionnaireData, appointment: reservationResult.appointment }
+  } catch (error: any) {
+    console.error("Error in createQuestionnaireAndReservation:", error)
+    return { success: false, error: error.message || "問診票と予約の作成に失敗しました。" }
+  }
+}
