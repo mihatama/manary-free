@@ -3,6 +3,9 @@ import { redirect } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { DashboardNav } from "@/components/dashboard-nav"
 
+// 静的生成を無効にして動的レンダリングを強制
+export const dynamic = "force-dynamic"
+
 export default async function DashboardLayout({
   children,
 }: {
