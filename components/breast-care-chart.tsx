@@ -85,39 +85,48 @@ export function BreastCareChart({ appointment, onClose }: BreastCareChartProps) 
 
   useEffect(() => {
     async function fetchChartData() {
-      const { data: chartData, error } = await getBreastCareChartByAppointmentId(appointment.id)
-      if (error) {
-        toast.error("カルテ情報の読み込みに失敗しました。")
-        // Initialize with questionnaire data even if fetch fails
-        const questionnaire = appointment.questionnaires
-        reset({
-          appointment_id: appointment.id,
-          visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
-          clinic_location: questionnaire?.visit_locations || [],
-        })
-      } else if (chartData) {
-        reset(chartData as ChartFormData)
-      } else {
-        // No existing chart, pre-fill from questionnaire
-        const questionnaire = appointment.questionnaires
-        reset({
-          appointment_id: appointment.id,
-          visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
-          clinic_location: questionnaire?.visit_locations || [],
-          // Add other pre-fill fields here if needed
-        })
+      try {
+        const { data: chartData, error } = await getBreastCareChartByAppointmentId(appointment.id)
+        if (error) {
+          toast.error("カルテ情報の読み込みに失敗しました。")
+          // Initialize with questionnaire data even if fetch fails
+          const questionnaire = appointment.questionnaires
+          reset({
+            appointment_id: appointment.id,
+            visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
+            clinic_location: questionnaire?.visit_locations || [],
+          })
+        } else if (chartData) {
+          reset(chartData as ChartFormData)
+        } else {
+          // No existing chart, pre-fill from questionnaire
+          const questionnaire = appointment.questionnaires
+          reset({
+            appointment_id: appointment.id,
+            visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
+            clinic_location: questionnaire?.visit_locations || [],
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching chart data:", error)
+        toast.error("カルテ情報の読み込み中にエラーが発生しました。")
       }
     }
     fetchChartData()
   }, [appointment, reset])
 
   const onSubmit = async (formData: ChartFormData) => {
-    const { error } = await upsertBreastCareChart(formData)
-    if (error) {
-      toast.error("カルテの保存に失敗しました。", { description: error })
-    } else {
-      toast.success("カルテを保存しました。")
-      onClose()
+    try {
+      const { error } = await upsertBreastCareChart(formData)
+      if (error) {
+        toast.error("カルテの保存に失敗しました。", { description: error })
+      } else {
+        toast.success("カルテを保存しました。")
+        onClose()
+      }
+    } catch (error) {
+      console.error("Error saving chart:", error)
+      toast.error("カルテの保存中にエラーが発生しました。")
     }
   }
 

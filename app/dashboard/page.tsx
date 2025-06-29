@@ -1,97 +1,148 @@
-import { requireAuth } from "@/lib/auth"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import Link from "next/link"
-import { Calendar, Users, MessageSquare } from "lucide-react"
-import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CalendarDays, Users, Clock, CheckCircle } from "lucide-react"
+
+export const dynamic = "force-dynamic"
+
+async function getDashboardStats() {
+  try {
+    const supabase = createClient()
+
+    // Get total appointments
+    const { count: totalAppointments } = await supabase.from("appointments").select("*", { count: "exact", head: true })
+
+    // Get today's appointments
+    const today = new Date().toISOString().split("T")[0]
+    const { count: todayAppointments } = await supabase
+      .from("appointments")
+      .select("*", { count: "exact", head: true })
+      .eq("appointment_date", today)
+      .neq("status", "cancelled")
+
+    // Get confirmed appointments
+    const { count: confirmedAppointments } = await supabase
+      .from("appointments")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "confirmed")
+
+    // Get total questionnaires
+    const { count: totalQuestionnaires } = await supabase
+      .from("questionnaires")
+      .select("*", { count: "exact", head: true })
+
+    return {
+      totalAppointments: totalAppointments || 0,
+      todayAppointments: todayAppointments || 0,
+      confirmedAppointments: confirmedAppointments || 0,
+      totalQuestionnaires: totalQuestionnaires || 0,
+    }
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error)
+    return {
+      totalAppointments: 0,
+      todayAppointments: 0,
+      confirmedAppointments: 0,
+      totalQuestionnaires: 0,
+    }
+  }
+}
 
 export default async function DashboardPage() {
-  try {
-    // 認証チェック
-    const session = await requireAuth()
-    const user = session?.user || { name: "ユーザー", role: "admin" }
+  const stats = await getDashboardStats()
 
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-8">
-          <h1 className="text-2xl font-bold mb-6">ダッシュボード</h1>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Link href="/dashboard/schedule-settings">
-              <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>予約設定</CardTitle>
-                    <Calendar className="h-5 w-5 text-manary-pink" />
-                  </div>
-                  <CardDescription>診療種別と予約可能時間の設定</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">{/* 数値データがあれば表示 */}</p>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/dashboard/users">
-              <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>利用者管理</CardTitle>
-                    <Users className="h-5 w-5 text-manary-green" />
-                  </div>
-                  <CardDescription>システム全体の利用者数</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">128</p>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/dashboard/messages">
-              <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>未読メッセージ</CardTitle>
-                    <MessageSquare className="h-5 w-5 text-manary-lightgreen" />
-                  </div>
-                  <CardDescription>未対応のお問い合わせ</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">5</p>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-
-          <div className="mt-8">
-            <h2 className="text-xl font-bold mb-4">最近の活動</h2>
-            <Card>
-              <CardContent className="p-0">
-                <ul className="divide-y divide-gray-200">
-                  {[
-                    { id: 1, action: "新規ユーザー登録", user: "田中さん", time: "10分前" },
-                    { id: 2, action: "予約変更", user: "佐藤さん", time: "30分前" },
-                    { id: 3, action: "メッセージ送信", user: "鈴木さん", time: "1時間前" },
-                    { id: 4, action: "予約キャンセル", user: "高橋さん", time: "2時間前" },
-                    { id: 5, action: "新規予約", user: "伊藤さん", time: "3時間前" },
-                  ].map((activity) => (
-                    <li key={activity.id} className="px-4 py-3 flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">{activity.action}</p>
-                        <p className="text-sm text-gray-500">{activity.user}</p>
-                      </div>
-                      <span className="text-sm text-gray-500">{activity.time}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">ダッシュボード</h2>
+        <p className="text-muted-foreground">システムの概要と統計情報</p>
       </div>
-    )
-  } catch (error) {
-    console.error("Error in DashboardPage:", error)
-    // エラーが発生した場合はログインページにリダイレクト
-    redirect("/")
-  }
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">総予約数</CardTitle>
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalAppointments}</div>
+            <p className="text-xs text-muted-foreground">全期間の予約数</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">本日の予約</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.todayAppointments}</div>
+            <p className="text-xs text-muted-foreground">今日の予約数</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">確定予約</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.confirmedAppointments}</div>
+            <p className="text-xs text-muted-foreground">確定済みの予約数</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">問診票</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalQuestionnaires}</div>
+            <p className="text-xs text-muted-foreground">登録済み問診票数</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>最近の活動</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <div className="ml-4 space-y-1">
+                  <p className="text-sm font-medium leading-none">予約システムが正常に動作しています</p>
+                  <p className="text-sm text-muted-foreground">すべての機能が利用可能です</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>クイックアクション</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="text-sm">
+              <a href="/dashboard/appointments" className="text-blue-600 hover:underline">
+                予約一覧を見る
+              </a>
+            </div>
+            <div className="text-sm">
+              <a href="/dashboard/settings" className="text-blue-600 hover:underline">
+                設定を変更する
+              </a>
+            </div>
+            <div className="text-sm">
+              <a href="/dashboard/users" className="text-blue-600 hover:underline">
+                ユーザー管理
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
 }
