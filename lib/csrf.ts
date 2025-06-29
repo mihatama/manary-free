@@ -10,39 +10,43 @@ function bufferToHex(buffer: ArrayBuffer): string {
     .join("")
 }
 
+// Helper to convert hex string to Uint8Array
+function hexToUint8Array(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = Number.parseInt(hex.substring(i, i + 2), 16)
+  }
+  return bytes
+}
+
 // Helper to create HMAC signature using Web Crypto API
 async function createHmacSignature(secret: BufferSource, data: string): Promise<string> {
-  // Ensure crypto is available (for environments like Node.js during SSR if needed, or browser)
-  const cryptoRef = typeof window !== "undefined" ? window.crypto : require("crypto").webcrypto
-
-  const key = await cryptoRef.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
-  const signature = await cryptoRef.subtle.sign("HMAC", key, new TextEncoder().encode(data))
+  // Use the global crypto object which is standard in modern environments
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data))
   return bufferToHex(signature)
 }
 
 // This function gets the secret, or creates and sets it as an HTTPOnly cookie if not present.
-function getSecret(): Buffer {
+function getSecret(): Uint8Array {
   const cookieStore = cookies()
   const secretCookie = cookieStore.get("csrf_secret")
   if (secretCookie && secretCookie.value) {
-    return Buffer.from(secretCookie.value, "hex")
+    return hexToUint8Array(secretCookie.value)
   }
 
-  // Ensure crypto is available
-  const cryptoRef = typeof window !== "undefined" ? window.crypto : require("crypto").webcrypto
-
+  // Use the global crypto object to generate random values
   const newSecretBytes = new Uint8Array(SECRET_LENGTH)
-  cryptoRef.getRandomValues(newSecretBytes)
-  const newSecret = Buffer.from(newSecretBytes)
+  crypto.getRandomValues(newSecretBytes)
 
-  cookieStore.set("csrf_secret", newSecret.toString("hex"), {
+  cookieStore.set("csrf_secret", bufferToHex(newSecretBytes), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     path: "/",
     sameSite: "strict",
     maxAge: 60 * 60 * 24, // 24 hours
   })
-  return newSecret
+  return newSecretBytes
 }
 
 export async function generateCSRFToken(): Promise<string> {
@@ -59,17 +63,22 @@ export async function validateCSRFToken(token: string): Promise<boolean> {
       console.error("CSRF secret cookie not found for validation.")
       return false
     }
-    const secret = Buffer.from(secretCookie.value, "hex")
+    const secret = hexToUint8Array(secretCookie.value)
     const expectedToken = await createHmacSignature(secret, CSRF_DATA_TO_SIGN)
 
+    // Constant-time comparison is crucial for security
     if (token.length !== expectedToken.length) {
       return false
     }
 
-    // Constant-time comparison for security
+    const tokenBytes = new TextEncoder().encode(token)
+    const expectedTokenBytes = new TextEncoder().encode(expectedToken)
+
+    // crypto.subtle.timingSafeEqual is the ideal way, but not universally available.
+    // We can build a robust fallback.
     let result = 0
-    for (let i = 0; i < token.length; i++) {
-      result |= token.charCodeAt(i) ^ expectedToken.charCodeAt(i)
+    for (let i = 0; i < tokenBytes.length; i++) {
+      result |= tokenBytes[i] ^ expectedTokenBytes[i]
     }
     return result === 0
   } catch (error) {

@@ -11,15 +11,16 @@ Manaryは、助産院やクリニック向けの予約管理・顧客管理シ�
 - [技術スタック](#技術スタック)
 - [プロジェクト構成](#プロジェクト構成)
 - [ローカル開発環境のセットアップ](#ローカル開発環境のセットアップ)
-  - [前提条件](#前提条件)
-  - [インストールと設定](#インストールと設定)
-  - [Supabaseのセットアップ](#supabaseのセットアップ)
-  - [Twilioのセットアップ](#twilioのセットアップ)
+- [前提条件](#前提条件)
+- [インストールと設定](#インストールと設定)
+- [Supabaseのセットアップ](#supabaseのセットアップ)
+- [Twilioのセットアップ](#twilioのセットアップ)
 - [主要なコンセプト](#主要なコンセプト)
-  - [認証](#認証)
-  - [Server Actions](#server-actions)
-  - [CSRF保護](#csrf保護)
-  - [予約スケジューリング](#予約スケジューリング)
+- [認証](#認証)
+- [Server Actions](#server-actions)
+- [CSRF保護](#csrf保護)
+- [予約スケジューリング](#予約スケジューリング)
+- [電子カルテ（乳房ケア）](#電子カルテ乳房ケア)
 - [デプロイ](#デプロイ)
 - [ライセンス](#ライセンス)
 
@@ -28,6 +29,7 @@ Manaryは、助産院やクリニック向けの予約管理・顧客管理シ�
 ### 管理者向け機能
 - **ダッシュボード**: 予約状況の概要を確認できます。
 - **予約管理**: 全ての予約をカレンダー形式またはリスト形式で表示・編集・新規作成できます。
+- **電子カルテ（乳房ケア）**: 「乳房ケア」の予約に対し、詳細なカルテを記録できます。問診票から情報を自動入力し、授乳状況、乳房の状態（図を含む）、S/O/A/P形式での記録が可能です。
 - **スケジュール設定**: 助産院、診療種別、予約可能時間（曜日ごと・特定日）を管理できます。
 - **ユーザー管理**: 管理者ユーザーの追加・一覧表示が可能です。
 - **メッセージ管理**: （将来的な機能）
@@ -59,10 +61,15 @@ manary/
 │   │   ├── reservation/
 │   │   └── page.tsx
 │   ├── actions/              # Server Actions
+│   │   ├── auth-actions.ts
+│   │   ├── breast-care-actions.ts # New
+│   │   └── ...
 │   ├── api/                  # API Routes
 │   └── layout.tsx            # ルートレイアウト
 ├── components/               # 再利用可能なReactコンポーネント
 │   ├── ui/                   # shadcn/ui コンポーネント
+│   ├── breast-care-chart.tsx # New
+│   ├── breast-diagram-input.tsx # New
 │   └── *.tsx                 # アプリケーション固有のコンポーネント
 ├── lib/                      # ライブラリ、ヘルパー関数
 │   ├── supabase/             # Supabaseクライアント、型定義
@@ -85,90 +92,90 @@ manary/
 ### インストールと設定
 
 1.  **リポジトリをクローン**
-    \`\`\`bash
-    git clone https://github.com/your-username/manary.git
-    cd manary
-    \`\`\`
+\`\`\`bash
+git clone https://github.com/your-username/manary.git
+cd manary
+\`\`\`
 
 2.  **依存関係をインストール**
-    \`\`\`bash
-    pnpm install
-    \`\`\`
+\`\`\`bash
+pnpm install
+\`\`\`
 
 3.  **環境変数を設定**
-    プロジェクトルートに `.env.local` ファイルを作成し、以下の内容をコピーして、自身の値に書き換えてください。
+プロジェクトルートに `.env.local` ファイルを作成し、以下の内容をコピーして、自身の値に書き換えてください。
 
-    \`\`\`env
-    # Supabase
-    NEXT_PUBLIC_SUPABASE_URL= # SupabaseプロジェクトのURL
-    NEXT_PUBLIC_SUPABASE_ANON_KEY= # Supabaseプロジェクトのanon key
-    SUPABASE_SERVICE_ROLE_KEY= # Supabaseプロジェクトのservice_role key
+\`\`\`env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL= # SupabaseプロジェクトのURL
+NEXT_PUBLIC_SUPABASE_ANON_KEY= # Supabaseプロジェクトのanon key
+SUPABASE_SERVICE_ROLE_KEY= # Supabaseプロジェクトのservice_role key
 
-    # Twilio
-    TWILIO_ACCOUNT_SID= # TwilioのAccount SID
-    TWILIO_AUTH_TOKEN= # TwilioのAuth Token
-    TWILIO_VERIFY_SERVICE_SID= # Twilio VerifyサービスのSID
-    TWILIO_PHONE_NUMBER= # Twilioで購入した電話番号
+# Twilio
+TWILIO_ACCOUNT_SID= # TwilioのAccount SID
+TWILIO_AUTH_TOKEN= # TwilioのAuth Token
+TWILIO_VERIFY_SERVICE_SID= # Twilio VerifyサービスのSID
+TWILIO_PHONE_NUMBER= # Twilioで購入した電話番号
 
-    # Application
-    NEXT_PUBLIC_BASE_URL=http://localhost:3000 # アプリケーションのベースURL
-    MOCK_SMS=true # trueにするとSMSを実際には送信せず、コンソールに出力します
-    \`\`\`
+# Application
+NEXT_PUBLIC_BASE_URL=http://localhost:3000 # アプリケーションのベースURL
+MOCK_SMS=true # trueにするとSMSを実際には送信せず、コンソールに出力します
+\`\`\`
 
 4.  **開発サーバーを起動**
-    \`\`\`bash
-    pnpm dev
-    \`\`\`
-    ブラウザで `http://localhost:3000` を開きます。
+\`\`\`bash
+pnpm dev
+\`\`\`
+ブラウザで `http://localhost:3000` を開きます。
 
 ### Supabaseのセットアップ
 
 1.  **Supabaseプロジェクトを作成**
-    [Supabase公式サイト](https://supabase.com/)で新しいプロジェクトを作成します。
+[Supabase公式サイト](https://supabase.com/)で新しいプロジェクトを作成します。
 
 2.  **データベーススキーマを設定**
-    Supabaseダッシュボードの `SQL Editor` で、プロジェクトに必要なテーブルを作成します。以下のSQLを実行してください。（これは基本的な構造です。詳細は `lib/supabase/database.types.ts` を参照してください）
+Supabaseダッシュボードの `SQL Editor` で、プロジェクトに必要なテーブルを作成します。以下のSQLを実行してください。（これは基本的な構造です。詳細は `lib/supabase/database.types.ts` を参照してください）
 
-    \`\`\`sql
-    -- clinics, service_types, availability_settings, appointments, questionnaires, users テーブルを作成
-    -- 詳細はプロジェクト内の `SUPABASE_SETUP.md` や型定義ファイルを参照してください。
-    -- 例: clinics テーブル
-    CREATE TABLE clinics (
-        id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-        name TEXT NOT NULL,
-        address TEXT,
-        phone TEXT,
-        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-    );
-    \`\`\`
-    **注**: 完全なスキーマ設定については、プロジェクト内の `SUPABASE_SETUP.md` を参照してください。
+\`\`\`sql
+-- clinics, service_types, availability_settings, appointments, questionnaires, users, breast_care_charts テーブルを作成
+-- 詳細はプロジェクト内の `SUPABASE_SETUP.md` や型定義ファイルを参照してください。
+-- 例: clinics テーブル
+CREATE TABLE clinics (
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  name TEXT NOT NULL,
+  address TEXT,
+  phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+\`\`\`
+**注**: 完全なスキーマ設定については、プロジェクト内の `SUPABASE_SETUP.md` を参照してください。
 
 3.  **認証設定**
-    - Supabaseダッシュボード > `Authentication` > `URL Configuration` に移動します。
-    - **Site URL**: `http://localhost:3000`
-    - **Redirect URLs**:
-      - `http://localhost:3000/auth/callback`
-      - `http://localhost:3000/update-password`
+- Supabaseダッシュボード > `Authentication` > `URL Configuration` に移動します。
+- **Site URL**: `http://localhost:3000`
+- **Redirect URLs**:
+- `http://localhost:3000/auth/callback`
+- `http://localhost:3000/update-password`
 
 4.  **管理者ユーザーを作成**
-    - Supabaseダッシュボード > `Authentication` > `Users` に移動し、「Add User」から管理者用のユーザーを作成します。
-    - `Database` > `Table editor` で `users` テーブル（または `profiles` テーブル）を開き、作成したユーザーの `role` を `admin` に設定します。
+- Supabaseダッシュボード > `Authentication` > `Users` に移動し、「Add User」から管理者用のユーザーを作成します。
+- `Database` > `Table editor` で `users` テーブル（または `profiles` テーブル）を開き、作成したユーザーの `role` を `admin` に設定します。
 
 ### Twilioのセットアップ
 
 1.  **Twilioアカウントを作成**
-    [Twilio公式サイト](https://www.twilio.com/)でアカウントを作成します。
+[Twilio公式サイト](https://www.twilio.com/)でアカウントを作成します。
 
 2.  **電話番号を取得**
-    SMSが送信可能な電話番号をTwilioコンソールから購入します。
+SMSが送信可能な電話番号をTwilioコンソールから購入します。
 
 3.  **APIキーを取得**
-    - `Account SID` と `Auth Token` をTwilioコンソールから取得し、`.env.local` に設定します。
+- `Account SID` と `Auth Token` をTwilioコンソールから取得し、`.env.local` に設定します。
 
 4.  **Verifyサービスを作成**
-    - `Verify` > `Services` に移動し、新しいサービスを作成します。
-    - 作成したサービスの `Service SID` を取得し、`.env.local` の `TWILIO_VERIFY_SERVICE_SID` に設定します。
+- `Verify` > `Services` に移動し、新しいサービスを作成します。
+- 作成したサービスの `Service SID` を取得し、`.env.local` の `TWILIO_VERIFY_SERVICE_SID` に設定します。
 
 ## 主要なコンセプト
 
@@ -191,24 +198,31 @@ manary/
 3.  `appointments` テーブルから既存の予約を取得し、既に埋まっている時間枠を除外します。
 4.  最終的に利用可能な時間枠がユーザーに表示されます。
 
+### 電子カルテ（乳房ケア）
+特定の診療種別（例：「乳房ケア」）に対して、詳細な電子カルテを記録する機能です。
+- **動的な表示**: 管理者ダッシュボードの予約一覧で、対象の予約にのみ「カルテ入力」ボタンが表示されます。
+- **自動入力と編集**: カルテを開くと、患者の基本情報（氏名、お子様の情報など）が既存の問診票から自動で入力されます。内容はすべて編集可能です。
+- **専門的な記録**: 授乳回数や量、乳房の状態（インタラクティブな図で記録）、S/O/A/P形式での所見など、専門的な情報を記録できます。
+- **データ連携**: 記録されたカルテデータは `breast_care_charts` テーブルに保存され、元の予約情報と一対一で紐付けられます。
+
 ## デプロイ
 
 このプロジェクトはVercelへのデプロイに最適化されています。
 
 1.  **リポジトリをGitHubにプッシュ**
 2.  **Vercelプロジェクトを作成**
-    - Vercelダッシュボードから、GitHubリポジトリをインポートして新しいプロジェクトを作成します。
-    - フレームワークプリセットとして `Next.js` が自動的に選択されます。
+- Vercelダッシュボードから、GitHubリポジトリをインポートして新しいプロジェクトを作成します。
+- フレームワークプリセットとして `Next.js` が自動的に選択されます。
 3.  **環境変数を設定**
-    - Vercelプロジェクトの `Settings` > `Environment Variables` で、`.env.local` と同じ内容の環境変数を設定します。
-    - **重要**: `NEXT_PUBLIC_BASE_URL` は、Vercelによって割り当てられた本番ドメイン（例: `https://your-project.vercel.app`）に設定してください。
-    - `MOCK_SMS` は `false` に設定するか、変数を削除して本番環境では実際にSMSが送信されるようにします。
+- Vercelプロジェクトの `Settings` > `Environment Variables` で、`.env.local` と同じ内容の環境変数を設定します。
+- **重要**: `NEXT_PUBLIC_BASE_URL` は、Vercelによって割り当てられた本番ドメイン（例: `https://your-project.vercel.app`）に設定してください。
+- `MOCK_SMS` は `false` に設定するか、変数を削除して本番環境では実際にSMSが送信されるようにします。
 4.  **SupabaseのURL設定を更新**
-    - Supabaseダッシュボードの `Authentication` > `URL Configuration` で、Site URLとRedirect URLsを本番ドメインに更新・追加します。
-    - **Site URL**: `https://your-project.vercel.app`
-    - **Redirect URLs**:
-      - `https://your-project.vercel.app/auth/callback`
-      - `https://your-project.vercel.app/update-password`
+- Supabaseダッシュボードの `Authentication` > `URL Configuration` で、Site URLとRedirect URLsを本番ドメインに更新・追加します。
+- **Site URL**: `https://your-project.vercel.app`
+- **Redirect URLs**:
+- `https://your-project.vercel.app/auth/callback`
+- `https://your-project.vercel.app/update-password`
 
 ## ライセンス
 
