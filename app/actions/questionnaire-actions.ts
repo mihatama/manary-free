@@ -6,6 +6,17 @@ import { createReservation } from "./reservation-actions"
 import type { Database } from "@/lib/supabase/database.types"
 
 type QuestionnaireInsert = Database["public"]["Tables"]["questionnaires"]["Insert"]
+type Questionnaire = Database["public"]["Tables"]["questionnaires"]["Row"]
+type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
+
+// Define a combined type for the response
+export type QuestionnaireWithReservation = Omit<Questionnaire, "data" | "updated_at"> & {
+  reservations: Pick<Reservation, "patient_name" | "reservation_date"> | null
+}
+
+export type DetailedQuestionnaireWithReservation = Questionnaire & {
+  reservations: Reservation | null
+}
 
 export async function createQuestionnaireAndReservation(formData: FormData) {
   const supabase = createClient()
@@ -53,56 +64,111 @@ export async function getQuestionnaires({
 }: {
   page?: number
   limit?: number
-}) {
+}): Promise<{ data: QuestionnaireWithReservation[]; count: number }> {
   noStore()
   const supabase = createClient()
   const offset = (page - 1) * limit
 
-  const { data, error, count } = await supabase
+  // Step 1: Fetch questionnaires with their reservation_id
+  const {
+    data: questionnairesData,
+    error: questionnairesError,
+    count,
+  } = await supabase
     .from("questionnaires")
-    .select(
-      `
-      id,
-      created_at,
-      reservations (
-        patient_name,
-        reservation_date
-      )
-    `,
-      { count: "exact" },
-    )
+    .select("id, created_at, reservation_id", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (error) {
-    console.error("Error fetching questionnaires:", error.message)
+  if (questionnairesError) {
+    console.error("Error fetching questionnaires:", questionnairesError.message)
     throw new Error("問診票の取得に失敗しました。")
   }
 
-  return { data, count: count ?? 0 }
+  if (!questionnairesData || questionnairesData.length === 0) {
+    return { data: [], count: 0 }
+  }
+
+  // Step 2: Extract non-null reservation IDs
+  const reservationIds = questionnairesData.map((q) => q.reservation_id).filter((id): id is number => id !== null)
+
+  let reservationsMap = new Map<number, Pick<Reservation, "id" | "patient_name" | "reservation_date">>()
+
+  // Step 3: Fetch the corresponding reservations if there are any IDs
+  if (reservationIds.length > 0) {
+    const { data: reservationsData, error: reservationsError } = await supabase
+      .from("reservations")
+      .select("id, patient_name, reservation_date")
+      .in("id", reservationIds)
+
+    if (reservationsError) {
+      console.error("Error fetching reservations:", reservationsError.message)
+      // Proceed without reservation data, but log the error.
+    } else if (reservationsData) {
+      reservationsMap = new Map(reservationsData.map((r) => [r.id, r]))
+    }
+  }
+
+  // Step 4: Combine the data
+  const combinedData = questionnairesData.map((q) => {
+    const reservation = q.reservation_id ? reservationsMap.get(q.reservation_id) : null
+    return {
+      id: q.id,
+      created_at: q.created_at,
+      reservation_id: q.reservation_id,
+      reservations: reservation
+        ? { patient_name: reservation.patient_name, reservation_date: reservation.reservation_date }
+        : null,
+    }
+  })
+
+  return { data: combinedData, count: count ?? 0 }
 }
 
-export async function getQuestionnaireById(id: number) {
+export async function getQuestionnaireById(id: number): Promise<DetailedQuestionnaireWithReservation | null> {
   noStore()
   const supabase = createClient()
 
-  const { data, error } = await supabase
+  // Step 1: Fetch the questionnaire
+  const { data: questionnaire, error: questionnaireError } = await supabase
     .from("questionnaires")
-    .select(
-      `
-      *,
-      reservations ( * )
-    `,
-    )
+    .select("*")
     .eq("id", id)
     .single()
 
-  if (error) {
-    console.error("Error fetching questionnaire by id:", error.message)
+  if (questionnaireError) {
+    console.error("Error fetching questionnaire by id:", questionnaireError.message)
     return null
   }
 
-  return data
+  if (!questionnaire) {
+    return null
+  }
+
+  // Step 2: Fetch the associated reservation if the ID exists
+  let reservationData: Reservation | null = null
+  if (questionnaire.reservation_id) {
+    const { data: reservation, error: reservationError } = await supabase
+      .from("reservations")
+      .select("*")
+      .eq("id", questionnaire.reservation_id)
+      .single()
+
+    if (reservationError) {
+      console.error("Error fetching reservation for questionnaire:", reservationError.message)
+      // Continue without reservation data
+    } else {
+      reservationData = reservation
+    }
+  }
+
+  // Step 3: Combine the data
+  const combinedData: DetailedQuestionnaireWithReservation = {
+    ...questionnaire,
+    reservations: reservationData,
+  }
+
+  return combinedData
 }
 
 export async function deleteQuestionnaire(id: number) {
