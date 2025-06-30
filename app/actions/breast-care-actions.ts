@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import type { Tables } from "@/lib/supabase/database.types"
+import { unstable_noStore as noStore } from "next/cache"
 
 type ChartInsert = Tables<"breast_care_charts">["Insert"]
 type ChartUpdate = Tables<"breast_care_charts">["Update"]
@@ -43,5 +44,22 @@ export async function upsertBreastCareChart(chartData: ChartInsert | ChartUpdate
   }
 
   revalidatePath("/dashboard/appointments")
+  revalidatePath("/dashboard/charts")
   return { data }
+}
+
+export async function getBreastCareChartById(id: number) {
+  noStore()
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("breast_care_charts")
+    .select(`*, reservations(*, questionnaires(*))`)
+    .eq("id", id)
+    .single()
+
+  if (error) {
+    console.error("Error fetching breast care chart by id:", error)
+  }
+
+  return { data, error }
 }

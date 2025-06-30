@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input"
 import { getAppointments } from "@/app/actions/reservation-actions"
 import { useDebounce } from "use-debounce"
 
-type AppointmentWithDetails = Tables<"appointments"> & {
+type AppointmentWithDetails = Tables<"reservations"> & {
   questionnaires: Tables<"questionnaires"> | null
   service_types: Tables<"service_types"> | null
   clinics: Tables<"clinics"> | null
@@ -43,7 +43,7 @@ interface AppointmentsClientProps {
 
 export function AppointmentsClient({ initialAppointments, user }: AppointmentsClientProps) {
   const [appointments, setAppointments] = useState(initialAppointments)
-  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithDetails | null>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [activeChart, setActiveChart] = useState<"breast" | "postpartum" | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -69,7 +69,7 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
     fetchAppointments()
   }, [fetchAppointments])
 
-  const handleViewDetails = (appointment: AppointmentWithDetails) => {
+  const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setIsDetailsOpen(true)
   }
@@ -79,7 +79,7 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
     setSelectedAppointment(null)
   }
 
-  const handleOpenChart = (chartType: "breast" | "postpartum", appointment: AppointmentWithDetails) => {
+  const handleOpenChart = (chartType: "breast" | "postpartum", appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setActiveChart(chartType)
   }
@@ -89,7 +89,8 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
     setSelectedAppointment(null)
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "N/A"
     try {
       const date = new Date(dateString)
       return date.toLocaleDateString("ja-JP", {
@@ -103,7 +104,8 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
     }
   }
 
-  const formatTime = (timeString: string) => {
+  const formatTime = (timeString: string | null) => {
+    if (!timeString) return "N/A"
     try {
       return timeString.substring(0, 5)
     } catch (error) {
@@ -132,12 +134,13 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
 
   const renderChart = () => {
     if (!selectedAppointment) return null
+    const appointmentForChart = selectedAppointment as AppointmentWithDetails
 
     switch (activeChart) {
       case "breast":
-        return <BreastCareChart appointment={selectedAppointment} onClose={handleCloseChart} user={user} />
+        return <BreastCareChart appointment={appointmentForChart} onClose={handleCloseChart} user={user} />
       case "postpartum":
-        return <PostpartumCareChart appointment={selectedAppointment} onClose={handleCloseChart} user={user} />
+        return <PostpartumCareChart appointment={appointmentForChart} onClose={handleCloseChart} user={user} />
       default:
         return null
     }
@@ -197,12 +200,13 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
                 <TableHead>
                   <SortableHeader sortKey="status">ステータス</SortableHeader>
                 </TableHead>
+                <TableHead>アクション</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isPending ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  <TableCell colSpan={6} className="text-center h-24">
                     読み込み中...
                   </TableCell>
                 </TableRow>
@@ -219,11 +223,22 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
                     <TableCell>
                       <Badge variant="outline">{appointment.status}</Badge>
                     </TableCell>
+                    <TableCell className="space-x-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(appointment)}>
+                        詳細
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleOpenChart("breast", appointment)}>
+                        乳房ケア
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleOpenChart("postpartum", appointment)}>
+                        産後ケア
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  <TableCell colSpan={6} className="text-center h-24">
                     データが見つかりません。
                   </TableCell>
                 </TableRow>
@@ -260,7 +275,7 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">予約日</label>
-                  <p className="mt-1">{formatDate(selectedAppointment.appointment_date)}</p>
+                  <p className="mt-1">{formatDate(selectedAppointment.reservation_date)}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">時間</label>

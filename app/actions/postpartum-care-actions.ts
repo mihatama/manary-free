@@ -2,32 +2,11 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import type { Tables } from "@/lib/supabase/database.types"
+import { unstable_noStore as noStore } from "next/cache"
 
-// NOTE: This assumes a `postpartum_care_charts` table exists in your database.
-// You may need to create it based on the fields used in `postpartum-care-chart.tsx`.
-export type PostpartumCareChart = {
-  id?: number
-  appointment_id: number
-  created_at?: string
-  visit_date?: string | null
-  practitioner_name?: string | null
-  mother_condition?: string | null
-  lochia_status?: string | null
-  episiotomy_pain?: string | null
-  constipation_status?: string | null
-  mental_state?: string | null
-  family_support?: string | null
-  baby_condition?: string | null
-  jaundice_level?: string | null
-  umbilical_cord_status?: string | null
-  feeding_status?: string | null
-  care_plan?: string | null
-  guidance?: string | null
-  payment_details?: string | null
-}
-
-type ChartInsert = Omit<PostpartumCareChart, "id" | "created_at">
-type ChartUpdate = PostpartumCareChart
+type ChartInsert = Tables<"postpartum_care_charts">["Insert"]
+type ChartUpdate = Tables<"postpartum_care_charts">["Update"]
 
 export async function getPostpartumCareChartByAppointmentId(appointmentId: number) {
   const supabase = createClient()
@@ -65,5 +44,22 @@ export async function upsertPostpartumCareChart(chartData: ChartInsert | ChartUp
   }
 
   revalidatePath("/dashboard/appointments")
+  revalidatePath("/dashboard/charts")
   return { data }
+}
+
+export async function getPostpartumCareChartById(id: number) {
+  noStore()
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("postpartum_care_charts")
+    .select(`*, reservations(*, questionnaires(*))`)
+    .eq("id", id)
+    .single()
+
+  if (error) {
+    console.error("Error fetching postpartum care chart by id:", error)
+  }
+
+  return { data, error }
 }

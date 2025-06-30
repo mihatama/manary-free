@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
+import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse, setHours, setMinutes, setSeconds } from "date-fns"
 
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
@@ -193,15 +194,22 @@ export async function cancelAppointment(id: number) {
   return updateAppointment(id, { status: "cancelled" })
 }
 
-export async function getAvailableSlots(date: string, serviceTypeId: number) {
+export async function getAvailableSlots(serviceTypeId: number, month: string) {
   noStore()
   const supabase = createClient()
 
   try {
+    const monthDate = parse(month, "yyyy-MM", new Date())
+    const startDate = startOfMonth(monthDate)
+    const endDate = endOfMonth(monthDate)
+
+    // 1. Fetch all reservations for the given month and service type
     const { data: existingReservations, error: reservationError } = await supabase
       .from("reservations")
-      .select("start_time")
-      .eq("reservation_date", date)
+      .select("reservation_date, start_time")
+      .eq("service_type_id", serviceTypeId)
+      .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
+      .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
       .in("status", ["confirmed", "pending"])
 
     if (reservationError) {
@@ -209,28 +217,43 @@ export async function getAvailableSlots(date: string, serviceTypeId: number) {
       throw new Error("既存の予約情報の取得に失敗しました。")
     }
 
-    const bookedSlots = new Set(existingReservations.map((r) => r.start_time))
+    const bookedSlots = new Set(existingReservations.map((r) => `${r.reservation_date}T${r.start_time}`))
 
+    // 2. Generate all possible slots for the month
     // In a real app, these values should come from clinic settings
     const openingTime = 9 * 60 // 9:00 AM in minutes
     const closingTime = 18 * 60 // 6:00 PM in minutes
-    const slotInterval = 30 // in minutes
+    const slotInterval = 30 // in minutes, assuming this is from serviceType duration, but hardcoding for now.
+
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate })
     const allSlots = []
 
-    for (let time = openingTime; time < closingTime; time += slotInterval) {
-      const hours = Math.floor(time / 60)
-        .toString()
-        .padStart(2, "0")
-      const minutes = (time % 60).toString().padStart(2, "0")
-      allSlots.push(`${hours}:${minutes}:00`)
+    for (const day of allDays) {
+      for (let time = openingTime; time < closingTime; time += slotInterval) {
+        const hours = Math.floor(time / 60)
+        const minutes = time % 60
+
+        const slotStartTime = setSeconds(setMinutes(setHours(day, hours), minutes), 0)
+        const slotEndTime = new Date(slotStartTime.getTime() + slotInterval * 60 * 1000)
+
+        const formattedDate = format(day, "yyyy-MM-dd")
+        const formattedTime = format(slotStartTime, "HH:mm:ss")
+
+        const isBooked = bookedSlots.has(`${formattedDate}T${formattedTime}`)
+
+        allSlots.push({
+          start_time: slotStartTime.toISOString(),
+          end_time: slotEndTime.toISOString(),
+          is_available: !isBooked,
+        })
+      }
     }
 
-    const availableSlots = allSlots.filter((slot) => !bookedSlots.has(slot))
-
-    return { success: true, data: availableSlots }
+    return allSlots
   } catch (error) {
     console.error("Error in getAvailableSlots:", error instanceof Error ? error.message : "Unknown error")
-    return { success: false, message: "利用可能な時間の取得に失敗しました。", data: [] }
+    // Return empty array on error to avoid crashing the client
+    return []
   }
 }
 

@@ -59,7 +59,7 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
           const startTime = parseISO(slot.start_time)
           const endTime = parseISO(slot.end_time)
           return {
-            title: "予約可能",
+            title: slot.is_available ? "予約可能" : "予約済み",
             start: startTime,
             end: endTime,
             isAvailable: slot.is_available,
@@ -103,10 +103,10 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
   const eventStyleGetter = (event: CalendarEvent) => {
     const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.getTime()
     const style = {
-      backgroundColor: isSelected ? "#f78989" : event.isAvailable ? "#a8d8ea" : "#e0e0e0",
+      backgroundColor: isSelected ? "#f78989" : event.isAvailable ? "#a8d8ea" : "#f0f0f0",
       borderRadius: "5px",
       opacity: 0.8,
-      color: isSelected ? "white" : "black",
+      color: isSelected ? "white" : event.isAvailable ? "black" : "#a0a0a0",
       border: "0px",
       display: "block",
       cursor: event.isAvailable ? "pointer" : "not-allowed",
