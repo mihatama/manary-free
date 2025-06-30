@@ -1,151 +1,150 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { unstable_noStore as noStore } from "next/cache"
-import { redirect } from "next/navigation"
+import { revalidatePath, unstable_noStore as noStore } from "next/cache"
+import { createReservation } from "./reservation-actions"
+import type { Database } from "@/lib/supabase/database.types"
+
+type QuestionnaireInsert = Database["public"]["Tables"]["questionnaires"]["Insert"]
+
+export async function createQuestionnaireAndReservation(formData: FormData) {
+  const supabase = createClient()
+
+  const reservationResult = await createReservation(formData)
+
+  if (!reservationResult.success || !reservationResult.data) {
+    return { success: false, message: reservationResult.message || "予約の作成に失敗しました。", data: null }
+  }
+
+  const reservationId = reservationResult.data.id
+  const rawData = Object.fromEntries(formData.entries())
+
+  const questionnairePayload: QuestionnaireInsert = {
+    reservation_id: reservationId,
+    data: rawData,
+  }
+
+  const { data: questionnaire, error } = await supabase
+    .from("questionnaires")
+    .insert(questionnairePayload)
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error creating questionnaire:", error.message)
+    // NOTE: In a production environment, you should implement a transaction
+    // or a cleanup mechanism to delete the reservation if questionnaire creation fails.
+    return { success: false, message: "問診票の作成に失敗しました。", data: null }
+  }
+
+  revalidatePath("/dashboard/questionnaires")
+  revalidatePath("/reservation/confirmation")
+
+  return {
+    success: true,
+    message: "予約と問診票が正常に作成されました。",
+    data: { reservation: reservationResult.data, questionnaire },
+  }
+}
 
 export async function getQuestionnaires({
-  query,
-  sortBy,
-  sortOrder,
+  page = 1,
+  limit = 10,
 }: {
-  query?: string
-  sortBy?: string
-  sortOrder?: "asc" | "desc"
+  page?: number
+  limit?: number
 }) {
   noStore()
   const supabase = createClient()
+  const offset = (page - 1) * limit
 
-  let supabaseQuery = supabase.from("medical_questionnaires").select(
-    `
+  const { data, error, count } = await supabase
+    .from("questionnaires")
+    .select(
+      `
       id,
       created_at,
-      users (
-        id,
-        full_name
+      reservations (
+        patient_name,
+        reservation_date
       )
     `,
-  )
-
-  if (query) {
-    supabaseQuery = supabaseQuery.or(`users.full_name.ilike.%${query}%,users.id::text.ilike.%${query}%`)
-  }
-
-  if (sortBy) {
-    const ascending = sortOrder === "asc"
-    if (sortBy === "patient_name") {
-      supabaseQuery = supabaseQuery.order("users(full_name)", { ascending })
-    } else {
-      supabaseQuery = supabaseQuery.order(sortBy, { ascending })
-    }
-  } else {
-    supabaseQuery = supabaseQuery.order("created_at", { ascending: false })
-  }
-
-  const { data, error } = await supabaseQuery
+      { count: "exact" },
+    )
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error("Error fetching questionnaires:", error)
-    throw new Error("問診票情報の取得に失敗しました。")
+    console.error("Error fetching questionnaires:", error.message)
+    throw new Error("問診票の取得に失敗しました。")
   }
 
-  return data.map((item) => ({
-    id: item.id,
-    patient_name: item.users?.full_name || "N/A",
-    patient_id: item.users?.id || "N/A",
-    submission_date: item.created_at,
-  }))
+  return { data, count: count ?? 0 }
 }
 
-export async function createQuestionnaireAndReservation(prevState: any, formData: FormData) {
+export async function getQuestionnaireById(id: number) {
+  noStore()
   const supabase = createClient()
 
-  // This is a simplified example. A real implementation would have robust validation and error handling.
-  const rawData = Object.fromEntries(formData.entries())
-
-  // This logic should be transactional in a production environment
-  try {
-    // 1. Create user (or find existing) - simplified
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", rawData.email as string)
-      .single()
-    let userId = user?.id
-
-    if (userError && userError.code !== "PGRST116") {
-      // PGRST116: no rows found
-      console.error("Error finding user:", userError)
-      return { message: "ユーザーの確認中にエラーが発生しました。" }
-    }
-
-    if (!userId) {
-      // Create a new user if not found (simplified)
-      const { data: newUser, error: newUserError } = await supabase
-        .from("users")
-        .insert({
-          full_name: rawData.full_name as string,
-          email: rawData.email as string,
-          phone_number: rawData.phone_number as string,
-        })
-        .select("id")
-        .single()
-
-      if (newUserError) {
-        console.error("Error creating user:", newUserError)
-        return { message: "ユーザーの作成中にエラーが発生しました。" }
-      }
-      userId = newUser!.id
-    }
-
-    // 2. Create reservation
-    const { error: reservationError } = await supabase.from("reservations").insert({
-      user_id: userId,
-      reservation_date: rawData.reservation_date as string,
-      start_time: rawData.start_time as string,
-      service_type_id: rawData.service_type_id as string,
-      status: "pending", // or some default
-    })
-
-    if (reservationError) {
-      throw new Error(`Reservation creation failed: ${reservationError.message}`)
-    }
-
-    // 3. Create questionnaire
-    const { error: questionnaireError } = await supabase.from("medical_questionnaires").insert({
-      user_id: userId,
-      // NOTE: Add other questionnaire fields from formData here
-    })
-
-    if (questionnaireError) {
-      throw new Error(`Questionnaire creation failed: ${questionnaireError.message}`)
-    }
-  } catch (error: any) {
-    console.error("Transaction failed:", error)
-    return { message: error.message || "問診票と予約の作成中にエラーが発生しました。" }
-  }
-
-  redirect("/reservation/confirmation")
-}
-
-export async function submitAndLinkQuestionnaire(prevState: any, formData: FormData) {
-  const supabase = createClient()
-  const rawData = Object.fromEntries(formData.entries())
-  const userId = rawData.user_id as string
-
-  if (!userId) {
-    return { message: "ユーザーIDが必要です。" }
-  }
-
-  const { error } = await supabase.from("medical_questionnaires").insert({
-    user_id: userId,
-    // NOTE: Add other questionnaire fields from formData here
-  })
+  const { data, error } = await supabase
+    .from("questionnaires")
+    .select(
+      `
+      *,
+      reservations ( * )
+    `,
+    )
+    .eq("id", id)
+    .single()
 
   if (error) {
-    console.error("Error submitting questionnaire:", error)
-    return { message: "問診票の送信中にエラーが発生しました。" }
+    console.error("Error fetching questionnaire by id:", error.message)
+    return null
   }
 
-  redirect("/reservation/questionnaire/success")
+  return data
+}
+
+export async function deleteQuestionnaire(id: number) {
+  const supabase = createClient()
+  const { error } = await supabase.from("questionnaires").delete().eq("id", id)
+
+  if (error) {
+    console.error("Error deleting questionnaire:", error.message)
+    return { success: false, message: "問診票の削除に失敗しました。" }
+  }
+
+  revalidatePath("/dashboard/questionnaires")
+  return { success: true, message: "問診票が削除されました。" }
+}
+
+export async function submitAndLinkQuestionnaire(formData: FormData) {
+  const supabase = createClient()
+  const rawData = Object.fromEntries(formData.entries())
+
+  const reservation_id_raw = rawData.reservation_id
+  if (!reservation_id_raw) {
+    return { success: false, message: "予約IDが見つかりません。" }
+  }
+  const reservation_id = Number(reservation_id_raw)
+
+  // We don't want to store the reservation_id inside the data blob
+  const dataForBlob = { ...rawData }
+  delete (dataForBlob as any).reservation_id
+
+  const questionnairePayload: QuestionnaireInsert = {
+    reservation_id: reservation_id,
+    data: dataForBlob,
+  }
+
+  const { data, error } = await supabase.from("questionnaires").insert(questionnairePayload).select().single()
+
+  if (error) {
+    console.error("Error submitting and linking questionnaire:", error.message)
+    return { success: false, message: "問診票の提出に失敗しました。" }
+  }
+
+  revalidatePath("/dashboard/questionnaires")
+  revalidatePath(`/reservation/questionnaire/success?reservation_id=${reservation_id}`)
+  return { success: true, message: "問診票が正常に提出されました。", data }
 }

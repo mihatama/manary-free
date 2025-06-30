@@ -1,45 +1,41 @@
-# Manary - 助産院予約管理システム
+# Manary - 助産院予約管理システム / Clinic Reservation and Management System
 
-Manaryは、助産院やクリニック向けの予約管理・顧客管理システムです。管理者向けのダッシュボードと、顧客（患者）向けの予約・問診票提出機能を提供します。
+Manaryは、助産院やクリニック向けの予約管理・顧客管理システムです。管理者向けのダッシュボードと、顧客（患者）向けの予約・問診票提出機能を提供します。This is a comprehensive web application for managing clinic reservations, patient information, and medical records. It is built with Next.js, Supabase, and Tailwind CSS.
 
 [![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev)
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
 
-## 目次
+## 目次 / Project Overview
 
-- [主な機能](#主な機能)
-- [技術スタック](#技術スタック)
-- [プロジェクト構成](#プロジェクト構成)
-- [ローカル開発環境のセットアップ](#ローカル開発環境のセットアップ)
-- [前提条件](#前提条件)
-- [インストールと設定](#インストールと設定)
-- [Supabaseのセットアップ](#supabaseのセットアップ)
-- [Twilioのセットアップ](#twilioのセットアップ)
-- [主要なコンセプト](#主要なコンセプト)
-- [認証](#認証)
-- [Server Actions](#server-actions)
-- [CSRF保護](#csrf保護)
-- [予約スケジューリング](#予約スケジューリング)
-- [電子カルテ（乳房ケア）](#電子カルテ乳房ケア)
-- [デプロイ](#デプロイ)
-- [ライセンス](#ライセンス)
+- [主な機能](#主な機能) / The application provides two main interfaces:
+  1. **Public-facing Reservation System:** Allows patients to book, view, and manage their appointments.
+  2. **Admin Dashboard:** A secure area for clinic staff to manage appointments, view patient questionnaires (charts), and configure clinic settings.
+- [技術スタック](#技術スタック) / Tech Stack
+- [プロジェクト構成](#プロジェクト構成) / Project Structure
+- [ローカル開発環境のセットアップ](#ローカル開発環境のセットアップ) / Getting Started
+- [データベーススキーマ（テーブル構成）](#データベーススキーマテーブル構成) / Database Schema
+- [主要なコンセプト](#主要なコンセプト) / Key Concepts
+- [デプロイ](#デプロイ) / Deployment
+- [ライセンス](#ライセンス) / License
 
-## 主な機能
+## 主な機能 / Features
 
-### 管理者向け機能
-- **ダッシュボード**: 予約状況の概要を確認できます。
-- **予約管理**: 全ての予約をカレンダー形式またはリスト形式で表示・編集・新規作成できます。
-- **電子カルテ（乳房ケア）**: 「乳房ケア」の予約に対し、詳細なカルテを記録できます。問診票から情報を自動入力し、授乳状況、乳房の状態（図を含む）、S/O/A/P形式での記録が可能です。
-- **スケジュール設定**: 助産院、診療種別、予約可能時間（曜日ごと・特定日）を管理できます。
-- **ユーザー管理**: 管理者ユーザーの追加・一覧表示が可能です。
-- **メッセージ管理**: （将来的な機能）
+### 管理者向け機能 / Admin Dashboard (`/dashboard`)
 
-### 顧客（患者）向け機能
-- **新規予約**: 空き状況を確認しながらオンラインで予約できます。
-- **予約確認・管理**: SMS認証を通じて、自身の予約を確認・変更・キャンセルできます。
-- **問診票**: オンラインで問診票を提出できます。
+- **ダッシュボード**: 予約状況の概要を確認できます。 / View, search, and sort all patient reservations. Update appointment status.
+- **予約管理**: 全ての予約をカレンダー形式またはリスト形式で表示・編集・新規作成できます。 / Access and review patient-submitted medical questionnaires.
+- **問診票・カルテ管理**: 提出された問診票（カルテ情報）を一覧で確認できます。 / View a summary or detailed medical charts derived from questionnaires.
+- **スケジュール設定**: 助産院、診療種別、予約可能時間を管理できます。 / Manage staff user accounts.
+- **ユーザー管理**: 管理者ユーザーの追加・一覧表示が可能です。 / Configure clinic availability and booking rules.
+- **一般設定**: クリニック情報や他のアプリケーション設定を管理できます。 / Manage clinic information and other application settings.
 
-## 技術スタック
+### 顧客（患者）向け機能 / Patient-facing Pages
+
+- **新規予約**: 空き状況を確認しながらオンラインで予約できます。 / A form for new patients to book an appointment.
+- **予約確認・管理**: SMS認証を通じて、自身の予約を確認・変更・キャンセルできます。 / Allows patients to view or cancel their existing appointment using a secure token or phone verification.
+- **問診票**: オンラインで問診票を提出できます。 / A form for patients to fill out their medical history, linked to their reservation.
+
+## 技術スタック / Tech Stack
 
 - **フレームワーク**: [Next.js (App Router)](https://nextjs.org/)
 - **UI**: [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/)
@@ -49,7 +45,7 @@ Manaryは、助産院やクリニック向けの予約管理・顧客管理シ�
 - **UIコンポーネント**: [Radix UI](https://www.radix-ui.com/), [Lucide React](https://lucide.dev/guide/packages/lucide-react) (Icons)
 - **カレンダー**: [React Big Calendar](http://jquense.github.io/react-big-calendar/), [React Day Picker](https://react-day-picker.js.org/)
 
-## プロジェクト構成
+## プロジェクト構成 / Project Structure
 
 \`\`\`
 manary/
@@ -61,169 +57,126 @@ manary/
 │   │   ├── reservation/
 │   │   └── page.tsx
 │   ├── actions/              # Server Actions
-│   │   ├── auth-actions.ts
-│   │   ├── breast-care-actions.ts # New
-│   │   └── ...
+│   │   ├── reservation-actions.ts
+│   │   ├── questionnaire-actions.ts
+│   │   └── chart-actions.ts
 │   ├── api/                  # API Routes
 │   └── layout.tsx            # ルートレイアウト
 ├── components/               # 再利用可能なReactコンポーネント
 │   ├── ui/                   # shadcn/ui コンポーネント
-│   ├── breast-care-chart.tsx # New
-│   ├── breast-diagram-input.tsx # New
 │   └── *.tsx                 # アプリケーション固有のコンポーネント
 ├── lib/                      # ライブラリ、ヘルパー関数
 │   ├── supabase/             # Supabaseクライアント、型定義
-│   ├── csrf.ts               # CSRF保護ロジック
-│   └── twilio.ts             # Twilio連携ロジック
+│   └── ...
 ├── public/                   # 静的ファイル（画像など）
-├── styles/                   # グローバルCSS
 ├── middleware.ts             # 認証ミドルウェア
 └── next.config.mjs           # Next.js設定ファイル
 \`\`\`
 
-## ローカル開発環境のセットアップ
+## ローカル開発環境のセットアップ / Getting Started
 
-### 前提条件
+### 前提条件 / Prerequisites
+
 - [Node.js](https://nodejs.org/) (v18以降)
 - [pnpm](https://pnpm.io/installation) (推奨)
 - [Supabase](https://supabase.com/) アカウント
-- [Twilio](https://www.twilio.com/) アカウント
+- [Twilio](https://www.twilio.com/) アカウント (オプション、SMS認証用)
 
-### インストールと設定
+### インストールと設定 / Installation
 
-1.  **リポジトリをクローン**
-\`\`\`bash
-git clone https://github.com/your-username/manary.git
-cd manary
-\`\`\`
+1.  **リポジトリをクローンし、依存関係をインストール** / Clone the repository:
+    \`\`\`bash
+    git clone https://github.com/your-username/manary.git
+    cd manary
+    npm install
+    \`\`\`
 
-2.  **依存関係をインストール**
-\`\`\`bash
-pnpm install
-\`\`\`
+2.  **環境変数を設定** / Set up environment variables:
+    プロジェクトルートに `.env.local` ファイルを作成し、自身の値に書き換えてください。 / Create a `.env.local` file in the root of the project and add your Supabase project URL and anon key.
+    \`\`\`
+    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+    # Add other variables like Twilio credentials if needed
+    \`\`\`
 
-3.  **環境変数を設定**
-プロジェクトルートに `.env.local` ファイルを作成し、以下の内容をコピーして、自身の値に書き換えてください。
+3.  **開発サーバーを起動** / Run the development server:
+    \`\`\`bash
+    npm run dev
+    \`\`\`
+    ブラウザで `http://localhost:3000` を開きます。 / Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-\`\`\`env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL= # SupabaseプロジェクトのURL
-NEXT_PUBLIC_SUPABASE_ANON_KEY= # Supabaseプロジェクトのanon key
-SUPABASE_SERVICE_ROLE_KEY= # Supabaseプロジェクトのservice_role key
+## データベーススキーマ（テーブル構成） / Database Schema
 
-# Twilio
-TWILIO_ACCOUNT_SID= # TwilioのAccount SID
-TWILIO_AUTH_TOKEN= # TwilioのAuth Token
-TWILIO_VERIFY_SERVICE_SID= # Twilio VerifyサービスのSID
-TWILIO_PHONE_NUMBER= # Twilioで購入した電話番号
+このプロジェクトのデータベースは、患者情報を独立した `users` テーブルで管理するのではなく、各予約や問診票に直接保存する「非正規化」された構造を特徴としています。以下は主要なテーブルの構成です。 / Based on the application code, the database is expected to have the following main tables.
 
-# Application
-NEXT_PUBLIC_BASE_URL=http://localhost:3000 # アプリケーションのベースURL
-MOCK_SMS=true # trueにするとSMSを実際には送信せず、コンソールに出力します
-\`\`\`
+### `reservations`
 
-4.  **開発サーバーを起動**
-\`\`\`bash
-pnpm dev
-\`\`\`
-ブラウザで `http://localhost:3000` を開きます。
+予約情報を格納するテーブル。患者情報は `patient_name` などのカラムに直接保存されます。 / Stores information about each patient booking.
 
-### Supabaseのセットアップ
+| カラム名 | データ型 | 説明 |
+| :--- | :--- | :--- |
+| `id` | integer | 予約の主キー |
+| `service_type_id` | integer | `service_types`テーブルへの外部キー |
+| `reservation_date` | date | 予約日 |
+| `start_time` | time | 開始時刻 |
+| `end_time` | time | 終了時刻 |
+| `patient_name` | varchar | 患者の氏名 |
+| `patient_email` | varchar | 患者のメールアドレス |
+| `patient_phone` | varchar | 患者の電話番号 |
+| `note` | text | 予約に関する追加のメモ |
+| `access_token` | varchar | 予約管理用のユニークなトークン |
+| `status` | varchar | 予約ステータス（例: confirmed, cancelled） |
+| `created_at` | timestamp with time zone | 作成日時 |
+| `updated_at` | timestamp with time zone | 最終更新日時 |
 
-1.  **Supabaseプロジェクトを作成**
-[Supabase公式サイト](https://supabase.com/)で新しいプロジェクトを作成します。
+### `questionnaires`
 
-2.  **データベーススキーマを設定**
-Supabaseダッシュボードの `SQL Editor` で、プロジェクトに必要なテーブルを作成します。以下のSQLを実行してください。（これは基本的な構造です。詳細は `lib/supabase/database.types.ts` を参照してください）
+問診票情報を格納するテーブル。カルテ情報もこのテーブルに含まれます。 / Stores detailed medical information submitted by patients.
 
-\`\`\`sql
--- clinics, service_types, availability_settings, appointments, questionnaires, users, breast_care_charts テーブルを作成
--- 詳細はプロジェクト内の `SUPABASE_SETUP.md` や型定義ファイルを参照してください。
--- 例: clinics テーブル
-CREATE TABLE clinics (
-  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  name TEXT NOT NULL,
-  address TEXT,
-  phone TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-);
-\`\`\`
-**注**: 完全なスキーマ設定については、プロジェクト内の `SUPABASE_SETUP.md` を参照してください。
+| カラム名 | データ型 | 説明 |
+| :--- | :--- | :--- |
+| `id` | integer | 問診票の主キー |
+| `reservation_id` | integer | `reservations`テーブルへの外部キー |
+| `mother_last_name` | varchar | 母親の姓 |
+| `mother_first_name` | varchar | 母親の名 |
+| `email` | varchar | メールアドレス |
+| `phone_number` | varchar | 電話番号 |
+| `created_at` | timestamp with time zone | 作成日時 |
+| `updated_at` | timestamp with time zone | 最終更新日時 |
+| *(...and many other columns for medical history)* | | |
 
-3.  **認証設定**
-- Supabaseダッシュボード > `Authentication` > `URL Configuration` に移動します。
-- **Site URL**: `http://localhost:3000`
-- **Redirect URLs**:
-- `http://localhost:3000/auth/callback`
-- `http://localhost:3000/update-password`
+### `service_types`
 
-4.  **管理者ユーザーを作成**
-- Supabaseダッシュボード > `Authentication` > `Users` に移動し、「Add User」から管理者用のユーザーを作成します。
-- `Database` > `Table editor` で `users` テーブル（または `profiles` テーブル）を開き、作成したユーザーの `role` を `admin` に設定します。
+提供するサービス（診療種別）のマスターテーブル。 / Stores the different types of services offered by the clinic.
 
-### Twilioのセットアップ
+| カラム名 | データ型 | 説明 |
+| :--- | :--- | :--- |
+| `id` | integer | サービスの主キー |
+| `name` | varchar | サービス名（例: 乳房ケア, 産後ケア） |
+| `duration` | integer | サービスの所要時間（分） |
+| `color` | varchar | カレンダー表示用の色 |
+| `...` | | |
 
-1.  **Twilioアカウントを作成**
-[Twilio公式サイト](https://www.twilio.com/)でアカウントを作成します。
+## 主要なコンセプト / Key Concepts
 
-2.  **電話番号を取得**
-SMSが送信可能な電話番号をTwilioコンソールから購入します。
-
-3.  **APIキーを取得**
-- `Account SID` と `Auth Token` をTwilioコンソールから取得し、`.env.local` に設定します。
-
-4.  **Verifyサービスを作成**
-- `Verify` > `Services` に移動し、新しいサービスを作成します。
-- 作成したサービスの `Service SID` を取得し、`.env.local` の `TWILIO_VERIFY_SERVICE_SID` に設定します。
-
-## 主要なコンセプト
+### データモデル
+このアプリケーションの最大の特徴は、患者情報を正規化せず、`reservations` や `questionnaires` テーブルに直接保存している点です。これにより、独立した `users` テーブルは不要になり、各レコードが自己完結型の情報を持つことになります。コードを書く際は、このデータ構造を常に意識する必要があります。 / This application's primary feature is storing patient information directly in the `reservations` and `questionnaires` tables rather than normalizing it in a separate `users` table. This eliminates the need for an independent `users` table and ensures that each record contains self-contained information. When writing code, always be mindful of this data structure.
 
 ### 認証
-- **管理者認証**: メールアドレスとパスワードによる認証。Supabase Authを利用し、セッションはHTTPOnlyのCookieで管理されます。
-- **顧客認証**: 電話番号（SMS）による認証。予約管理ページへのアクセス時にTwilio Verifyを利用して本人確認を行います。
+- **管理者認証**: メールアドレスとパスワードによる認証。Supabase Authを利用します。 / **Admin Authentication**: Uses email and password authentication with Supabase Auth.
+- **顧客認証**: 電話番号（SMS）による認証。予約管理ページへのアクセス時にTwilio Verifyを利用します。 / **Patient Authentication**: Uses phone number (SMS) authentication with Twilio Verify for accessing reservation management pages.
 
 ### Server Actions
-データ作成・更新・削除などのミューテーション処理は、主にNext.jsのServer Actionsを利用しています。これにより、APIエンドポイントを別途作成することなく、サーバーサイドのロジックをフォームから直接呼び出すことができます。CSRF保護も組み込まれています。
+データ作成・更新・削除などの処理は、主にNext.jsのServer Actionsを利用しています。これにより、APIエンドポイントを別途作成することなく、サーバーサイドのロジックを直接呼び出せます。 / Data creation, update, and deletion processes primarily use Next.js Server Actions. This allows for direct invocation of server-side logic without the need to create separate API endpoints.
 
-### CSRF保護
-全てのPOSTリクエスト（Server Actions）は、カスタムのCSRF保護メカニズムによって保護されています。
-- `lib/csrf.ts`: HMACベースのトークンを生成・検証します。
-- `components/csrf-form.tsx`: CSRFトークンを含むフォームを簡単に作成するためのコンポーネントです。
+## デプロイ / Deployment
 
-### 予約スケジューリング
-予約の空き状況は、以下のロジックで動的に計算されます。
-1.  `availability_settings` テーブルに、曜日ごとの基本スケジュールと、特定日の特別スケジュール（休診日など）を登録します。
-2.  ユーザーが日付を選択すると、その日の設定（特定日設定が優先）に基づいて予約可能な時間枠のリストが生成されます。
-3.  `appointments` テーブルから既存の予約を取得し、既に埋まっている時間枠を除外します。
-4.  最終的に利用可能な時間枠がユーザーに表示されます。
+このプロジェクトはVercelへのデプロイに最適化されています。 / This project is optimized for deployment on Vercel.
+1.  リポジトリをGitHubにプッシュします。 / Push the repository to GitHub.
+2.  Vercelダッシュボードから、GitHubリポジトリをインポートして新しいプロジェクトを作成します。 / Import the GitHub repository into the Vercel dashboard to create a new project.
+3.  Vercelプロジェクトの環境変数を `.env.local` と同じ内容で設定します。`NEXT_PUBLIC_BASE_URL` は本番ドメインに更新してください。 / Set the environment variables for the Vercel project to the same content as `.env.local`. Update `NEXT_PUBLIC_BASE_URL` to your production domain.
+4.  Supabaseダッシュボードの認証設定で、Site URLとRedirect URLsを本番ドメインに更新・追加します。 / Update and add Site URL and Redirect URLs in the Supabase dashboard to your production domain.
 
-### 電子カルテ（乳房ケア）
-特定の診療種別（例：「乳房ケア」）に対して、詳細な電子カルテを記録する機能です。
-- **動的な表示**: 管理者ダッシュボードの予約一覧で、対象の予約にのみ「カルテ入力」ボタンが表示されます。
-- **自動入力と編集**: カルテを開くと、患者の基本情報（氏名、お子様の情報など）が既存の問診票から自動で入力されます。内容はすべて編集可能です。
-- **専門的な記録**: 授乳回数や量、乳房の状態（インタラクティブな図で記録）、S/O/A/P形式での所見など、専門的な情報を記録できます。
-- **データ連携**: 記録されたカルテデータは `breast_care_charts` テーブルに保存され、元の予約情報と一対一で紐付けられます。
+## ライセンス / License
 
-## デプロイ
-
-このプロジェクトはVercelへのデプロイに最適化されています。
-
-1.  **リポジトリをGitHubにプッシュ**
-2.  **Vercelプロジェクトを作成**
-- Vercelダッシュボードから、GitHubリポジトリをインポートして新しいプロジェクトを作成します。
-- フレームワークプリセットとして `Next.js` が自動的に選択されます。
-3.  **環境変数を設定**
-- Vercelプロジェクトの `Settings` > `Environment Variables` で、`.env.local` と同じ内容の環境変数を設定します。
-- **重要**: `NEXT_PUBLIC_BASE_URL` は、Vercelによって割り当てられた本番ドメイン（例: `https://your-project.vercel.app`）に設定してください。
-- `MOCK_SMS` は `false` に設定するか、変数を削除して本番環境では実際にSMSが送信されるようにします。
-4.  **SupabaseのURL設定を更新**
-- Supabaseダッシュボードの `Authentication` > `URL Configuration` で、Site URLとRedirect URLsを本番ドメインに更新・追加します。
-- **Site URL**: `https://your-project.vercel.app`
-- **Redirect URLs**:
-- `https://your-project.vercel.app/auth/callback`
-- `https://your-project.vercel.app/update-password`
-
-## ライセンス
-
-このプロジェクトは [MIT License](LICENSE) の下で公開されています。
+このプロジェクトは [MIT License](LICENSE) の下で公開されています。 / This project is released under the [MIT License](LICENSE).

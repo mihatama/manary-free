@@ -1,212 +1,248 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { unstable_noStore as noStore } from "next/cache"
-import { revalidatePath } from "next/cache"
-import { randomUUID } from "crypto"
+import { unstable_noStore as noStore, revalidatePath } from "next/cache"
+import type { Database } from "@/lib/supabase/database.types"
+import { v4 as uuidv4 } from "uuid"
 
-// Helper to check for UUID format
-const isUUID = (str: string) => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  return uuidRegex.test(str)
+// Correctly derive types from the master Database type
+type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
+type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
+
+// This type represents a reservation with its related service type information joined.
+export type ReservationWithService = Reservation & {
+  service_types: Pick<ServiceType, "name" | "color"> | null
 }
 
 export async function getAppointments({
-  query,
-  sortBy,
-  sortOrder,
+  page = 1,
+  limit = 10,
+  sortBy = "reservation_date",
+  sortOrder = "desc",
+  search = "",
 }: {
-  query?: string
+  page?: number
+  limit?: number
   sortBy?: string
   sortOrder?: "asc" | "desc"
+  search?: string
 }) {
   noStore()
   const supabase = createClient()
+  const offset = (page - 1) * limit
 
-  // Use inner joins for required related data to prevent errors
-  let supabaseQuery = supabase.from("reservations").select(
-    `
-    id,
-    reservation_date,
-    start_time,
-    status,
-    users!inner (
-      id,
-      full_name
-    ),
-    service_types!inner (
-      name
+  try {
+    const sortableColumns: { [key: string]: string } = {
+      date: "reservation_date",
+      time: "start_time",
+      status: "status",
+      patient_name: "patient_name",
+    }
+    const dbSortBy = sortableColumns[sortBy] || "reservation_date"
+
+    let reservationQuery = supabase.from("reservations").select("*", { count: "exact" })
+
+    if (search) {
+      reservationQuery = reservationQuery.ilike("patient_name", `%${search}%`)
+    }
+
+    reservationQuery = reservationQuery
+      .order(dbSortBy, { ascending: sortOrder === "asc" })
+      .range(offset, offset + limit - 1)
+
+    const { data: reservations, error: reservationsError, count } = await reservationQuery
+
+    if (reservationsError) {
+      console.error("Error fetching reservations:", reservationsError.message)
+      throw new Error("予約情報の取得に失敗しました。")
+    }
+    if (!reservations || reservations.length === 0) {
+      return { data: [], count: 0 }
+    }
+
+    const serviceTypeIds = reservations.map((r) => r.service_type_id).filter((id): id is number => id !== null)
+
+    if (serviceTypeIds.length === 0) {
+      const dataWithServices: ReservationWithService[] = reservations.map((reservation) => ({
+        ...reservation,
+        service_types: null,
+      }))
+      return { data: dataWithServices, count: count ?? 0 }
+    }
+
+    const { data: serviceTypes, error: serviceTypesError } = await supabase
+      .from("service_types")
+      .select("id, name, color")
+      .in("id", serviceTypeIds)
+
+    if (serviceTypesError) {
+      console.error("Error fetching service types:", serviceTypesError.message)
+      throw new Error("サービス情報の取得に失敗しました。")
+    }
+
+    const serviceTypesMap = new Map(serviceTypes?.map((st) => [st.id, st]) ?? [])
+
+    const dataWithServices: ReservationWithService[] = reservations.map((reservation) => ({
+      ...reservation,
+      service_types: reservation.service_type_id ? (serviceTypesMap.get(reservation.service_type_id) ?? null) : null,
+    }))
+
+    return { data: dataWithServices, count: count ?? 0 }
+  } catch (error) {
+    console.error(
+      "An unexpected error occurred in getAppointments:",
+      error instanceof Error ? error.message : "Unknown error",
     )
-  `,
-  )
-
-  if (query) {
-    if (isUUID(query)) {
-      // Search by user ID
-      supabaseQuery = supabaseQuery.eq("users.id", query)
-    } else {
-      // Search by user name
-      supabaseQuery = supabaseQuery.ilike("users.full_name", `%${query}%`)
-    }
-  }
-
-  if (sortBy) {
-    const ascending = sortOrder === "asc"
-    let dbSortBy = sortBy
-
-    // Map client-side sort keys to database columns
-    switch (sortBy) {
-      case "patient_name":
-        dbSortBy = "users.full_name"
-        break
-      case "date":
-        dbSortBy = "reservation_date"
-        break
-      case "time":
-        dbSortBy = "start_time"
-        break
-      case "service":
-        dbSortBy = "service_types.name"
-        break
-      // 'status' can be passed directly
-    }
-
-    supabaseQuery = supabaseQuery.order(dbSortBy, { ascending })
-  } else {
-    // Default sort order
-    supabaseQuery = supabaseQuery
-      .order("reservation_date", { ascending: false })
-      .order("start_time", { ascending: true })
-  }
-
-  const { data, error } = await supabaseQuery
-
-  if (error) {
-    console.error("Error fetching appointments:", error)
     throw new Error("予約情報の取得に失敗しました。")
   }
-
-  // The !inner join guarantees users and service_types are not null
-  return data.map((item) => ({
-    id: item.id,
-    patient_name: item.users.full_name,
-    patient_id: item.users.id,
-    date: item.reservation_date,
-    time: item.start_time,
-    service: item.service_types.name,
-    status: item.status,
-  }))
 }
 
-export async function updateAppointment(
-  id: string,
-  data: { reservation_date?: string; start_time?: string; status?: string },
-) {
+export async function getAppointmentByToken(token: string): Promise<ReservationWithService | null> {
+  noStore()
   const supabase = createClient()
-  const { error } = await supabase.from("reservations").update(data).eq("id", id)
-  if (error) {
-    console.error("Error updating appointment:", error)
-    return { success: false, message: "予約の更新に失敗しました。" }
+  try {
+    const { data: reservation, error } = await supabase
+      .from("reservations")
+      .select("*")
+      .eq("access_token", token)
+      .single()
+
+    if (error || !reservation) {
+      console.error("Error fetching reservation by token:", error?.message)
+      return null
+    }
+
+    let serviceTypeData: Pick<ServiceType, "name" | "color"> | null = null
+    if (reservation.service_type_id) {
+      const { data: st, error: stError } = await supabase
+        .from("service_types")
+        .select("name, color")
+        .eq("id", reservation.service_type_id)
+        .single()
+      if (stError) {
+        console.error("Error fetching service type for reservation:", stError.message)
+      } else {
+        serviceTypeData = st
+      }
+    }
+
+    return {
+      ...reservation,
+      service_types: serviceTypeData,
+    }
+  } catch (error) {
+    console.error(
+      "An unexpected error occurred in getAppointmentByToken:",
+      error instanceof Error ? error.message : "Unknown error",
+    )
+    return null
   }
-  revalidatePath("/dashboard/appointments")
-  return { success: true, message: "予約を更新しました。" }
 }
 
-export async function cancelAppointment(id: string) {
-  const supabase = createClient()
-  const { error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id)
-  if (error) {
-    console.error("Error cancelling appointment:", error)
-    return { success: false, message: "予約のキャンセルに失敗しました。" }
-  }
-  revalidatePath("/dashboard/appointments")
-  revalidatePath("/reservation/manage")
-  return { success: true, message: "予約をキャンセルしました。" }
-}
-
-export async function createReservation(prevState: any, formData: FormData) {
+export async function createReservation(formData: FormData) {
   const supabase = createClient()
   const rawData = Object.fromEntries(formData.entries())
 
-  // Simplified: assumes user_id is provided
-  const { error } = await supabase.from("reservations").insert({
-    user_id: rawData.user_id as string,
-    reservation_date: rawData.reservation_date as string,
-    start_time: rawData.start_time as string,
-    service_type_id: rawData.service_type_id as string,
+  const reservationData: Database["public"]["Tables"]["reservations"]["Insert"] = {
+    service_type_id: Number(rawData.service_type_id),
+    reservation_date: String(rawData.reservation_date),
+    start_time: String(rawData.start_time),
+    patient_name: String(rawData.patient_name),
+    patient_email: String(rawData.patient_email),
+    patient_phone: String(rawData.patient_phone),
+    note: String(rawData.note),
     status: "confirmed",
-    management_token: randomUUID(), // For managing reservation via link
-  })
+    access_token: uuidv4(),
+  }
+
+  const { data, error } = await supabase.from("reservations").insert(reservationData).select().single()
 
   if (error) {
-    console.error("Error creating reservation:", error)
-    return { success: false, message: "予約の作成に失敗しました。" }
+    console.error("Error creating reservation:", error.message)
+    return { success: false, message: "予約の作成に失敗しました。", data: null }
   }
+
   revalidatePath("/dashboard/appointments")
-  return { success: true, message: "予約を作成しました。" }
+  return { success: true, message: "予約が作成されました。", data }
 }
 
-// This is a complex function that depends on clinic schedule settings.
-// This is a simplified placeholder.
-export async function getAvailableSlots(date: string) {
-  noStore()
-  const supabase = createClient()
-
-  // 1. Get clinic's business hours for the day of the week.
-  // (Assuming a 'schedules' table exists with business hours)
-  const businessHours = { start: "09:00", end: "18:00" } // Placeholder
-  const slotDuration = 60 // in minutes, placeholder
-
-  // 2. Get existing reservations for the selected date.
-  const { data: existingReservations, error } = await supabase
-    .from("reservations")
-    .select("start_time")
-    .eq("reservation_date", date)
-    .in("status", ["confirmed", "pending"])
-
-  if (error) {
-    console.error("Error fetching existing reservations:", error)
-    return []
-  }
-  const bookedSlots = existingReservations.map((r) => r.start_time)
-
-  // 3. Generate all possible slots and filter out booked ones.
-  const availableSlots = []
-  const currentTime = new Date(`${date}T${businessHours.start}:00`)
-  const endTime = new Date(`${date}T${businessHours.end}:00`)
-
-  while (currentTime < endTime) {
-    const timeString = currentTime.toTimeString().substring(0, 5) // HH:mm
-    if (!bookedSlots.includes(timeString + ":00")) {
-      availableSlots.push(timeString)
-    }
-    currentTime.setMinutes(currentTime.getMinutes() + slotDuration)
-  }
-
-  return availableSlots
-}
-
-// Alias for createReservation for clarity in different contexts
 export const createAppointment = createReservation
 
-export async function getAppointmentByToken(token: string) {
-  noStore()
-  if (!token) return null
-
+export async function updateAppointment(
+  id: number,
+  updates: Partial<Database["public"]["Tables"]["reservations"]["Update"]>,
+) {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from("reservations")
-    .select(`
-      *,
-      users (full_name),
-      service_types (name)
-    `)
-    .eq("management_token", token)
-    .single()
+  const { error } = await supabase.from("reservations").update(updates).eq("id", id)
 
   if (error) {
-    console.error("Error fetching appointment by token:", error)
-    return null
+    console.error("Error updating appointment:", error.message)
+    return { success: false, message: "予約の更新に失敗しました。" }
   }
-  return data
+
+  revalidatePath("/dashboard/appointments")
+  revalidatePath("/reservation/manage")
+  return { success: true, message: "予約が更新されました。" }
+}
+
+export async function updateReservationStatus(id: number, status: string) {
+  return updateAppointment(id, { status })
+}
+
+export async function cancelAppointment(id: number) {
+  return updateAppointment(id, { status: "cancelled" })
+}
+
+export async function getAvailableSlots(date: string, serviceTypeId: number) {
+  noStore()
+  const supabase = createClient()
+
+  try {
+    const { data: existingReservations, error: reservationError } = await supabase
+      .from("reservations")
+      .select("start_time")
+      .eq("reservation_date", date)
+      .in("status", ["confirmed", "pending"])
+
+    if (reservationError) {
+      console.error("Error fetching existing reservations:", reservationError.message)
+      throw new Error("既存の予約情報の取得に失敗しました。")
+    }
+
+    const bookedSlots = new Set(existingReservations.map((r) => r.start_time))
+
+    // In a real app, these values should come from clinic settings
+    const openingTime = 9 * 60 // 9:00 AM in minutes
+    const closingTime = 18 * 60 // 6:00 PM in minutes
+    const slotInterval = 30 // in minutes
+    const allSlots = []
+
+    for (let time = openingTime; time < closingTime; time += slotInterval) {
+      const hours = Math.floor(time / 60)
+        .toString()
+        .padStart(2, "0")
+      const minutes = (time % 60).toString().padStart(2, "0")
+      allSlots.push(`${hours}:${minutes}:00`)
+    }
+
+    const availableSlots = allSlots.filter((slot) => !bookedSlots.has(slot))
+
+    return { success: true, data: availableSlots }
+  } catch (error) {
+    console.error("Error in getAvailableSlots:", error instanceof Error ? error.message : "Unknown error")
+    return { success: false, message: "利用可能な時間の取得に失敗しました。", data: [] }
+  }
+}
+
+export async function deleteReservation(id: number) {
+  const supabase = createClient()
+  const { error } = await supabase.from("reservations").delete().eq("id", id)
+
+  if (error) {
+    console.error("Error deleting reservation:", error.message)
+    return { success: false, message: "予約の削除に失敗しました。" }
+  }
+
+  revalidatePath("/dashboard/appointments")
+  return { success: true, message: "予約が削除されました。" }
 }

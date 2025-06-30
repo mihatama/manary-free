@@ -1,79 +1,65 @@
 "use server"
+
 import { createClient } from "@/lib/supabase/server"
 import { unstable_noStore as noStore } from "next/cache"
+import type { Database } from "@/lib/supabase/database.types"
+
+type Questionnaire = Database["public"]["Tables"]["questionnaires"]["Row"]
+export type ChartData = Questionnaire & {
+  patient_name: string
+}
 
 export async function getCharts({
-  query,
-  sortBy,
-  sortOrder,
+  page = 1,
+  limit = 10,
+  sortBy = "created_at",
+  sortOrder = "desc",
+  search = "",
 }: {
-  query?: string
+  page?: number
+  limit?: number
   sortBy?: string
   sortOrder?: "asc" | "desc"
-}) {
+  search?: string
+}): Promise<{ data: ChartData[]; count: number }> {
   noStore()
   const supabase = createClient()
+  const offset = (page - 1) * limit
 
-  // Use `!inner` to ensure we only fetch records that have an associated user.
-  // This prevents potential errors down the line if a user record is missing.
-  let supabaseQuery = supabase.from("postpartum_care_records").select(
-    `
-      id,
-      created_at,
-      users!inner (
-        id,
-        full_name
-      )
-    `,
-  )
+  try {
+    // "Charts" are represented by "questionnaires" table in this context.
+    let query = supabase.from("questionnaires").select("*", { count: "exact" })
 
-  // Handle search query. The original code tried to search by name or ID.
-  // We'll implement this logic robustly.
-  if (query) {
-    // A simple regex to check if the query is in UUID format.
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query)
-
-    if (isUUID) {
-      // If the query looks like a UUID, search the user ID.
-      supabaseQuery = supabaseQuery.eq("users.id", query)
-    } else {
-      // Otherwise, perform a case-insensitive search on the user's full name.
-      supabaseQuery = supabaseQuery.ilike("users.full_name", `%${query}%`)
+    if (search) {
+      query = query.or(`mother_last_name.ilike.%${search}%,mother_first_name.ilike.%${search}%,email.ilike.%${search}%`)
     }
-  }
 
-  // Handle sorting. The previous implementation was incomplete and could cause errors.
-  if (sortBy) {
-    const ascending = sortOrder === "asc"
-    // We need to specify the foreign table for columns that belong to `users`.
-    if (sortBy === "patient_name") {
-      supabaseQuery = supabaseQuery.order("full_name", { foreignTable: "users", ascending })
-    } else if (sortBy === "patient_id") {
-      supabaseQuery = supabaseQuery.order("id", { foreignTable: "users", ascending })
-    } else {
-      // For columns on the primary table, like `created_at`.
-      supabaseQuery = supabaseQuery.order(sortBy, { ascending })
+    const validSortBy = ["created_at", "email", "mother_last_name"].includes(sortBy) ? sortBy : "created_at"
+    query = query.order(validSortBy, { ascending: sortOrder === "asc" })
+
+    query = query.range(offset, offset + limit - 1)
+
+    const { data, error, count } = await query
+
+    if (error) {
+      console.error("Error fetching charts (questionnaires):", error.message)
+      throw new Error("カルテ情報の取得に失敗しました。")
     }
-  } else {
-    // Default sort order.
-    supabaseQuery = supabaseQuery.order("created_at", { ascending: false })
-  }
 
-  const { data, error } = await supabaseQuery
+    const formattedData: ChartData[] = data.map((q) => {
+      const { mother_last_name, mother_first_name, ...rest } = q
+      return {
+        ...rest,
+        patient_name: `${mother_last_name || ""} ${mother_first_name || ""}`.trim(),
+      }
+    })
 
-  if (error) {
-    // Log the detailed error for debugging, but throw a generic one to the client.
-    console.error("Error fetching charts:", error)
+    return { data: formattedData, count: count ?? 0 }
+  } catch (error) {
+    console.error(
+      "An unexpected error occurred in getCharts:",
+      error instanceof Error ? error.message : "Unknown error",
+    )
     throw new Error("カルテ情報の取得に失敗しました。")
   }
-
-  // Map the data to the expected format.
-  // Because we used `!inner`, `item.users` is guaranteed to exist.
-  return data.map((item) => ({
-    id: item.id,
-    patient_name: item.users.full_name,
-    patient_id: item.users.id,
-    creation_date: item.created_at,
-    chart_type: "産後ケア", // This is a static value for now.
-  }))
 }
