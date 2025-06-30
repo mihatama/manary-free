@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useActionState } from "react"
+import { useState, useEffect, useActionState } from "react"
 import { useFormStatus } from "react-dom"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -41,17 +40,19 @@ export function LoginForm() {
       <div className="text-center py-8 space-y-6">
         <div className="py-4">
           <p className="text-lg mb-2">ログインに成功しました。ダッシュボードにリダイレクトしています...</p>
-          <div className="animate-spin w-8 h-8 border-4 border-manary-pink border-t-transparent rounded-full mx-auto"></div>
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
         </div>
       </div>
     )
   }
 
   return (
-    <Card className="w-full shadow-md border-gray-100">
+    <Card className="w-full shadow-md border-border">
       <CardHeader>
-        <CardTitle className="text-xl text-center text-gray-800">マナリー管理システム</CardTitle>
-        <CardDescription className="text-center">管理者アカウントでログインしてください</CardDescription>
+        <CardTitle className="text-xl text-center text-foreground">マナリー管理システム</CardTitle>
+        <CardDescription className="text-center text-muted-foreground">
+          管理者アカウントでログインしてください
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {state.status === "error" && state.errors?.general && (
@@ -69,14 +70,11 @@ export function LoginForm() {
               type="email"
               placeholder="example@manary.care"
               required
-              className={`border-gray-200 focus:border-[#f8a0a0] focus:ring-[#f8a0a0] ${
-                state.errors?.email ? "border-red-500" : ""
-              }`}
               aria-invalid={!!state.errors?.email}
               aria-errormessage={state.errors?.email ? "email-error" : undefined}
             />
             {state.errors?.email && (
-              <p id="email-error" className="text-sm text-red-500 mt-1">
+              <p id="email-error" className="text-sm text-destructive mt-1">
                 {state.errors.email[0]}
               </p>
             )}
@@ -90,15 +88,13 @@ export function LoginForm() {
                 type={showPassword ? "text" : "password"}
                 placeholder="パスワードを入力"
                 required
-                className={`border-gray-200 focus:border-[#f8a0a0] focus:ring-[#f8a0a0] pr-10 ${
-                  state.errors?.password ? "border-red-500" : ""
-                }`}
+                className={`pr-10 ${state.errors?.password ? "border-destructive" : ""}`}
                 aria-invalid={!!state.errors?.password}
                 aria-errormessage={state.errors?.password ? "password-error" : undefined}
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
               >
@@ -106,7 +102,7 @@ export function LoginForm() {
               </button>
             </div>
             {state.errors?.password && (
-              <p id="password-error" className="text-sm text-red-500 mt-1">
+              <p id="password-error" className="text-sm text-destructive mt-1">
                 {state.errors.password[0]}
               </p>
             )}
@@ -117,17 +113,17 @@ export function LoginForm() {
                 type="checkbox"
                 id="remember"
                 name="remember"
-                className="rounded border-gray-300 text-[#f8a0a0] focus:ring-[#f8a0a0]"
+                className="rounded border-gray-300 text-primary focus:ring-ring"
               />
               <Label htmlFor="remember" className="text-sm font-normal">
                 ログイン状態を保存
               </Label>
             </div>
-            <Link href="/reset-password" className="text-sm text-[#f8a0a0] hover:underline">
+            <Link href="/reset-password" className="text-sm text-primary hover:underline">
               パスワードをお忘れですか？
             </Link>
           </div>
-          <Button type="submit" className="w-full bg-[#f8a0a0] hover:bg-[#f78989] text-white" disabled={pending}>
+          <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "ログイン中..." : "ログイン"}
           </Button>
         </CSRFForm>
