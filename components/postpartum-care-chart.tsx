@@ -24,6 +24,11 @@ type Appointment = Tables<"appointments"> & {
 interface PostpartumCareChartProps {
   appointment: Appointment
   onClose: () => void
+  user: {
+    id: string
+    name: string | null
+    email: string | undefined
+  }
 }
 
 const chartSchema = z.object({
@@ -46,7 +51,7 @@ const chartSchema = z.object({
   payment_details: z.string().optional().nullable(),
 })
 
-export function PostpartumCareChart({ appointment, onClose }: PostpartumCareChartProps) {
+export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCareChartProps) {
   const {
     register,
     handleSubmit,
@@ -65,25 +70,37 @@ export function PostpartumCareChart({ appointment, onClose }: PostpartumCareChar
         const { data: chartData, error } = await getPostpartumCareChartByAppointmentId(appointment.id)
         if (error) {
           toast.error("産後ケアカルテの読み込みに失敗しました。")
-          reset({
-            appointment_id: appointment.id,
-            visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
-          })
-        } else if (chartData) {
-          reset(chartData as ChartFormData)
-        } else {
-          reset({
-            appointment_id: appointment.id,
-            visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
-          })
         }
-      } catch (error) {
-        console.error("Error fetching chart data:", error)
+
+        const questionnaire = appointment.questionnaires
+
+        const baseData = {
+          appointment_id: appointment.id,
+          visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
+          practitioner_name: user.name || "",
+        }
+
+        let questionnaireData: Partial<ChartFormData> = {}
+        if (questionnaire) {
+          questionnaireData = {
+            mother_condition: questionnaire.notes || "",
+          }
+        }
+
+        const finalData = {
+          ...questionnaireData,
+          ...(chartData || {}),
+          ...baseData,
+        }
+
+        reset(finalData as ChartFormData)
+      } catch (e) {
+        console.error("Error fetching chart data:", e)
         toast.error("産後ケアカルテの読み込み中にエラーが発生しました。")
       }
     }
     fetchChartData()
-  }, [appointment, reset])
+  }, [appointment, reset, user])
 
   const onSubmit = async (formData: ChartFormData) => {
     try {
@@ -116,11 +133,11 @@ export function PostpartumCareChart({ appointment, onClose }: PostpartumCareChar
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <Label>日付</Label>
-              <Input {...register("visit_date")} />
+              <Input {...register("visit_date")} readOnly />
             </div>
             <div>
               <Label>担当者</Label>
-              <Input {...register("practitioner_name")} />
+              <Input {...register("practitioner_name")} readOnly />
             </div>
           </div>
 

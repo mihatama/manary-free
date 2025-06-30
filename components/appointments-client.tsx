@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useEffect, useTransition, useCallback } from "react"
 import type { Tables } from "@/lib/supabase/database.types"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -13,17 +15,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BreastCareChart } from "./breast-care-chart"
 import { PostpartumCareChart } from "./postpartum-care-chart"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
+import { ArrowUpDown, Search } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { getAppointments } from "@/app/actions/reservation-actions"
+import { useDebounce } from "use-debounce"
 
 type AppointmentWithDetails = Tables<"appointments"> & {
   questionnaires: Tables<"questionnaires"> | null
@@ -31,14 +28,46 @@ type AppointmentWithDetails = Tables<"appointments"> & {
   clinics: Tables<"clinics"> | null
 }
 
+type Appointment = Awaited<ReturnType<typeof getAppointments>>[0]
+
+type SortKey = keyof Appointment | "patient_name"
+
 interface AppointmentsClientProps {
-  appointments: AppointmentWithDetails[]
+  initialAppointments: Appointment[]
+  user: {
+    id: string
+    name: string | null
+    email: string | undefined
+  }
 }
 
-export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
+export function AppointmentsClient({ initialAppointments, user }: AppointmentsClientProps) {
+  const [appointments, setAppointments] = useState(initialAppointments)
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithDetails | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [activeChart, setActiveChart] = useState<"breast" | "postpartum" | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500)
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" } | null>({
+    key: "date",
+    direction: "desc",
+  })
+  const [isPending, startTransition] = useTransition()
+
+  const fetchAppointments = useCallback(() => {
+    startTransition(async () => {
+      const data = await getAppointments({
+        query: debouncedSearchTerm,
+        sortBy: sortConfig?.key,
+        sortOrder: sortConfig?.direction,
+      })
+      setAppointments(data)
+    })
+  }, [debouncedSearchTerm, sortConfig])
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [fetchAppointments])
 
   const handleViewDetails = (appointment: AppointmentWithDetails) => {
     setSelectedAppointment(appointment)
@@ -57,7 +86,7 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
 
   const handleCloseChart = () => {
     setActiveChart(null)
-    setSelectedAppointment(null) // Also clear selected appointment
+    setSelectedAppointment(null)
   }
 
   const formatDate = (dateString: string) => {
@@ -82,24 +111,33 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
     }
   }
 
-  if (!appointments || appointments.length === 0) {
-    return (
-      <Card>
-        <CardContent className="text-center py-8">
-          <p className="text-muted-foreground">予約がありません。</p>
-        </CardContent>
-      </Card>
-    )
+  const handleSort = (key: SortKey) => {
+    let direction: "asc" | "desc" = "asc"
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc"
+    }
+    setSortConfig({ key, direction })
   }
+
+  const SortableHeader = ({ sortKey, children }: { sortKey: SortKey; children: React.ReactNode }) => (
+    <Button variant="ghost" onClick={() => handleSort(sortKey)} className="px-0">
+      {children}
+      {sortConfig?.key === sortKey ? (
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      ) : (
+        <ArrowUpDown className="ml-2 h-4 w-4 opacity-0" />
+      )}
+    </Button>
+  )
 
   const renderChart = () => {
     if (!selectedAppointment) return null
 
     switch (activeChart) {
       case "breast":
-        return <BreastCareChart appointment={selectedAppointment} onClose={handleCloseChart} />
+        return <BreastCareChart appointment={selectedAppointment} onClose={handleCloseChart} user={user} />
       case "postpartum":
-        return <PostpartumCareChart appointment={selectedAppointment} onClose={handleCloseChart} />
+        return <PostpartumCareChart appointment={selectedAppointment} onClose={handleCloseChart} user={user} />
       default:
         return null
     }
@@ -129,91 +167,71 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>予約一覧 ({appointments.length}件)</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="患者名またはIDで検索..."
+            className="pl-8 w-full md:w-1/3"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="border rounded-md">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>日時</TableHead>
-                <TableHead>患者名</TableHead>
-                <TableHead>電話番号</TableHead>
-                <TableHead>診療種別</TableHead>
-                <TableHead>ステータス</TableHead>
-                <TableHead>アクション</TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="patient_name">患者名</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="date">予約日</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="time">時間</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="service">サービス</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader sortKey="status">ステータス</SortableHeader>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {appointments.map((appointment) => (
-                <TableRow key={appointment.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{formatDate(appointment.appointment_date)}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{appointment.patient_name}</div>
-                      {appointment.questionnaires && (
-                        <div className="text-sm text-muted-foreground">
-                          問診票: {appointment.questionnaires.mother_last_name}{" "}
-                          {appointment.questionnaires.mother_first_name}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{appointment.patient_phone}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{appointment.service_types?.name || "未設定"}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        appointment.status === "confirmed"
-                          ? "default"
-                          : appointment.status === "cancelled"
-                            ? "destructive"
-                            : "secondary"
-                      }
-                    >
-                      {appointment.status === "confirmed"
-                        ? "確定"
-                        : appointment.status === "cancelled"
-                          ? "キャンセル"
-                          : appointment.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          アクション
-                          <ChevronDown className="ml-2 h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleViewDetails(appointment)}>詳細を表示</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleOpenChart("breast", appointment)}>
-                          乳房ケアカルテ
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenChart("postpartum", appointment)}>
-                          産後ケアカルテ
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {isPending ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center h-24">
+                    読み込み中...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : appointments.length > 0 ? (
+                appointments.map((appointment) => (
+                  <TableRow key={appointment.id}>
+                    <TableCell className="font-medium">
+                      {appointment.patient_name}{" "}
+                      <span className="text-xs text-muted-foreground">({appointment.patient_id})</span>
+                    </TableCell>
+                    <TableCell>{new Date(appointment.date).toLocaleDateString("ja-JP")}</TableCell>
+                    <TableCell>{appointment.time}</TableCell>
+                    <TableCell>{appointment.service}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{appointment.status}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center h-24">
+                    データが見つかりません。
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {selectedAppointment && (
         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
@@ -269,13 +287,13 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
                     </p>
                     <p>
                       <span className="font-medium">赤ちゃん名:</span>{" "}
-                      {selectedAppointment.questionnaires.baby_last_name}{" "}
-                      {selectedAppointment.questionnaires.baby_first_name}
+                      {selectedAppointment.questionnaires.child_last_name}{" "}
+                      {selectedAppointment.questionnaires.child_first_name}
                     </p>
-                    {selectedAppointment.questionnaires.baby_birth_date && (
+                    {selectedAppointment.questionnaires.child_birth_year && (
                       <p>
                         <span className="font-medium">生年月日:</span>{" "}
-                        {selectedAppointment.questionnaires.baby_birth_date}
+                        {`${selectedAppointment.questionnaires.child_birth_year}/${selectedAppointment.questionnaires.child_birth_month}/${selectedAppointment.questionnaires.child_birth_day}`}
                       </p>
                     )}
                   </div>

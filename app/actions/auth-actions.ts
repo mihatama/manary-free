@@ -118,3 +118,10 @@ export async function logoutAction(formData: FormData) {
     redirect("/")
   }
 }
+
+export async function logOut() {
+  const cookieStore = cookies()
+  const supabase = createServerActionClient<Database>({ cookies: () => cookieStore })
+  await supabase.auth.signOut()
+  redirect("/")
+}

@@ -24,6 +24,11 @@ type Appointment = Tables<"appointments"> & {
 interface BreastCareChartProps {
   appointment: Appointment
   onClose: () => void
+  user: {
+    id: string
+    name: string | null
+    email: string | undefined
+  }
 }
 
 const chartSchema = z.object({
@@ -72,7 +77,7 @@ const chartSchema = z.object({
 
 type ChartFormData = z.infer<typeof chartSchema>
 
-export function BreastCareChart({ appointment, onClose }: BreastCareChartProps) {
+export function BreastCareChart({ appointment, onClose, user }: BreastCareChartProps) {
   const {
     register,
     handleSubmit,
@@ -89,31 +94,45 @@ export function BreastCareChart({ appointment, onClose }: BreastCareChartProps) 
         const { data: chartData, error } = await getBreastCareChartByAppointmentId(appointment.id)
         if (error) {
           toast.error("カルテ情報の読み込みに失敗しました。")
-          // Initialize with questionnaire data even if fetch fails
-          const questionnaire = appointment.questionnaires
-          reset({
-            appointment_id: appointment.id,
-            visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
-            clinic_location: questionnaire?.visit_locations || [],
-          })
-        } else if (chartData) {
-          reset(chartData as ChartFormData)
-        } else {
-          // No existing chart, pre-fill from questionnaire
-          const questionnaire = appointment.questionnaires
-          reset({
-            appointment_id: appointment.id,
-            visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
-            clinic_location: questionnaire?.visit_locations || [],
-          })
         }
-      } catch (error) {
-        console.error("Error fetching chart data:", error)
+
+        const questionnaire = appointment.questionnaires
+
+        const baseData = {
+          appointment_id: appointment.id,
+          visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
+          practitioner_name: user.name || "",
+        }
+
+        let questionnaireData: Partial<ChartFormData> = {}
+        if (questionnaire) {
+          const locations = []
+          if (questionnaire.location_nishinomiya) locations.push("西宮")
+          if (questionnaire.location_takarazuka) locations.push("宝塚")
+          if (questionnaire.location_nihonbashi) locations.push("日本橋")
+          if (questionnaire.location_aichi) locations.push("愛知")
+          if (questionnaire.location_visit) locations.push("訪問")
+
+          questionnaireData = {
+            clinic_location: locations,
+            s_text: questionnaire.notes || "",
+          }
+        }
+
+        const finalData = {
+          ...questionnaireData,
+          ...(chartData || {}),
+          ...baseData,
+        }
+
+        reset(finalData as ChartFormData)
+      } catch (e) {
+        console.error("Error fetching chart data:", e)
         toast.error("カルテ情報の読み込み中にエラーが発生しました。")
       }
     }
     fetchChartData()
-  }, [appointment, reset])
+  }, [appointment, reset, user])
 
   const onSubmit = async (formData: ChartFormData) => {
     try {
@@ -151,16 +170,45 @@ export function BreastCareChart({ appointment, onClose }: BreastCareChartProps) 
             </div>
             <div>
               <Label>日付</Label>
-              <Input {...register("visit_date")} />
+              <Input {...register("visit_date")} readOnly />
             </div>
             <div>
               <Label>担当者</Label>
-              <Input {...register("practitioner_name")} />
+              <Input {...register("practitioner_name")} readOnly />
             </div>
             <div>
               <Label>研修生</Label>
               <Input {...register("trainee_name")} />
             </div>
+          </div>
+
+          <div>
+            <Label>場所</Label>
+            <Controller
+              name="clinic_location"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-4 mt-2">
+                  {["西宮", "宝塚", "日本橋", "愛知", "訪問"].map((location) => (
+                    <div key={location} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`location-${location}`}
+                        checked={field.value?.includes(location)}
+                        onCheckedChange={(checked) => {
+                          const currentLocations = field.value || []
+                          if (checked) {
+                            field.onChange([...currentLocations, location])
+                          } else {
+                            field.onChange(currentLocations.filter((l) => l !== location))
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`location-${location}`}>{location}</Label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            />
           </div>
 
           {/* Feeding Info */}

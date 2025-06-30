@@ -1,12 +1,13 @@
 import type React from "react"
 import { DashboardNav } from "@/components/dashboard-nav"
-import { LogoutButton } from "@/components/logout-button"
+import { UserProfile } from "@/components/user-profile"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import type { User } from "@supabase/supabase-js"
 
 export const dynamic = "force-dynamic"
 
-async function checkAuth() {
+async function checkAuth(): Promise<User> {
   try {
     const supabase = createClient()
     const {
@@ -30,36 +31,31 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  await checkAuth()
+  const user = await checkAuth()
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-md flex flex-col">
-        <div className="p-4 border-b">
-          <div className="flex items-center space-x-2">
+      <div className="w-64 bg-white dark:bg-gray-900 border-r dark:border-gray-800 flex flex-col">
+        <div className="p-4 border-b dark:border-gray-800">
+          <div className="flex items-center space-x-3">
             <img src="/manary-logo.png" alt="Manary" className="h-8 w-auto" />
-            <span className="text-xl font-semibold text-gray-800">管理画面</span>
+            <span className="text-xl font-semibold text-gray-800 dark:text-white">管理画面</span>
           </div>
         </div>
 
-        <nav className="flex-1 p-4">
+        <nav className="flex-1 p-3 overflow-y-auto">
           <DashboardNav />
         </nav>
 
-        <div className="p-4 border-t">
-          <LogoutButton />
+        <div className="p-3 border-t dark:border-gray-800">
+          <UserProfile user={user} />
         </div>
       </div>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white shadow-sm border-b">
-          <div className="px-6 py-4">
-            <h1 className="text-2xl font-semibold text-gray-900">ダッシュボード</h1>
-          </div>
-        </header>
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">{children}</main>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-950 p-6">{children}</main>
       </div>
     </div>
   )
