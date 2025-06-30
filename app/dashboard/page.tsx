@@ -8,20 +8,20 @@ async function getDashboardStats() {
   try {
     const supabase = createClient()
 
-    // Get total appointments
-    const { count: totalAppointments } = await supabase.from("appointments").select("*", { count: "exact", head: true })
+    // Get total reservations
+    const { count: totalAppointments } = await supabase.from("reservations").select("*", { count: "exact", head: true })
 
-    // Get today's appointments
+    // Get today's reservations
     const today = new Date().toISOString().split("T")[0]
     const { count: todayAppointments } = await supabase
-      .from("appointments")
+      .from("reservations")
       .select("*", { count: "exact", head: true })
-      .eq("appointment_date", today)
+      .eq("reservation_date", today)
       .neq("status", "cancelled")
 
-    // Get confirmed appointments
+    // Get confirmed reservations
     const { count: confirmedAppointments } = await supabase
-      .from("appointments")
+      .from("reservations")
       .select("*", { count: "exact", head: true })
       .eq("status", "confirmed")
 
