@@ -1,34 +1,19 @@
-"use client"
+import { createBrowserClient } from "@supabase/ssr"
+import type { Database } from "./database.types"
 
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { Database } from "@/lib/supabase/database.types"
+let client: ReturnType<typeof createBrowserClient<Database>> | undefined
 
-// グローバル変数としてクライアントインスタンスを保持
-let clientInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
-
-// クライアントコンポーネント用のSupabaseクライアント
-// シングルトンパターンを使用して一貫したインスタンスを保証
-export const getSupabaseBrowser = () => {
-  // ブラウザ環境でのみ実行
-  if (typeof window === "undefined") {
-    throw new Error("getSupabaseBrowser should only be called in browser environment")
+export function createClient() {
+  if (!client) {
+    client = createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
   }
-
-  // 既存のインスタンスがあればそれを返す
-  if (clientInstance) {
-    return clientInstance
-  }
-
-  // 新しいインスタンスを作成
-  clientInstance = createClientComponentClient<Database>({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  })
-
-  return clientInstance
+  return client
 }
 
-// 後方互換性のために残しておくが、内部では getSupabaseBrowser を使用
-export const createClient = () => {
-  return getSupabaseBrowser()
+// Add the missing export
+export function getSupabaseBrowser() {
+  return createClient()
 }

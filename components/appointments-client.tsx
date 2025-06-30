@@ -4,9 +4,26 @@ import { useState } from "react"
 import type { Tables } from "@/lib/supabase/database.types"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { BreastCareChart } from "./breast-care-chart"
+import { PostpartumCareChart } from "./postpartum-care-chart"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ChevronDown } from "lucide-react"
 
 type AppointmentWithDetails = Tables<"appointments"> & {
   questionnaires: Tables<"questionnaires"> | null
@@ -21,6 +38,7 @@ interface AppointmentsClientProps {
 export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithDetails | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [activeChart, setActiveChart] = useState<"breast" | "postpartum" | null>(null)
 
   const handleViewDetails = (appointment: AppointmentWithDetails) => {
     setSelectedAppointment(appointment)
@@ -30,6 +48,16 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
   const handleCloseDetails = () => {
     setIsDetailsOpen(false)
     setSelectedAppointment(null)
+  }
+
+  const handleOpenChart = (chartType: "breast" | "postpartum", appointment: AppointmentWithDetails) => {
+    setSelectedAppointment(appointment)
+    setActiveChart(chartType)
+  }
+
+  const handleCloseChart = () => {
+    setActiveChart(null)
+    setSelectedAppointment(null) // Also clear selected appointment
   }
 
   const formatDate = (dateString: string) => {
@@ -62,6 +90,41 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
         </CardContent>
       </Card>
     )
+  }
+
+  const renderChart = () => {
+    if (!selectedAppointment) return null
+
+    switch (activeChart) {
+      case "breast":
+        return <BreastCareChart appointment={selectedAppointment} onClose={handleCloseChart} />
+      case "postpartum":
+        return <PostpartumCareChart appointment={selectedAppointment} onClose={handleCloseChart} />
+      default:
+        return null
+    }
+  }
+
+  const getChartTitle = () => {
+    switch (activeChart) {
+      case "breast":
+        return "乳房ケアカルテ"
+      case "postpartum":
+        return "産後ケアカルテ"
+      default:
+        return ""
+    }
+  }
+
+  const getChartDescription = () => {
+    switch (activeChart) {
+      case "breast":
+        return "乳房ケアに関する情報を入力します。"
+      case "postpartum":
+        return "産後ケアに関する情報を入力します。"
+      default:
+        return ""
+    }
   }
 
   return (
@@ -126,9 +189,24 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(appointment)}>
-                      詳細
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          アクション
+                          <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleViewDetails(appointment)}>詳細を表示</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleOpenChart("breast", appointment)}>
+                          乳房ケアカルテ
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenChart("postpartum", appointment)}>
+                          産後ケアカルテ
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
@@ -140,11 +218,11 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
       {selectedAppointment && (
         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
           <DialogContent className="max-w-2xl">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold">予約詳細</h2>
-              </div>
-
+            <DialogHeader>
+              <DialogTitle>予約詳細</DialogTitle>
+              <DialogDescription>選択された予約の詳細情報です。</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">患者名</label>
@@ -203,13 +281,24 @@ export function AppointmentsClient({ appointments }: AppointmentsClientProps) {
                   </div>
                 </div>
               )}
-
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={handleCloseDetails}>
-                  閉じる
-                </Button>
-              </div>
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCloseDetails}>
+                閉じる
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {selectedAppointment && (
+        <Dialog open={!!activeChart} onOpenChange={(isOpen) => !isOpen && handleCloseChart()}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>{getChartTitle()}</DialogTitle>
+              <DialogDescription>{getChartDescription()}</DialogDescription>
+            </DialogHeader>
+            {renderChart()}
           </DialogContent>
         </Dialog>
       )}

@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { PlusCircle } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface UserManagementClientProps {
   users: User[]
@@ -36,6 +37,7 @@ function SubmitButton() {
 
 // Form logic is encapsulated in its own component
 function AddUserForm({ closeDialog }: { closeDialog: () => void }) {
+  const router = useRouter()
   const { toast } = useToast()
   const initialState = { message: null, errors: null, success: false }
   const [state, dispatch] = useActionState(createUser, initialState)
@@ -47,6 +49,7 @@ function AddUserForm({ closeDialog }: { closeDialog: () => void }) {
           title: "成功",
           description: state.message,
         })
+        router.refresh() // Refresh the page to show the new user
         closeDialog() // Close dialog on success
       } else {
         toast({
@@ -56,7 +59,7 @@ function AddUserForm({ closeDialog }: { closeDialog: () => void }) {
         })
       }
     }
-  }, [state, toast, closeDialog])
+  }, [state, toast, closeDialog, router])
 
   return (
     <form action={dispatch}>

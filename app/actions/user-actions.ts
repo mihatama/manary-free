@@ -57,6 +57,14 @@ export async function createUser(prevState: any, formData: FormData) {
     }
   }
 
+  if (!data.user) {
+    return {
+      errors: null,
+      message: "ユーザーの作成に失敗しました: 予期せぬエラーが発生しました。",
+      success: false,
+    }
+  }
+
   revalidatePath("/dashboard/users")
   return {
     errors: null,
