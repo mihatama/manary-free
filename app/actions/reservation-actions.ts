@@ -14,7 +14,6 @@ import {
   setMinutes,
   setSeconds,
   getDay,
-  parseISO,
 } from "date-fns"
 
 // Correctly derive types from the master Database type
@@ -279,32 +278,45 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       }
 
       for (const setting of settingsToUse) {
-        // Skip if the setting has an end date and it's in the past
-        if (setting.end_date && parseISO(setting.end_date) < day) {
+        // Robustly check if the setting's end_date has passed
+        if (setting.end_date && dateStr > setting.end_date) {
           continue
         }
 
-        const [startHour, startMinute] = setting.start_time.split(":").map(Number)
-        const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+        try {
+          const [startHour, startMinute] = setting.start_time.split(":").map(Number)
+          const [endHour, endMinute] = setting.end_time.split(":").map(Number)
 
-        let slotStart = setSeconds(setMinutes(setHours(day, startHour), startMinute), 0)
-        const settingEnd = setSeconds(setMinutes(setHours(day, endHour), endMinute), 0)
+          if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+            throw new Error("Invalid time format in setting")
+          }
 
-        while (slotStart < settingEnd) {
-          const slotEnd = new Date(slotStart.getTime() + slotInterval * 60 * 1000)
-          if (slotEnd > settingEnd) break
+          let slotStart = setSeconds(setMinutes(setHours(day, startHour), startMinute), 0)
+          const settingEnd = setSeconds(setMinutes(setHours(day, endHour), endMinute), 0)
 
-          const formattedDate = format(slotStart, "yyyy-MM-dd")
-          const formattedTime = format(slotStart, "HH:mm:ss")
-          const isBooked = bookedSlots.has(`${formattedDate}T${formattedTime}`)
+          while (slotStart < settingEnd) {
+            const slotEnd = new Date(slotStart.getTime() + slotInterval * 60 * 1000)
+            if (slotEnd > settingEnd) break
 
-          allSlots.push({
-            start_time: slotStart.toISOString(),
-            end_time: slotEnd.toISOString(),
-            is_available: !isBooked,
-          })
+            const formattedDate = format(slotStart, "yyyy-MM-dd")
+            const formattedTime = format(slotStart, "HH:mm:ss")
+            const isBooked = bookedSlots.has(`${formattedDate}T${formattedTime}`)
 
-          slotStart = slotEnd
+            allSlots.push({
+              start_time: slotStart.toISOString(),
+              end_time: slotEnd.toISOString(),
+              is_available: !isBooked,
+            })
+
+            slotStart = slotEnd
+          }
+        } catch (e) {
+          console.error(
+            `Skipping availability setting due to an error. Setting ID: ${setting.id}, Error: ${
+              e instanceof Error ? e.message : "Unknown error"
+            }`,
+          )
+          continue
         }
       }
     }
