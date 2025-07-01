@@ -225,6 +225,10 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       throw new Error("サービス情報の取得に失敗しました。")
     }
     const slotInterval = serviceType.duration // in minutes
+    if (slotInterval <= 0) {
+      console.error(`Invalid slot interval for service type ${serviceTypeId}: ${slotInterval}`)
+      return []
+    }
 
     // 2. Fetch availability settings for the service type
     const { data: availabilitySettings, error: availabilityError } = await supabase
