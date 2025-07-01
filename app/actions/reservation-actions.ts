@@ -4,7 +4,18 @@ import { createClient } from "@/lib/supabase/server"
 import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
-import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse, setHours, setMinutes, setSeconds } from "date-fns"
+import {
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  format,
+  parse,
+  setHours,
+  setMinutes,
+  setSeconds,
+  getDay,
+  parseISO,
+} from "date-fns"
 
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
@@ -203,7 +214,35 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     const startDate = startOfMonth(monthDate)
     const endDate = endOfMonth(monthDate)
 
-    // 1. Fetch all reservations for the given month and service type
+    // 1. Fetch service type to get duration
+    const { data: serviceType, error: serviceTypeError } = await supabase
+      .from("service_types")
+      .select("duration")
+      .eq("id", serviceTypeId)
+      .single()
+
+    if (serviceTypeError || !serviceType || !serviceType.duration) {
+      console.error("Error fetching service type or duration is null:", serviceTypeError?.message)
+      throw new Error("サービス情報の取得に失敗しました。")
+    }
+    const slotInterval = serviceType.duration // in minutes
+
+    // 2. Fetch availability settings for the service type
+    const { data: availabilitySettings, error: availabilityError } = await supabase
+      .from("availability_settings")
+      .select("*")
+      .eq("service_type_id", serviceTypeId)
+      .eq("is_available", true)
+
+    if (availabilityError) {
+      console.error("Error fetching availability settings:", availabilityError.message)
+      throw new Error("予約可能時間の設定の取得に失敗しました。")
+    }
+    if (!availabilitySettings) {
+      return [] // No availability settings for this service type
+    }
+
+    // 3. Fetch existing reservations for the month
     const { data: existingReservations, error: reservationError } = await supabase
       .from("reservations")
       .select("reservation_date, start_time")
@@ -219,40 +258,60 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
 
     const bookedSlots = new Set(existingReservations.map((r) => `${r.reservation_date}T${r.start_time}`))
 
-    // 2. Generate all possible slots for the month
-    // In a real app, these values should come from clinic settings
-    const openingTime = 9 * 60 // 9:00 AM in minutes
-    const closingTime = 18 * 60 // 6:00 PM in minutes
-    const slotInterval = 30 // in minutes, assuming this is from serviceType duration, but hardcoding for now.
-
+    // 4. Generate all possible slots based on availability settings
+    const allSlots: { start_time: string; end_time: string; is_available: boolean }[] = []
     const allDays = eachDayOfInterval({ start: startDate, end: endDate })
-    const allSlots = []
+
+    const weeklySettings = availabilitySettings.filter((s) => !s.specific_date)
+    const specificDateSettings = availabilitySettings.filter((s) => s.specific_date)
 
     for (const day of allDays) {
-      for (let time = openingTime; time < closingTime; time += slotInterval) {
-        const hours = Math.floor(time / 60)
-        const minutes = time % 60
+      const dayOfWeek = getDay(day)
+      const dateStr = format(day, "yyyy-MM-dd")
 
-        const slotStartTime = setSeconds(setMinutes(setHours(day, hours), minutes), 0)
-        const slotEndTime = new Date(slotStartTime.getTime() + slotInterval * 60 * 1000)
+      const hasSpecificSettingForDay = specificDateSettings.some((s) => s.specific_date === dateStr)
+      let settingsToUse = []
 
-        const formattedDate = format(day, "yyyy-MM-dd")
-        const formattedTime = format(slotStartTime, "HH:mm:ss")
+      if (hasSpecificSettingForDay) {
+        settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
+      } else {
+        settingsToUse = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
+      }
 
-        const isBooked = bookedSlots.has(`${formattedDate}T${formattedTime}`)
+      for (const setting of settingsToUse) {
+        // Skip if the setting has an end date and it's in the past
+        if (setting.end_date && parseISO(setting.end_date) < day) {
+          continue
+        }
 
-        allSlots.push({
-          start_time: slotStartTime.toISOString(),
-          end_time: slotEndTime.toISOString(),
-          is_available: !isBooked,
-        })
+        const [startHour, startMinute] = setting.start_time.split(":").map(Number)
+        const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+
+        let slotStart = setSeconds(setMinutes(setHours(day, startHour), startMinute), 0)
+        const settingEnd = setSeconds(setMinutes(setHours(day, endHour), endMinute), 0)
+
+        while (slotStart < settingEnd) {
+          const slotEnd = new Date(slotStart.getTime() + slotInterval * 60 * 1000)
+          if (slotEnd > settingEnd) break
+
+          const formattedDate = format(slotStart, "yyyy-MM-dd")
+          const formattedTime = format(slotStart, "HH:mm:ss")
+          const isBooked = bookedSlots.has(`${formattedDate}T${formattedTime}`)
+
+          allSlots.push({
+            start_time: slotStart.toISOString(),
+            end_time: slotEnd.toISOString(),
+            is_available: !isBooked,
+          })
+
+          slotStart = slotEnd
+        }
       }
     }
 
     return allSlots
   } catch (error) {
     console.error("Error in getAvailableSlots:", error instanceof Error ? error.message : "Unknown error")
-    // Return empty array on error to avoid crashing the client
     return []
   }
 }

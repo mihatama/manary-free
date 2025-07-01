@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent } from "react-big-calendar"
-import { format, parse, startOfWeek, getDay, parseISO } from "date-fns"
+import { format, parse, startOfWeek, getDay, parseISO, addMonths, subMonths } from "date-fns"
 import { ja } from "date-fns/locale"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { getAvailableSlots } from "@/app/actions/reservation-actions"
 import type { Database } from "@/lib/supabase/database.types"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // date-fns localizer setup
 const locales = {
@@ -36,11 +37,10 @@ interface CalendarEvent extends BigCalendarEvent {
 }
 
 export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }: ReservationCalendarProps) {
-  const [date, setDate] = useState(new Date())
+  const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [view, setView] = useState<"month" | "week" | "day">("month")
 
   useEffect(() => {
     if (!serviceType) {
@@ -52,14 +52,14 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
       try {
         setIsLoading(true)
         setError(null)
-        const month = format(date, "yyyy-MM")
+        const month = format(currentDate, "yyyy-MM")
         const slots = await getAvailableSlots(serviceType!.id, month)
 
         const calendarEvents: CalendarEvent[] = slots.map((slot) => {
           const startTime = parseISO(slot.start_time)
           const endTime = parseISO(slot.end_time)
           return {
-            title: slot.is_available ? "予約可能" : "予約済み",
+            title: slot.is_available ? format(startTime, "HH:mm") : "予約済",
             start: startTime,
             end: endTime,
             isAvailable: slot.is_available,
@@ -75,98 +75,73 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
     }
 
     fetchAvailableSlots()
-  }, [serviceType, date])
-
-  const handleNavigate = (newDate: Date) => {
-    setDate(newDate)
-  }
-
-  const handleView = (newView: any) => {
-    setView(newView)
-  }
-
-  const handleSelectSlot = (slotInfo: { start: Date }) => {
-    if (view === "month") {
-      setDate(slotInfo.start)
-      setView("day")
-    } else {
-      const isAvailable = events.some(
-        (event) =>
-          event.start && event.end && slotInfo.start >= event.start && slotInfo.start < event.end && event.isAvailable,
-      )
-      if (isAvailable) {
-        onSelectSlot(slotInfo.start)
-      }
-    }
-  }
+  }, [serviceType, currentDate])
 
   const eventStyleGetter = (event: CalendarEvent) => {
     const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.getTime()
+
     const style = {
-      backgroundColor: isSelected ? "#f78989" : event.isAvailable ? "#a8d8ea" : "#f0f0f0",
-      borderRadius: "5px",
-      opacity: 0.8,
-      color: isSelected ? "white" : event.isAvailable ? "black" : "#a0a0a0",
-      border: "0px",
+      backgroundColor: isSelected ? "#f78989" : event.isAvailable ? "#a8d8ea" : "#e0e0e0",
+      borderRadius: "4px",
+      opacity: 0.9,
+      color: isSelected ? "white" : event.isAvailable ? "black" : "#616161",
+      border: "none",
       display: "block",
       cursor: event.isAvailable ? "pointer" : "not-allowed",
+      padding: "2px 4px",
+      fontSize: "0.8em",
+      textAlign: "center" as const,
     }
     return {
       style: style,
     }
   }
 
-  const CustomToolbar = (toolbar: any) => {
-    const goToBack = () => {
-      toolbar.onNavigate("PREV")
+  const handleSelectEvent = (event: CalendarEvent) => {
+    if (event.isAvailable && event.start) {
+      onSelectSlot(event.start)
     }
+  }
 
-    const goToNext = () => {
-      toolbar.onNavigate("NEXT")
-    }
+  const goToPreviousMonth = () => {
+    setCurrentDate((prev) => subMonths(prev, 1))
+  }
 
-    const goToCurrent = () => {
-      toolbar.onNavigate("TODAY")
-    }
+  const goToNextMonth = () => {
+    setCurrentDate((prev) => addMonths(prev, 1))
+  }
 
-    const label = () => {
-      return format(toolbar.date, "yyyy年 M月", { locale: ja })
-    }
-
-    return (
-      <div className="rbc-toolbar">
-        <span className="rbc-btn-group">
-          <Button onClick={goToBack}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button onClick={goToCurrent}>今日</Button>
-          <Button onClick={goToNext}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </span>
-        <span className="rbc-toolbar-label">{label()}</span>
-        <span className="rbc-btn-group">
-          {["month", "week", "day"].map((viewName) => (
-            <Button
-              key={viewName}
-              onClick={() => toolbar.onView(viewName)}
-              className={toolbar.view === viewName ? "rbc-active" : ""}
-            >
-              {viewName === "month" ? "月" : viewName === "week" ? "週" : "日"}
-            </Button>
-          ))}
-        </span>
-      </div>
-    )
+  const goToToday = () => {
+    setCurrentDate(new Date())
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">{serviceType ? `${serviceType.name} - 予約日時選択` : "予約日時選択"}</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg">
+            {serviceType ? `${serviceType.name} - 予約日時選択` : "予約日時選択"}
+          </CardTitle>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={goToPreviousMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={goToToday}>
+              今月
+            </Button>
+            <Button variant="outline" size="sm" onClick={goToNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        {error && <p className="text-red-500">{error}</p>}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {isLoading && <p className="text-center p-4">予約枠を読み込み中...</p>}
         <div style={{ height: "600px" }}>
           <Calendar
             localizer={localizer}
@@ -174,19 +149,22 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
             startAccessor="start"
             endAccessor="end"
             style={{ height: "100%" }}
-            date={date}
-            onNavigate={handleNavigate}
-            onView={handleView}
-            view={view}
-            onSelectSlot={handleSelectSlot}
-            selectable
+            date={currentDate}
+            onNavigate={(date) => setCurrentDate(date)}
+            views={["month", "week", "day"]}
+            defaultView="month"
             eventPropGetter={eventStyleGetter}
+            onSelectEvent={handleSelectEvent}
+            selectable={false}
             culture="ja"
-            components={{
-              toolbar: CustomToolbar,
-            }}
             formats={{
-              dayHeaderFormat: (date) => format(date, "M月d日 (E)", { locale: ja }),
+              monthHeaderFormat: (date) => format(date, "yyyy年M月", { locale: ja }),
+              weekdayFormat: (date) => format(date, "E", { locale: ja }),
+              dayHeaderFormat: (date) => format(date, "M月d日(E)", { locale: ja }),
+              dayRangeHeaderFormat: ({ start, end }) =>
+                `${format(start, "yyyy年M月d日", { locale: ja })} - ${format(end, "M月d日", {
+                  locale: ja,
+                })}`,
               timeGutterFormat: (date) => format(date, "H:mm"),
             }}
             messages={{
@@ -201,10 +179,10 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
               time: "時間",
               event: "イベント",
               noEventsInRange: "この期間に予約可能な時間はありません",
+              showMore: (total) => `他 ${total} 件`,
             }}
           />
         </div>
-        {isLoading && <p>予約枠を読み込み中...</p>}
       </CardContent>
     </Card>
   )
