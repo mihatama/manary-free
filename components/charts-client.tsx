@@ -21,6 +21,76 @@ type Chart = Awaited<ReturnType<typeof getCharts>>[0]
 
 type SortKey = keyof Chart | "patient_name"
 
+// Mock data for templates
+const mockBreastCareChart = {
+  id: 0,
+  no: "（番号）",
+  visit_date: new Date().toLocaleDateString("ja-JP"),
+  practitioner_name: "（担当者名）",
+  trainee_name: "",
+  clinic_location: [],
+  breast_milk_interval: "",
+  milk_volume_day: "",
+  milk_volume_night: "",
+  formula_volume_per_feed: "",
+  s_text: "",
+  p_text: "",
+  breast_shape: "",
+  nipple_shield_used: false,
+  pumping_frequency: "",
+  nipple_areola_condition: [],
+  pain_location: [],
+  feeding_position: "",
+  family_support_status: "",
+  breast_diagram_right: {},
+  breast_diagram_left: {},
+  diagnosis: "",
+  initial_consultation_fee: false,
+  single_session_fee: false,
+  ticket_fee: false,
+  rental_towel_fee: false,
+  care_towel_fee: false,
+  other_fee: null,
+  other_fee_description: null,
+  appointments: {
+    start_time: new Date().toISOString(),
+    questionnaires: {
+      data: {
+        child_last_name: "（お子様姓）",
+        child_first_name: "（お子様名）",
+      },
+    },
+  },
+}
+
+const mockPostpartumCareChart = {
+  id: 0,
+  visit_date: new Date().toLocaleDateString("ja-JP"),
+  practitioner_name: "（担当者名）",
+  mother_condition: "",
+  lochia_status: "",
+  episiotomy_pain: "",
+  constipation_status: "",
+  mental_state: "",
+  family_support: "",
+  baby_condition: "",
+  jaundice_level: "",
+  umbilical_cord_status: "",
+  feeding_status: "",
+  care_plan: "",
+  guidance: "",
+  payment_details: "",
+  appointments: {
+    start_time: new Date().toISOString(),
+    questionnaires: {
+      data: {
+        mother_last_name: "（お母様姓）",
+        mother_first_name: "（お母様名）",
+      },
+    },
+  },
+}
+
 export function ChartsClient({ initialCharts }: { initialCharts: Chart[] }) {
   const [charts, setCharts] = useState(initialCharts)
   const [searchTerm, setSearchTerm] = useState("")
@@ -33,6 +103,8 @@ export function ChartsClient({ initialCharts }: { initialCharts: Chart[] }) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [selectedChart, setSelectedChart] = useState<any | null>(null)
   const [activeChartType, setActiveChartType] = useState<"breast" | "postpartum" | null>(null)
+  const [isBreastCareTemplateOpen, setIsBreastCareTemplateOpen] = useState(false)
+  const [isPostpartumCareTemplateOpen, setIsPostpartumCareTemplateOpen] = useState(false)
 
   const fetchCharts = useCallback(() => {
     startTransition(async () => {
@@ -98,15 +170,25 @@ export function ChartsClient({ initialCharts }: { initialCharts: Chart[] }) {
   return (
     <>
       <div className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="患者名またはIDで検索..."
-            className="pl-8 w-full md:w-1/3"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex justify-between items-center gap-4">
+          <div className="relative flex-grow">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="患者名またはIDで検索..."
+              className="pl-8 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button variant="secondary" size="sm" onClick={() => setIsBreastCareTemplateOpen(true)}>
+              乳房ケアフォーマット
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setIsPostpartumCareTemplateOpen(true)}>
+              産後ケアフォーマット
+            </Button>
+          </div>
         </div>
         <div className="border rounded-md">
           <Table>
@@ -181,6 +263,24 @@ export function ChartsClient({ initialCharts }: { initialCharts: Chart[] }) {
           ) : selectedChart && activeChartType === "postpartum" ? (
             <PostpartumCareChartDetails chart={selectedChart} />
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBreastCareTemplateOpen} onOpenChange={setIsBreastCareTemplateOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>乳房ケアカルテ フォーマット</DialogTitle>
+          </DialogHeader>
+          <BreastCareChartDetails chart={mockBreastCareChart} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPostpartumCareTemplateOpen} onOpenChange={setIsPostpartumCareTemplateOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>産後ケアカルテ フォーマット</DialogTitle>
+          </DialogHeader>
+          <PostpartumCareChartDetails chart={mockPostpartumCareChart} />
         </DialogContent>
       </Dialog>
     </>

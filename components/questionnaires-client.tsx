@@ -20,6 +20,28 @@ import { toast } from "sonner"
 
 type SortKey = "patient_name" | "submission_date"
 
+// Mock data for template view
+const mockQuestionnaire: DetailedQuestionnaireWithReservation = {
+  id: 0,
+  created_at: new Date().toISOString(),
+  reservation_id: 0,
+  data: {}, // Empty data shows all fields as "未入力"
+  reservations: {
+    id: 0,
+    created_at: new Date().toISOString(),
+    patient_name: "（氏名）",
+    patient_id: "（ID）",
+    phone_number: "090-1234-5678",
+    email: "example@example.com",
+    reservation_date: new Date().toISOString(),
+    service_type_id: 0,
+    status: "confirmed",
+    clinic_id: 0,
+    user_id: null,
+    notes: null,
+  },
+}
+
 export function QuestionnairesClient({
   initialQuestionnaires,
 }: {
@@ -35,6 +57,7 @@ export function QuestionnairesClient({
   const [isPending, startTransition] = useTransition()
   const [selectedQuestionnaire, setSelectedQuestionnaire] = useState<DetailedQuestionnaireWithReservation | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [isTemplateOpen, setIsTemplateOpen] = useState(false)
 
   // This is a placeholder fetch function. The real implementation would use the search and sort state.
   const fetchQuestionnaires = useCallback(() => {
@@ -84,15 +107,20 @@ export function QuestionnairesClient({
   return (
     <>
       <div className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="患者名またはIDで検索..."
-            className="pl-8 w-full md:w-1/3"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex justify-between items-center gap-4">
+          <div className="relative flex-grow">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="患者名またはIDで検索..."
+              className="pl-8 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button variant="secondary" onClick={() => setIsTemplateOpen(true)}>
+            フォーマット表示
+          </Button>
         </div>
         <div className="border rounded-md">
           <Table>
@@ -148,6 +176,15 @@ export function QuestionnairesClient({
           ) : (
             <div className="text-center py-8">読み込み中...</div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isTemplateOpen} onOpenChange={setIsTemplateOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>問診票フォーマット</DialogTitle>
+          </DialogHeader>
+          <QuestionnaireDetails questionnaire={mockQuestionnaire} />
         </DialogContent>
       </Dialog>
     </>
