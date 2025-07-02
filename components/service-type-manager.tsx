@@ -41,7 +41,7 @@ type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
 interface ServiceTypeManagerProps {
   clinicId: number
-  onSelectServiceType: (serviceType: ServiceType) => void
+  onSelectServiceType: (serviceType: ServiceType | null) => void
   selectedServiceTypeId: number | null
 }
 
@@ -51,6 +51,7 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
   const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingServiceType, setEditingServiceType] = useState<ServiceType | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // フォーム状態
   const [name, setName] = useState("")
@@ -60,29 +61,55 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
 
   const { csrfToken, isLoading: isLoadingCSRF, error: csrfError } = useCSRF()
 
+  // 診療所IDが変更されたときに診療種別を読み込む
   useEffect(() => {
-    if (!clinicId) return
+    if (!clinicId) {
+      setServiceTypes([])
+      setIsLoading(false)
+      return
+    }
 
+    let isMounted = true
     async function loadServiceTypes() {
+      setIsLoading(true)
+      setError(null)
       try {
-        setIsLoading(true)
         const data = await getServiceTypes(clinicId)
-        setServiceTypes(data)
-
-        // 初期選択
-        if (data.length > 0 && !selectedServiceTypeId) {
-          onSelectServiceType(data[0])
+        if (isMounted) {
+          setServiceTypes(data)
         }
       } catch (err) {
-        setError("診療種別の読み込みに失敗しました")
-        console.error(err)
+        if (isMounted) {
+          setError("診療種別の読み込みに失敗しました")
+          console.error(err)
+        }
       } finally {
-        setIsLoading(false)
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
     }
 
     loadServiceTypes()
-  }, [clinicId, selectedServiceTypeId, onSelectServiceType])
+
+    return () => {
+      isMounted = false
+    }
+  }, [clinicId])
+
+  // 読み込み完了後、またはリストが変更された後に選択状態を管理する
+  useEffect(() => {
+    if (isLoading) return
+
+    if (serviceTypes.length > 0) {
+      const selectionExists = serviceTypes.some((st) => st.id === selectedServiceTypeId)
+      if (!selectionExists) {
+        onSelectServiceType(serviceTypes[0])
+      }
+    } else {
+      onSelectServiceType(null)
+    }
+  }, [serviceTypes, isLoading, onSelectServiceType, selectedServiceTypeId])
 
   const resetForm = () => {
     setName("")
@@ -111,6 +138,13 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
   }
 
   const handleSubmit = async () => {
+    if (!name.trim()) {
+      // Prevent submission if name is empty
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
     try {
       if (!csrfToken) {
         setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
@@ -129,7 +163,11 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
         formData.append("color", color)
 
         const updated = await updateServiceType(formData)
-        setServiceTypes(serviceTypes.map((st) => (st.id === updated.id ? updated : st)))
+        setServiceTypes((prev) => prev.map((st) => (st.id === updated.id ? updated : st)))
+
+        if (selectedServiceTypeId === updated.id) {
+          onSelectServiceType(updated)
+        }
       } else {
         // 新規作成
         formData.append("clinic_id", clinicId.toString())
@@ -139,19 +177,28 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
         formData.append("color", color)
 
         const created = await createServiceType(formData)
-        setServiceTypes([...serviceTypes, created])
+        setServiceTypes((prev) => [...prev, created])
       }
       handleCloseDialog()
     } catch (err) {
-      console.error("Service type operation error")
+      console.error("Service type operation error", err)
       setError("データの保存に失敗しました。もう一度お試しください。")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleDelete = async (id: number) => {
+    // Store original state for potential rollback
+    const originalServiceTypes = [...serviceTypes]
+
+    // Optimistically update the UI
+    setServiceTypes((prev) => prev.filter((st) => st.id !== id))
+
     try {
       if (!csrfToken) {
         setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
+        setServiceTypes(originalServiceTypes) // Rollback
         return
       }
 
@@ -160,18 +207,12 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
       formData.append("id", id.toString())
 
       await deleteServiceType(formData)
-      setServiceTypes(serviceTypes.filter((st) => st.id !== id))
-
-      // 選択中の診療種別が削除された場合、別の診療種別を選択
-      if (selectedServiceTypeId === id && serviceTypes.length > 1) {
-        const newSelected = serviceTypes.find((st) => st.id !== id)
-        if (newSelected) {
-          onSelectServiceType(newSelected)
-        }
-      }
+      // On success, the optimistic update is now confirmed.
     } catch (err) {
-      console.error("Service type deletion error")
+      console.error("Service type deletion error:", err)
       setError("データの削除に失敗しました。もう一度お試しください。")
+      // Rollback on error
+      setServiceTypes(originalServiceTypes)
     }
   }
 
@@ -185,7 +226,11 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
         <h3 className="text-lg font-medium">診療種別</h3>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()} size="sm" className="bg-manary-pink hover:bg-[#f78989]">
+            <Button
+              onClick={() => handleOpenDialog()}
+              size="sm"
+              className="bg-manary-pink hover:bg-[#f78989] text-foreground"
+            >
               <Plus className="h-4 w-4 mr-1" />
               新規作成
             </Button>
@@ -247,8 +292,12 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
               <Button variant="outline" onClick={handleCloseDialog}>
                 キャンセル
               </Button>
-              <Button onClick={handleSubmit} className="bg-manary-pink hover:bg-[#f78989]">
-                保存
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || isLoadingCSRF || !name.trim()}
+                className="bg-manary-pink hover:bg-[#f78989] text-foreground"
+              >
+                {isSubmitting ? "保存中..." : "保存"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -330,7 +379,7 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
       {serviceTypes.length === 0 && !isLoading && (
         <div className="text-center py-8 border rounded-lg bg-gray-50">
           <p className="text-gray-500 mb-4">診療種別がまだ登録されていません</p>
-          <Button onClick={() => handleOpenDialog()} className="bg-manary-pink hover:bg-[#f78989]">
+          <Button onClick={() => handleOpenDialog()} className="bg-manary-pink hover:bg-[#f78989] text-foreground">
             <Plus className="h-4 w-4 mr-1" />
             診療種別を作成
           </Button>
