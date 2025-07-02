@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
-import "react-big-calendar/lib/css/react-big-calendar.css"
 
 export const metadata: Metadata = {
   title: "v0 App",
