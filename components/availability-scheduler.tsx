@@ -10,8 +10,9 @@ import { format, addMonths, subMonths } from "date-fns"
 import { ja } from "date-fns/locale"
 import {
   getAvailabilitySettings,
-  upsertAvailabilitySetting,
   deleteAvailabilitySetting,
+  createWeeklyAvailability, // 新しいアクションをインポート
+  createSpecificDateAvailability, // 新しいアクションをインポート
 } from "@/app/actions/schedule-actions"
 import type { Database } from "@/lib/supabase/database.types"
 import { useCSRF } from "@/hooks/use-csrf"
@@ -140,7 +141,7 @@ function SimpleCalendar({
   }
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-sm relative">
       <button
         onClick={toggleCalendar}
         className="w-full flex items-center justify-between p-2 border rounded-md bg-white hover:bg-gray-50"
@@ -150,7 +151,7 @@ function SimpleCalendar({
       </button>
 
       {isOpen && (
-        <div className="mt-1 border rounded-md overflow-hidden bg-white shadow-md">
+        <div className="absolute z-10 mt-1 w-full border rounded-md overflow-hidden bg-white shadow-md">
           <div className="p-2 bg-gray-50 flex justify-between items-center">
             <div className="font-medium">{format(currentMonth, "yyyy年M月", { locale: ja })}</div>
             <div className="flex space-x-1">
@@ -180,11 +181,11 @@ function SimpleCalendar({
                 <button
                   key={index}
                   className={`
-                    h-8 w-full flex items-center justify-center rounded-sm text-sm
-                    ${isSelected(date) ? "bg-blue-500 text-white" : ""}
-                    ${!isCurrentMonth(date) ? "text-gray-400" : ""}
-                    ${isDateDisabled(date) ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}
-                  `}
+              h-8 w-full flex items-center justify-center rounded-sm text-sm
+              ${isSelected(date) ? "bg-blue-500 text-white" : ""}
+              ${!isCurrentMonth(date) ? "text-gray-400" : ""}
+              ${isDateDisabled(date) ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}
+            `}
                   onClick={() => !isDateDisabled(date) && handleSelectDate(date)}
                   disabled={isDateDisabled(date)}
                 >
@@ -215,10 +216,20 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
   const [newEndTime, setNewEndTime] = useState<string>("17:00")
   const [weeklyEndDate, setWeeklyEndDate] = useState<Date | undefined>(undefined)
 
+  // 休憩時間用の状態
+  const [showBreak, setShowBreak] = useState(false)
+  const [breakStartTime, setBreakStartTime] = useState("12:00")
+  const [breakEndTime, setBreakEndTime] = useState("13:00")
+
   // 特定日付ベースの設定用の状態
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [specificStartTime, setSpecificStartTime] = useState<string>("09:00")
   const [specificEndTime, setSpecificEndTime] = useState<string>("17:00")
+
+  // 特定日用の休憩時間状態
+  const [specificShowBreak, setSpecificShowBreak] = useState(false)
+  const [specificBreakStartTime, setSpecificBreakStartTime] = useState("12:00")
+  const [specificBreakEndTime, setSpecificBreakEndTime] = useState("13:00")
 
   const [isAdding, setIsAdding] = useState(false)
 
@@ -243,74 +254,60 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
     loadAvailabilitySettings()
   }, [serviceType])
 
-  // 曜日ベースの予約可能時間を追加
+  // 曜日ベースの予約可能時間を追加（休憩時間対応）
   const handleAddWeeklyAvailability = async () => {
     if (!serviceType) return
 
     try {
       setIsAdding(true)
+      setError(null)
 
       if (!csrfToken) {
         setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
         return
       }
 
-      const dayOfWeekNum = Number.parseInt(newDayOfWeek)
-
-      // 時間の検証
+      // Client-side validation
       if (newStartTime >= newEndTime) {
         setError("開始時間は終了時間より前である必要があります")
-        return
-      }
-
-      // 重複チェック
-      const hasOverlap = availabilitySettings.some(
-        (setting) =>
-          setting.day_of_week === dayOfWeekNum &&
-          !setting.specific_date && // 曜日ベースの設定のみをチェック
-          ((newStartTime >= setting.start_time && newStartTime < setting.end_time) ||
-            (newEndTime > setting.start_time && newEndTime <= setting.end_time) ||
-            (newStartTime <= setting.start_time && newEndTime >= setting.end_time)),
-      )
-
-      if (hasOverlap) {
-        setError("選択した時間帯は既存の設定と重複しています")
         return
       }
 
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
       formData.append("service_type_id", serviceType.id.toString())
-      formData.append("day_of_week", dayOfWeekNum.toString())
+      formData.append("day_of_week", newDayOfWeek)
       formData.append("start_time", newStartTime)
       formData.append("end_time", newEndTime)
-      formData.append("is_available", "true")
 
-      // 終了日を追加
       if (weeklyEndDate) {
-        console.log("Adding end date to form:", format(weeklyEndDate, "yyyy-MM-dd"))
         formData.append("end_date", format(weeklyEndDate, "yyyy-MM-dd"))
       }
 
-      const newSetting = await upsertAvailabilitySetting(formData)
-      setAvailabilitySettings([...availabilitySettings, newSetting])
-      setError(null)
-
-      // 成功メッセージを表示
-      if (weeklyEndDate) {
-        const endDateStr = format(weeklyEndDate, "yyyy年MM月dd日", { locale: ja })
-        setError(
-          `${DAYS_OF_WEEK.find((d) => d.value.toString() === newDayOfWeek)?.label}の予約枠を${endDateStr}まで追加しました`,
-        )
-        setTimeout(() => setError(null), 3000)
-      } else {
-        setError("予約枠を追加しました")
-        setTimeout(() => setError(null), 3000)
+      if (showBreak) {
+        if (breakStartTime >= breakEndTime) {
+          setError("休憩の開始時間は終了時間より前である必要があります")
+          return
+        }
+        if (breakStartTime <= newStartTime || breakEndTime >= newEndTime) {
+          setError("休憩時間は勤務時間内に設定してください")
+          return
+        }
+        formData.append("break_start_time", breakStartTime)
+        formData.append("break_end_time", breakEndTime)
       }
+
+      const newSettings = await createWeeklyAvailability(formData)
+
+      setAvailabilitySettings([...availabilitySettings, ...newSettings])
+
+      // Reset fields and show success message
+      setShowBreak(false)
+      setError("予約枠を追加しました")
+      setTimeout(() => setError(null), 3000)
     } catch (err: any) {
       console.error("Availability setting error:", err)
-      // エラーメッセージをより詳細に表示
-      setError(`予約可能時間の追加に失敗しました: ${err.message || "不明なエラー"}`)
+      setError(`予約可能時間の追加に失敗しました: ${err.message}`)
     } finally {
       setIsAdding(false)
     }
@@ -322,52 +319,50 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
 
     try {
       setIsAdding(true)
+      setError(null)
 
       if (!csrfToken) {
         setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
         return
       }
 
-      // 時間の検証
+      // Client-side validation
       if (specificStartTime >= specificEndTime) {
         setError("開始時間は終了時間より前である必要があります")
-        return
-      }
-
-      // 日付をYYYY-MM-DD形式に変換
-      const formattedDate = format(selectedDate, "yyyy-MM-dd")
-
-      // 重複チェック
-      const hasOverlap = availabilitySettings.some(
-        (setting) =>
-          setting.specific_date === formattedDate && // 特定日付の設定のみをチェック
-          ((specificStartTime >= setting.start_time && specificStartTime < setting.end_time) ||
-            (specificEndTime > setting.start_time && specificEndTime <= setting.end_time) ||
-            (specificStartTime <= setting.start_time && specificEndTime >= setting.end_time)),
-      )
-
-      if (hasOverlap) {
-        setError("選択した時間帯は既存の設定と重複しています")
         return
       }
 
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
       formData.append("service_type_id", serviceType.id.toString())
-      formData.append("day_of_week", new Date(selectedDate).getDay().toString()) // 曜日も設定
+      formData.append("specific_date", format(selectedDate, "yyyy-MM-dd"))
       formData.append("start_time", specificStartTime)
       formData.append("end_time", specificEndTime)
-      formData.append("is_available", "true")
-      formData.append("specific_date", formattedDate)
 
-      const newSetting = await upsertAvailabilitySetting(formData)
+      if (specificShowBreak) {
+        if (specificBreakStartTime >= specificBreakEndTime) {
+          setError("休憩の開始時間は終了時間より前である必要があります")
+          return
+        }
+        if (specificBreakStartTime <= specificStartTime || specificBreakEndTime >= specificEndTime) {
+          setError("休憩時間は勤務時間内に設定してください")
+          return
+        }
+        formData.append("break_start_time", specificBreakStartTime)
+        formData.append("break_end_time", specificBreakEndTime)
+      }
 
-      // 新しい設定を追加
-      setAvailabilitySettings([...availabilitySettings, newSetting])
-      setError(null)
-    } catch (err) {
-      console.error("Specific date availability setting error")
-      setError("予約可能時間の追加に失敗しました。もう一度お試しください。")
+      const newSettings = await createSpecificDateAvailability(formData)
+
+      setAvailabilitySettings([...availabilitySettings, ...newSettings])
+
+      // Reset fields and show success message
+      setSpecificShowBreak(false)
+      setError("特定日の予約枠を追加しました")
+      setTimeout(() => setError(null), 3000)
+    } catch (err: any) {
+      console.error("Specific date availability setting error:", err)
+      setError(`特定日の予約枠の追加に失敗しました: ${err.message}`)
     } finally {
       setIsAdding(false)
     }
@@ -442,70 +437,113 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
               <CardTitle className="text-base">新しい予約可能時間を追加（毎週）</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">曜日</label>
-                  <Select value={newDayOfWeek} onValueChange={setNewDayOfWeek}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="曜日を選択" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAYS_OF_WEEK.map((day) => (
-                        <SelectItem key={day.value} value={day.value.toString()}>
-                          {day.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">曜日</label>
+                    <Select value={newDayOfWeek} onValueChange={setNewDayOfWeek}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="曜日を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DAYS_OF_WEEK.map((day) => (
+                          <SelectItem key={day.value} value={day.value.toString()}>
+                            {day.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">勤務開始</label>
+                    <Select value={newStartTime} onValueChange={setNewStartTime}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="開始時間" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIME_OPTIONS.map((time) => (
+                          <SelectItem key={time.value} value={time.value}>
+                            {time.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">勤務終了</label>
+                    <Select value={newEndTime} onValueChange={setNewEndTime}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="終了時間" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIME_OPTIONS.map((time) => (
+                          <SelectItem key={time.value} value={time.value}>
+                            {time.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">いつまで設定</label>
+                    <SimpleCalendar
+                      selectedDate={weeklyEndDate}
+                      onSelectDate={setWeeklyEndDate}
+                      disablePastDates={true}
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label className="text-sm font-medium mb-1 block">開始時間</label>
-                  <Select value={newStartTime} onValueChange={setNewStartTime}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="開始時間" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIME_OPTIONS.map((time) => (
-                        <SelectItem key={time.value} value={time.value}>
-                          {time.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">終了時間</label>
-                  <Select value={newEndTime} onValueChange={setNewEndTime}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="終了時間" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIME_OPTIONS.map((time) => (
-                        <SelectItem key={time.value} value={time.value}>
-                          {time.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {/* 毎週の予約枠の部分を更新 */}
-                {/* 「いつまで設定」の部分を更新します */}
-                <div>
-                  <label className="text-sm font-medium mb-1 block">いつまで設定</label>
-                  <SimpleCalendar
-                    selectedDate={weeklyEndDate}
-                    onSelectDate={setWeeklyEndDate}
-                    disablePastDates={true}
-                  />
-                </div>
-                <div className="flex items-end">
                   <Button
-                    onClick={handleAddWeeklyAvailability}
-                    disabled={isAdding}
-                    className="w-full bg-manary-pink hover:bg-[#f78989]"
+                    variant="link"
+                    size="sm"
+                    onClick={() => setShowBreak(!showBreak)}
+                    className="p-0 h-auto text-blue-600"
                   >
                     <Plus className="h-4 w-4 mr-1" />
-                    追加
+                    {showBreak ? "休憩設定をキャンセル" : "休憩時間を設定する"}
+                  </Button>
+                  {showBreak && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+                      <div className="md:col-start-2">
+                        <label className="text-sm font-medium mb-1 block">休憩開始</label>
+                        <Select value={breakStartTime} onValueChange={setBreakStartTime}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="休憩開始" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map((time) => (
+                              <SelectItem key={`break-start-${time.value}`} value={time.value}>
+                                {time.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">休憩終了</label>
+                        <Select value={breakEndTime} onValueChange={setBreakEndTime}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="休憩終了" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map((time) => (
+                              <SelectItem key={`break-end-${time.value}`} value={time.value}>
+                                {time.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={handleAddWeeklyAvailability} disabled={isAdding} className="w-full md:w-auto">
+                    <Plus className="h-4 w-4 mr-1" />
+                    予約枠を追加
                   </Button>
                 </div>
               </div>
@@ -578,50 +616,98 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
               <CardTitle className="text-base">特定の日付の予約可能時間を追加</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* 特定日の予約枠の部分も同様に更新 */}
-                <div>
-                  <label className="text-sm font-medium mb-1 block">日付</label>
-                  <SimpleCalendar selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">日付</label>
+                    <SimpleCalendar selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">勤務開始</label>
+                    <Select value={specificStartTime} onValueChange={setSpecificStartTime}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="開始時間" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIME_OPTIONS.map((time) => (
+                          <SelectItem key={`specific-start-${time.value}`} value={time.value}>
+                            {time.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">勤務終了</label>
+                    <Select value={specificEndTime} onValueChange={setSpecificEndTime}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="終了時間" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIME_OPTIONS.map((time) => (
+                          <SelectItem key={`specific-end-${time.value}`} value={time.value}>
+                            {time.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
                 <div>
-                  <label className="text-sm font-medium mb-1 block">開始時間</label>
-                  <Select value={specificStartTime} onValueChange={setSpecificStartTime}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="開始時間" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIME_OPTIONS.map((time) => (
-                        <SelectItem key={`specific-start-${time.value}`} value={time.value}>
-                          {time.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => setSpecificShowBreak(!specificShowBreak)}
+                    className="p-0 h-auto text-blue-600"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    {specificShowBreak ? "休憩設定をキャンセル" : "休憩時間を設定する"}
+                  </Button>
+                  {specificShowBreak && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+                      <div className="md:col-start-2">
+                        <label className="text-sm font-medium mb-1 block">休憩開始</label>
+                        <Select value={specificBreakStartTime} onValueChange={setSpecificBreakStartTime}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="休憩開始" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map((time) => (
+                              <SelectItem key={`specific-break-start-${time.value}`} value={time.value}>
+                                {time.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">休憩終了</label>
+                        <Select value={specificBreakEndTime} onValueChange={setSpecificBreakEndTime}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="休憩終了" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map((time) => (
+                              <SelectItem key={`specific-break-end-${time.value}`} value={time.value}>
+                                {time.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">終了時間</label>
-                  <Select value={specificEndTime} onValueChange={setSpecificEndTime}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="終了時間" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIME_OPTIONS.map((time) => (
-                        <SelectItem key={`specific-end-${time.value}`} value={time.value}>
-                          {time.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
+
+                <div className="flex justify-end pt-4">
                   <Button
                     onClick={handleAddSpecificDateAvailability}
                     disabled={isAdding || !selectedDate}
-                    className="w-full bg-manary-pink hover:bg-[#f78989]"
+                    className="w-full md:w-auto"
                   >
                     <Plus className="h-4 w-4 mr-1" />
-                    追加
+                    予約枠を追加
                   </Button>
                 </div>
               </div>

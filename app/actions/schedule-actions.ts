@@ -422,3 +422,184 @@ export async function deleteAvailabilitySetting(formData: FormData) {
     throw new Error("データの削除に失敗しました")
   }
 }
+
+// 新しいサーバーアクション：休憩時間を含む週次の予約可能時間を作成
+export async function createWeeklyAvailability(formData: FormData) {
+  try {
+    await validateCSRF(formData)
+
+    const service_type_id = Number(formData.get("service_type_id"))
+    const day_of_week = Number(formData.get("day_of_week"))
+    const start_time = formData.get("start_time") as string
+    const end_time = formData.get("end_time") as string
+    const is_available = true // Always true for new availability
+    const end_date = (formData.get("end_date") as string) || null
+    const break_start_time = (formData.get("break_start_time") as string) || null
+    const break_end_time = (formData.get("break_end_time") as string) || null
+
+    // --- Server-side validation ---
+    if (start_time >= end_time) {
+      throw new Error("開始時間は終了時間より前である必要があります")
+    }
+
+    const slotsToCreate: { start_time: string; end_time: string }[] = []
+
+    if (break_start_time && break_end_time) {
+      if (break_start_time >= break_end_time) {
+        throw new Error("休憩の開始時間は終了時間より前である必要があります")
+      }
+      if (break_start_time <= start_time || break_end_time >= end_time) {
+        throw new Error("休憩時間は勤務時間内に設定してください")
+      }
+      // With break, create two slots
+      slotsToCreate.push({ start_time: start_time, end_time: break_start_time })
+      slotsToCreate.push({ start_time: break_end_time, end_time: end_time })
+    } else {
+      // No break, create one slot
+      slotsToCreate.push({ start_time: start_time, end_time: end_time })
+    }
+
+    const supabase = createClient()
+
+    // --- Overlap check ---
+    const { data: existingSettings, error: fetchError } = await supabase
+      .from("availability_settings")
+      .select("start_time, end_time")
+      .eq("service_type_id", service_type_id)
+      .eq("day_of_week", day_of_week)
+      .is("specific_date", null)
+
+    if (fetchError) {
+      console.error("Error fetching existing settings:", fetchError)
+      throw new Error("既存の設定の確認に失敗しました")
+    }
+
+    for (const slot of slotsToCreate) {
+      const hasOverlap = existingSettings.some(
+        (existing) =>
+          (slot.start_time >= existing.start_time && slot.start_time < existing.end_time) ||
+          (slot.end_time > existing.start_time && slot.end_time <= existing.end_time) ||
+          (slot.start_time <= existing.start_time && slot.end_time >= existing.end_time),
+      )
+      if (hasOverlap) {
+        throw new Error(`時間帯 ${slot.start_time}-${slot.end_time} は既存の設定と重複しています`)
+      }
+    }
+
+    // --- Insert new settings ---
+    const newSettingsPayload = slotsToCreate.map((slot) => ({
+      service_type_id,
+      day_of_week,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      is_available,
+      end_date,
+      updated_at: new Date().toISOString(),
+    }))
+
+    const { data, error } = await supabase.from("availability_settings").insert(newSettingsPayload).select()
+
+    if (error) {
+      console.error("Database operation error:", error)
+      throw new Error("データの保存に失敗しました: " + error.message)
+    }
+
+    revalidatePath("/dashboard/schedule-settings")
+    return data // returns an array of new settings
+  } catch (error: any) {
+    console.error("Error in createWeeklyAvailability:", error)
+    // Re-throw with a user-friendly message
+    throw new Error(error.message || "予約可能時間の作成に失敗しました")
+  }
+}
+
+// 新しいサーバーアクション：休憩時間を含む特定日の予約可能時間を作成
+export async function createSpecificDateAvailability(formData: FormData) {
+  try {
+    await validateCSRF(formData)
+
+    const service_type_id = Number(formData.get("service_type_id"))
+    const specific_date = formData.get("specific_date") as string
+    const start_time = formData.get("start_time") as string
+    const end_time = formData.get("end_time") as string
+    const break_start_time = (formData.get("break_start_time") as string) || null
+    const break_end_time = (formData.get("break_end_time") as string) || null
+
+    if (!specific_date) {
+      throw new Error("日付が指定されていません")
+    }
+
+    // --- Server-side validation ---
+    if (start_time >= end_time) {
+      throw new Error("開始時間は終了時間より前である必要があります")
+    }
+
+    const slotsToCreate: { start_time: string; end_time: string }[] = []
+
+    if (break_start_time && break_end_time) {
+      if (break_start_time >= break_end_time) {
+        throw new Error("休憩の開始時間は終了時間より前である必要があります")
+      }
+      if (break_start_time <= start_time || break_end_time >= end_time) {
+        throw new Error("休憩時間は勤務時間内に設定してください")
+      }
+      // With break, create two slots
+      slotsToCreate.push({ start_time: start_time, end_time: break_start_time })
+      slotsToCreate.push({ start_time: break_end_time, end_time: end_time })
+    } else {
+      // No break, create one slot
+      slotsToCreate.push({ start_time: start_time, end_time: end_time })
+    }
+
+    const supabase = createClient()
+
+    // --- Overlap check ---
+    const { data: existingSettings, error: fetchError } = await supabase
+      .from("availability_settings")
+      .select("start_time, end_time")
+      .eq("service_type_id", service_type_id)
+      .eq("specific_date", specific_date)
+
+    if (fetchError) {
+      console.error("Error fetching existing settings:", fetchError)
+      throw new Error("既存の設定の確認に失敗しました")
+    }
+
+    for (const slot of slotsToCreate) {
+      const hasOverlap = existingSettings.some(
+        (existing) =>
+          (slot.start_time >= existing.start_time && slot.start_time < existing.end_time) ||
+          (slot.end_time > existing.start_time && slot.end_time <= existing.end_time) ||
+          (slot.start_time <= existing.start_time && slot.end_time >= existing.end_time),
+      )
+      if (hasOverlap) {
+        throw new Error(`時間帯 ${slot.start_time}-${slot.end_time} は既存の設定と重複しています`)
+      }
+    }
+
+    // --- Insert new settings ---
+    const day_of_week = new Date(specific_date).getDay()
+    const newSettingsPayload = slotsToCreate.map((slot) => ({
+      service_type_id,
+      day_of_week,
+      specific_date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      is_available: true,
+      updated_at: new Date().toISOString(),
+    }))
+
+    const { data, error } = await supabase.from("availability_settings").insert(newSettingsPayload).select()
+
+    if (error) {
+      console.error("Database operation error:", error)
+      throw new Error("データの保存に失敗しました: " + error.message)
+    }
+
+    revalidatePath("/dashboard/schedule-settings")
+    return data // returns an array of new settings
+  } catch (error: any) {
+    console.error("Error in createSpecificDateAvailability:", error)
+    throw new Error(error.message || "特定日の予約可能時間の作成に失敗しました")
+  }
+}
