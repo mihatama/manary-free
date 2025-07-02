@@ -1,19 +1,53 @@
 "use client"
 
-import { useState } from "react"
-import { ClinicSelector } from "@/components/clinic-selector"
+import { useState, useEffect } from "react"
 import { ClinicManager } from "@/components/clinic-manager"
 import { ServiceTypeManager } from "@/components/service-type-manager"
 import { AvailabilityScheduler } from "@/components/availability-scheduler"
 import { ScheduleCalendar } from "@/components/schedule-calendar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Database } from "@/lib/supabase/database.types"
+import { getClinics } from "@/app/actions/schedule-actions"
 
+type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
 export function ScheduleSettingsClient() {
+  const [clinics, setClinics] = useState<Clinic[]>([])
+  const [isLoadingClinics, setIsLoadingClinics] = useState(true)
+  const [clinicsError, setClinicsError] = useState<string | null>(null)
+
   const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null)
   const [selectedServiceType, setSelectedServiceType] = useState<ServiceType | null>(null)
+
+  const refreshClinics = async () => {
+    try {
+      setIsLoadingClinics(true)
+      const data = await getClinics()
+      setClinics(data)
+      // If the selected clinic was deleted, reset selection
+      if (selectedClinicId && !data.some((c) => c.id === selectedClinicId)) {
+        setSelectedClinicId(null)
+        setSelectedServiceType(null)
+      }
+    } catch (err) {
+      setClinicsError("助産院の読み込みに失敗しました")
+      console.error(err)
+    } finally {
+      setIsLoadingClinics(false)
+    }
+  }
+
+  useEffect(() => {
+    refreshClinics()
+  }, [])
+
+  const handleSelectClinic = (clinicId: number | null) => {
+    if (clinicId !== selectedClinicId) {
+      setSelectedClinicId(clinicId)
+      setSelectedServiceType(null)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -25,28 +59,23 @@ export function ScheduleSettingsClient() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-bold mb-4">助産院を選択</h2>
-          <ClinicSelector
+          <ClinicManager
+            clinics={clinics}
+            isLoading={isLoadingClinics}
+            error={clinicsError}
+            onUpdate={refreshClinics}
             selectedClinicId={selectedClinicId}
-            onSelectClinic={(clinicId) => {
-              setSelectedClinicId(clinicId)
-              setSelectedServiceType(null)
-            }}
+            onSelectClinic={handleSelectClinic}
           />
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
           <Tabs defaultValue="service-types">
             <TabsList className="mb-6">
-              <TabsTrigger value="clinics">助産院管理</TabsTrigger>
               <TabsTrigger value="service-types">診療種別</TabsTrigger>
               <TabsTrigger value="availability">予約可能時間</TabsTrigger>
               <TabsTrigger value="calendar">カレンダー表示</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="clinics">
-              <ClinicManager />
-            </TabsContent>
 
             <TabsContent value="service-types">
               {selectedClinicId ? (
@@ -57,7 +86,7 @@ export function ScheduleSettingsClient() {
                 />
               ) : (
                 <div className="text-center py-8 border rounded-lg bg-gray-50">
-                  <p className="text-gray-500">助産院を選択してください</p>
+                  <p className="text-gray-500">上のリストから助産院を選択して、診療種別を管理してください</p>
                 </div>
               )}
             </TabsContent>
@@ -67,7 +96,13 @@ export function ScheduleSettingsClient() {
             </TabsContent>
 
             <TabsContent value="calendar">
-              <ScheduleCalendar clinicId={selectedClinicId} />
+              {selectedClinicId ? (
+                <ScheduleCalendar clinicId={selectedClinicId} />
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-gray-50">
+                  <p className="text-gray-500">上のリストから助産院を選択して、カレンダーを表示してください</p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
