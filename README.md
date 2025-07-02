@@ -8,13 +8,14 @@ Manaryは、助産院やクリニック向けの予約管理・顧客管理シ�
 ## 目次 / Project Overview
 
 - [主な機能](#主な機能) / The application provides two main interfaces:
-  1. **Public-facing Reservation System:** Allows patients to book, view, and manage their appointments.
-  2. **Admin Dashboard:** A secure area for clinic staff to manage appointments, view patient questionnaires (charts), and configure clinic settings.
+1. **Public-facing Reservation System:** Allows patients to book, view, and manage their appointments.
+2. **Admin Dashboard:** A secure area for clinic staff to manage appointments, view patient questionnaires (charts), and configure clinic settings.
 - [技術スタック](#技術スタック) / Tech Stack
 - [プロジェクト構成](#プロジェクト構成) / Project Structure
 - [ローカル開発環境のセットアップ](#ローカル開発環境のセットアップ) / Getting Started
 - [データベーススキーマ（テーブル構成）](#データベーススキーマテーブル構成) / Database Schema
 - [主要なコンセプト](#主要なコンセプト) / Key Concepts
+- [カスタマイズ](#カスタマイズ) / Customization
 - [デプロイ](#デプロイ) / Deployment
 - [ライセンス](#ライセンス) / License
 
@@ -85,25 +86,25 @@ manary/
 ### インストールと設定 / Installation
 
 1.  **リポジトリをクローンし、依存関係をインストール** / Clone the repository:
-    \`\`\`bash
-    git clone https://github.com/your-username/manary.git
-    cd manary
-    npm install
-    \`\`\`
+\`\`\`bash
+git clone https://github.com/your-username/manary.git
+cd manary
+npm install
+\`\`\`
 
 2.  **環境変数を設定** / Set up environment variables:
-    プロジェクトルートに `.env.local` ファイルを作成し、自身の値に書き換えてください。 / Create a `.env.local` file in the root of the project and add your Supabase project URL and anon key.
-    \`\`\`
-    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-    # Add other variables like Twilio credentials if needed
-    \`\`\`
+プロジェクトルートに `.env.local` ファイルを作成し、自身の値に書き換えてください。 / Create a `.env.local` file in the root of the project and add your Supabase project URL and anon key.
+\`\`\`
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+# Add other variables like Twilio credentials if needed
+\`\`\`
 
 3.  **開発サーバーを起動** / Run the development server:
-    \`\`\`bash
-    npm run dev
-    \`\`\`
-    ブラウザで `http://localhost:3000` を開きます。 / Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+\`\`\`bash
+npm run dev
+\`\`\`
+ブラウザで `http://localhost:3000` を開きます。 / Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## データベーススキーマ（テーブル構成） / Database Schema
 
@@ -168,6 +169,37 @@ manary/
 
 ### Server Actions
 データ作成・更新・削除などの処理は、主にNext.jsのServer Actionsを利用しています。これにより、APIエンドポイントを別途作成することなく、サーバーサイドのロジックを直接呼び出せます。 / Data creation, update, and deletion processes primarily use Next.js Server Actions. This allows for direct invocation of server-side logic without the need to create separate API endpoints.
+
+## カスタマイズ / Customization
+
+### 助産院の作成上限数 / Maximum Number of Clinics
+このシステムでは、契約プランに応じて作成できる助産院の数を制限できます。この上限は、開発者がコード内の変数を変更することで設定します。
+
+- **設定ファイル**: `components/clinic-manager.tsx`
+- **変数名**: `MAX_CLINICS`
+
+この変数の値を変更することで、管理画面に表示される助産院の登録枠の数を `1` や `3` など、プランに応じた数に調整できます。
+
+\`\`\`typescript
+// components/clinic-manager.tsx
+
+// ↓この値を変更することで、作成できる助産院の上限数を設定します
+const MAX_CLINICS = 3; // 例: 3件に設定
+\`\`\`
+
+This system allows for limiting the number of clinics that can be created based on the subscription plan. This limit is configured by developers by changing a variable in the code.
+
+- **Configuration File**: `components/clinic-manager.tsx`
+- **Variable Name**: `MAX_CLINICS`
+
+By changing the value of this variable, you can adjust the number of clinic registration slots displayed on the admin screen to match the plan, such as `1` or `3`.
+
+\`\`\`typescript
+// components/clinic-manager.tsx
+
+// ↓ Change this value to set the maximum number of clinics that can be created.
+const MAX_CLINICS = 3; // Example: Set to 3
+\`\`\`
 
 ## デプロイ / Deployment
 
