@@ -442,8 +442,25 @@ export async function createWeeklyAvailability(formData: FormData) {
       throw new Error("開始時間は終了時間より前である必要があります")
     }
 
-    const slotsToCreate: { start_time: string; end_time: string }[] = []
+    const supabase = createClient()
 
+    // Fetch service type duration
+    const { data: serviceType, error: serviceTypeError } = await supabase
+      .from("service_types")
+      .select("duration")
+      .eq("id", service_type_id)
+      .single()
+
+    if (serviceTypeError || !serviceType) {
+      throw new Error("診療種別の取得に失敗しました")
+    }
+    const duration = serviceType.duration
+    if (!duration || duration <= 0) {
+      throw new Error("診療種別の所要時間が0分以下に設定されているため、予約枠を作成できません。")
+    }
+
+    // Define work periods
+    const workPeriods: { start: string; end: string }[] = []
     if (break_start_time && break_end_time) {
       if (break_start_time >= break_end_time) {
         throw new Error("休憩の開始時間は終了時間より前である必要があります")
@@ -451,15 +468,34 @@ export async function createWeeklyAvailability(formData: FormData) {
       if (break_start_time <= start_time || break_end_time >= end_time) {
         throw new Error("休憩時間は勤務時間内に設定してください")
       }
-      // With break, create two slots
-      slotsToCreate.push({ start_time: start_time, end_time: break_start_time })
-      slotsToCreate.push({ start_time: break_end_time, end_time: end_time })
+      workPeriods.push({ start: start_time, end: break_start_time })
+      workPeriods.push({ start: break_end_time, end: end_time })
     } else {
-      // No break, create one slot
-      slotsToCreate.push({ start_time: start_time, end_time: end_time })
+      workPeriods.push({ start: start_time, end: end_time })
     }
 
-    const supabase = createClient()
+    // Generate slots based on duration
+    const slotsToCreate: { start_time: string; end_time: string }[] = []
+    const timeToMinutes = (time: string): number => {
+      const [hours, minutes] = time.split(":").map(Number)
+      return hours * 60 + minutes
+    }
+
+    for (const period of workPeriods) {
+      let currentMinutes = timeToMinutes(period.start)
+      const periodEndMinutes = timeToMinutes(period.end)
+
+      while (currentMinutes + duration <= periodEndMinutes) {
+        const slotStartTime = formatTime(currentMinutes)
+        const slotEndTime = formatTime(currentMinutes + duration)
+        slotsToCreate.push({ start_time: slotStartTime, end_time: slotEndTime })
+        currentMinutes += duration
+      }
+    }
+
+    if (slotsToCreate.length === 0) {
+      throw new Error("作成できる予約枠がありません。勤務時間と所要時間を確認してください。")
+    }
 
     // --- Overlap check ---
     const { data: existingSettings, error: fetchError } = await supabase
@@ -534,8 +570,25 @@ export async function createSpecificDateAvailability(formData: FormData) {
       throw new Error("開始時間は終了時間より前である必要があります")
     }
 
-    const slotsToCreate: { start_time: string; end_time: string }[] = []
+    const supabase = createClient()
 
+    // Fetch service type duration
+    const { data: serviceType, error: serviceTypeError } = await supabase
+      .from("service_types")
+      .select("duration")
+      .eq("id", service_type_id)
+      .single()
+
+    if (serviceTypeError || !serviceType) {
+      throw new Error("診療種別の取得に失敗しました")
+    }
+    const duration = serviceType.duration
+    if (!duration || duration <= 0) {
+      throw new Error("診療種別の所要時間が0分以下に設定されているため、予約枠を作成できません。")
+    }
+
+    // Define work periods
+    const workPeriods: { start: string; end: string }[] = []
     if (break_start_time && break_end_time) {
       if (break_start_time >= break_end_time) {
         throw new Error("休憩の開始時間は終了時間より前である必要があります")
@@ -543,15 +596,34 @@ export async function createSpecificDateAvailability(formData: FormData) {
       if (break_start_time <= start_time || break_end_time >= end_time) {
         throw new Error("休憩時間は勤務時間内に設定してください")
       }
-      // With break, create two slots
-      slotsToCreate.push({ start_time: start_time, end_time: break_start_time })
-      slotsToCreate.push({ start_time: break_end_time, end_time: end_time })
+      workPeriods.push({ start: start_time, end: break_start_time })
+      workPeriods.push({ start: break_end_time, end: end_time })
     } else {
-      // No break, create one slot
-      slotsToCreate.push({ start_time: start_time, end_time: end_time })
+      workPeriods.push({ start: start_time, end: end_time })
     }
 
-    const supabase = createClient()
+    // Generate slots based on duration
+    const slotsToCreate: { start_time: string; end_time: string }[] = []
+    const timeToMinutes = (time: string): number => {
+      const [hours, minutes] = time.split(":").map(Number)
+      return hours * 60 + minutes
+    }
+
+    for (const period of workPeriods) {
+      let currentMinutes = timeToMinutes(period.start)
+      const periodEndMinutes = timeToMinutes(period.end)
+
+      while (currentMinutes + duration <= periodEndMinutes) {
+        const slotStartTime = formatTime(currentMinutes)
+        const slotEndTime = formatTime(currentMinutes + duration)
+        slotsToCreate.push({ start_time: slotStartTime, end_time: slotEndTime })
+        currentMinutes += duration
+      }
+    }
+
+    if (slotsToCreate.length === 0) {
+      throw new Error("作成できる予約枠がありません。勤務時間と所要時間を確認してください。")
+    }
 
     // --- Overlap check ---
     const { data: existingSettings, error: fetchError } = await supabase

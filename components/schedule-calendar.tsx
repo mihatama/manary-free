@@ -15,7 +15,6 @@ import {
   parseISO,
 } from "date-fns"
 import { ja } from "date-fns/locale"
-import "react-big-calendar/lib/css/react-big-calendar.css"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Info } from "lucide-react"
