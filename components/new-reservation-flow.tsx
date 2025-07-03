@@ -120,7 +120,7 @@ export function NewReservationFlow({
         setIsModalOpen(false)
         onReservationComplete()
       } else {
-        setError(result.error || "予約の作成に失敗しました。")
+        setError(result.message || "予約の作成に失敗しました。")
       }
     } catch (err: any) {
       setError(err.message || "予約の作成中にエラーが発生しました。")

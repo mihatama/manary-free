@@ -158,6 +158,7 @@ export async function createReservation(formData: FormData) {
     service_type_id: Number(rawData.service_type_id),
     reservation_date: String(rawData.reservation_date),
     start_time: String(rawData.start_time),
+    end_time: String(rawData.end_time),
     patient_name: String(rawData.patient_name),
     patient_email: String(rawData.patient_email),
     patient_phone: String(rawData.patient_phone),
@@ -170,10 +171,11 @@ export async function createReservation(formData: FormData) {
 
   if (error) {
     console.error("Error creating reservation:", error.message)
-    return { success: false, message: "予約の作成に失敗しました。", data: null }
+    return { success: false, message: `予約の作成に失敗しました: ${error.message}`, data: null }
   }
 
   revalidatePath("/dashboard/appointments")
+  revalidatePath("/reservation/manage")
   return { success: true, message: "予約が作成されました。", data }
 }
 
