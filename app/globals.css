@@ -92,3 +92,10 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.rbc-time-grid {
+  display: flex;
+  flex: 1;
+  min-height: 100%;
+  overflow: auto;
+}
