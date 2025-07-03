@@ -96,40 +96,6 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }).map((_, i) => {
   }
 })
 
-// Add this helper function before the ScheduleCalendar component definition
-function getContrastingTextColor(hexColor: string): string {
-  if (!hexColor) return "#000000"
-
-  const cleanHex = hexColor.startsWith("#") ? hexColor.slice(1) : hexColor
-
-  let hex = cleanHex
-  if (hex.length === 8) {
-    // RRGGBBAA
-    hex = hex.slice(0, 6)
-  } else if (hex.length === 4) {
-    // RGBA
-    hex = hex.slice(0, 3)
-  }
-
-  const fullHex =
-    hex.length === 3
-      ? hex
-          .split("")
-          .map((char) => char + char)
-          .join("")
-      : hex
-
-  if (fullHex.length !== 6) return "#000000"
-
-  const r = Number.parseInt(fullHex.substring(0, 2), 16)
-  const g = Number.parseInt(fullHex.substring(2, 4), 16)
-  const b = Number.parseInt(fullHex.substring(4, 6), 16)
-
-  const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
-
-  return luma > 0.5 ? "#212529" : "#FFFFFF"
-}
-
 export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
   const [availabilitySettings, setAvailabilitySettings] = useState<AvailabilitySetting[]>([])
@@ -324,14 +290,13 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
   // カスタムイベントスタイル
   const eventStyleGetter = (event: CalendarEvent) => {
     const backgroundColor = event.specificDate ? event.color : `${event.color}CC`
-    const textColor = getContrastingTextColor(event.color)
 
     return {
       style: {
         backgroundColor,
         borderRadius: "4px",
         opacity: 0.8,
-        color: textColor,
+        color: "#fff",
         border: "0px",
         display: "block",
         cursor: "pointer",
@@ -693,7 +658,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     <ShadCalendar
                       mode="single"
                       selected={editSpecificDate}
-                      onSelect={editSpecificDate}
+                      onSelect={setEditSpecificDate}
                       initialFocus
                       locale={ja}
                     />
@@ -827,7 +792,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     <ShadCalendar
                       mode="single"
                       selected={editSpecificDate}
-                      onSelect={editSpecificDate}
+                      onSelect={setEditSpecificDate}
                       initialFocus
                       locale={ja}
                     />

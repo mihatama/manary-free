@@ -4,7 +4,7 @@ import "./globals.css"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 
 export const metadata: Metadata = {
-  title: "manary",
+  title: "v0 App",
   description: "Created with v0",
   generator: "v0.dev",
 }
