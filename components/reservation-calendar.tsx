@@ -35,6 +35,31 @@ interface CalendarEvent extends BigCalendarEvent {
   isAvailable: boolean
 }
 
+// Add this helper function before the ReservationCalendar component definition
+function getContrastingTextColor(hexColor: string): string {
+  if (!hexColor) return "#000000"
+
+  const cleanHex = hexColor.startsWith("#") ? hexColor.slice(1) : hexColor
+
+  const fullHex =
+    cleanHex.length === 3
+      ? cleanHex
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : cleanHex
+
+  if (fullHex.length !== 6) return "#000000"
+
+  const r = Number.parseInt(fullHex.substring(0, 2), 16)
+  const g = Number.parseInt(fullHex.substring(2, 4), 16)
+  const b = Number.parseInt(fullHex.substring(4, 6), 16)
+
+  const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+
+  return luma > 0.5 ? "#212529" : "#FFFFFF"
+}
+
 export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }: ReservationCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -79,11 +104,19 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
   const eventStyleGetter = (event: CalendarEvent) => {
     const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.getTime()
 
+    const selectedColor = "#f78989"
+    const availableColor = "#a8d8ea"
+    const unavailableColor = "#e0e0e0"
+
+    const backgroundColor = isSelected ? selectedColor : event.isAvailable ? availableColor : unavailableColor
+
+    const textColor = getContrastingTextColor(backgroundColor)
+
     const style = {
-      backgroundColor: isSelected ? "#f78989" : event.isAvailable ? "#a8d8ea" : "#e0e0e0",
+      backgroundColor: backgroundColor,
       borderRadius: "4px",
       opacity: 0.9,
-      color: isSelected ? "white" : event.isAvailable ? "black" : "#616161",
+      color: event.isAvailable ? textColor : "#616161",
       border: "none",
       display: "block",
       cursor: event.isAvailable ? "pointer" : "not-allowed",
