@@ -41,13 +41,7 @@ function getContrastingTextColor(hexColor: string): string {
 
   const cleanHex = hexColor.startsWith("#") ? hexColor.slice(1) : hexColor
 
-  const fullHex =
-    cleanHex.length === 3
-      ? cleanHex
-          .split("")
-          .map((char) => char + char)
-          .join("")
-      : cleanHex
+  const fullHex = cleanHex.length === 3 ? cleanHex.split("").map((char) => char + char) : cleanHex
 
   if (fullHex.length !== 6) return "#000000"
 

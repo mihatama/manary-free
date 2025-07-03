@@ -693,7 +693,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     <ShadCalendar
                       mode="single"
                       selected={editSpecificDate}
-                      onSelect={setEditSpecificDate}
+                      onSelect={editSpecificDate}
                       initialFocus
                       locale={ja}
                     />
@@ -827,7 +827,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     <ShadCalendar
                       mode="single"
                       selected={editSpecificDate}
-                      onSelect={setEditSpecificDate}
+                      onSelect={editSpecificDate}
                       initialFocus
                       locale={ja}
                     />
