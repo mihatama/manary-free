@@ -25,14 +25,14 @@ const localizer = dateFnsLocalizer({
 
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
-interface ReservationCalendarProps {
-  serviceType: ServiceType | null
-  onSelectSlot: (slot: Date) => void
-  selectedSlot: Date | null
+export interface CalendarEvent extends BigCalendarEvent {
+  isAvailable: boolean
 }
 
-interface CalendarEvent extends BigCalendarEvent {
-  isAvailable: boolean
+interface ReservationCalendarProps {
+  serviceType: ServiceType | null
+  onSelectSlot: (event: CalendarEvent) => void
+  selectedSlot: CalendarEvent | null
 }
 
 // Add this helper function before the ReservationCalendar component definition
@@ -102,7 +102,7 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
   }, [serviceType, currentDate])
 
   const eventStyleGetter = (event: CalendarEvent) => {
-    const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.getTime()
+    const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.start?.getTime()
 
     const selectedColor = "#f78989"
     const availableColor = "#a8d8ea"
@@ -131,7 +131,7 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
 
   const handleSelectEvent = (event: CalendarEvent) => {
     if (event.isAvailable && event.start) {
-      onSelectSlot(event.start)
+      onSelectSlot(event)
     }
   }
 
