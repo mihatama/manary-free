@@ -146,6 +146,79 @@ export interface Database {
           },
         ]
       }
+      reservations: {
+        Row: {
+          access_token: string
+          clinic_id: number
+          created_at: string
+          end_time: string
+          id: number
+          note: string | null
+          patient_email: string | null
+          patient_name: string
+          patient_phone: string
+          reservation_date: string
+          service_type_id: number
+          start_time: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          access_token: string
+          clinic_id: number
+          created_at?: string
+          end_time: string
+          id?: number
+          note?: string | null
+          patient_email?: string | null
+          patient_name: string
+          patient_phone: string
+          reservation_date: string
+          service_type_id: number
+          start_time: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string
+          clinic_id?: number
+          created_at?: string
+          end_time?: string
+          id?: number
+          note?: string | null
+          patient_email?: string | null
+          patient_name?: string
+          patient_phone?: string
+          reservation_date?: string
+          service_type_id?: number
+          start_time?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
