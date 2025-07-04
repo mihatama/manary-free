@@ -4,7 +4,20 @@ import { createClient } from "@/lib/supabase/server"
 import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
-import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse, getDay } from "date-fns"
+import {
+  addMinutes,
+  eachDayOfInterval,
+  endOfMonth,
+  format,
+  formatISO,
+  getDay,
+  isAfter,
+  isBefore,
+  parse,
+  parseISO,
+  startOfMonth,
+  areIntervalsOverlapping,
+} from "date-fns"
 
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
@@ -166,6 +179,7 @@ export async function createReservation(formData: FormData) {
   }
 
   revalidatePath("/dashboard/appointments")
+  revalidatePath("/reservation")
   return { success: true, message: "予約が作成されました。", data }
 }
 
@@ -201,10 +215,6 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
   const supabase = createClient()
 
   try {
-    const monthDate = parse(month, "yyyy-MM", new Date())
-    const startDate = startOfMonth(monthDate)
-    const endDate = endOfMonth(monthDate)
-
     // 1. Fetch service type to get duration
     const { data: serviceType, error: serviceTypeError } = await supabase
       .from("service_types")
@@ -216,34 +226,38 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       console.error("Error fetching service type or duration is null:", serviceTypeError?.message)
       throw new Error("サービス情報の取得に失敗しました。")
     }
-    const slotInterval = serviceType.duration // in minutes
-    if (slotInterval <= 0) {
-      console.error(`Invalid slot interval for service type ${serviceTypeId}: ${slotInterval}`)
+    const duration = serviceType.duration
+    if (duration <= 0) {
+      console.error(`Invalid duration for service type ${serviceTypeId}: ${duration}`)
       return []
     }
 
     // 2. Fetch availability settings for the service type
-    const { data: availabilitySettings, error: availabilityError } = await supabase
-      .from("availability_settings")
+    // Note: Using 'availability' table as per previous fix context.
+    const { data: availability, error: availabilityError } = await supabase
+      .from("availability")
       .select("*")
       .eq("service_type_id", serviceTypeId)
-      .eq("is_available", true)
 
     if (availabilityError) {
       console.error("Error fetching availability settings:", availabilityError.message)
       throw new Error("予約可能時間の設定の取得に失敗しました。")
     }
-    if (!availabilitySettings) {
+    if (!availability) {
       return [] // No availability settings for this service type
     }
 
     // 3. Fetch existing reservations for the month
+    const monthDate = parseISO(`${month}-01`)
+    const monthStart = startOfMonth(monthDate)
+    const monthEnd = endOfMonth(monthDate)
+
     const { data: existingReservations, error: reservationError } = await supabase
       .from("reservations")
-      .select("reservation_date, start_time")
+      .select("reservation_date, start_time, end_time")
       .eq("service_type_id", serviceTypeId)
-      .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
-      .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
+      .gte("reservation_date", format(monthStart, "yyyy-MM-dd"))
+      .lte("reservation_date", format(monthEnd, "yyyy-MM-dd"))
       .in("status", ["confirmed", "pending"])
 
     if (reservationError) {
@@ -251,91 +265,70 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       throw new Error("既存の予約情報の取得に失敗しました。")
     }
 
-    const bookedSlots = new Set(
-      existingReservations
-        .map((r) => {
-          if (!r.reservation_date || !r.start_time) return null
-          // Ensure start_time has seconds for robust parsing
-          const time = r.start_time.split(":").length === 2 ? `${r.start_time}:00` : r.start_time
-          try {
-            // Parse as JST (+09:00) and convert to UTC ISO string
-            return new Date(`${r.reservation_date}T${time}+09:00`).toISOString()
-          } catch (e) {
-            console.error(`Invalid date format in reservation: ${r.reservation_date} ${time}`)
-            return null
-          }
-        })
-        .filter((d): d is string => d !== null),
-    )
-
     // 4. Generate all possible slots based on availability settings
-    const allSlots: { start_time: string; end_time: string; is_available: boolean }[] = []
-    const allDays = eachDayOfInterval({ start: startDate, end: endDate })
+    const slots: { start_time: string; end_time: string; is_available: boolean }[] = []
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
 
-    const weeklySettings = availabilitySettings.filter((s) => !s.specific_date)
-    const specificDateSettings = availabilitySettings.filter((s) => s.specific_date)
+    for (const day of days) {
+      const dayOfWeek = getDay(day) // 0 = Sunday, 1 = Monday, ...
+      const dayAvailability = availability.find((a) => a.day_of_week === dayOfWeek)
 
-    for (const day of allDays) {
-      const dayOfWeek = getDay(day)
-      const dateStr = format(day, "yyyy-MM-dd")
-
-      const hasSpecificSettingForDay = specificDateSettings.some((s) => s.specific_date === dateStr)
-      let settingsToUse = []
-
-      if (hasSpecificSettingForDay) {
-        settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
-      } else {
-        settingsToUse = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
-      }
-
-      for (const setting of settingsToUse) {
-        // Robustly check if the setting's end_date has passed
-        if (setting.end_date && dateStr > setting.end_date) {
-          continue
-        }
-
+      if (dayAvailability && dayAvailability.start_time && dayAvailability.end_time) {
         try {
-          // Ensure time strings have seconds for robust parsing
-          const startTime = setting.start_time.split(":").length === 2 ? `${setting.start_time}:00` : setting.start_time
-          const endTime = setting.end_time.split(":").length === 2 ? `${setting.end_time}:00` : setting.end_time
+          const startTime = parse(dayAvailability.start_time, "HH:mm:ss", day)
+          const endTime = parse(dayAvailability.end_time, "HH:mm:ss", day)
 
-          // Construct Date objects by parsing time strings as JST (+09:00)
-          const slotStartDateTime = new Date(`${dateStr}T${startTime}+09:00`)
-          const settingEndDateTime = new Date(`${dateStr}T${endTime}+09:00`)
-
-          if (isNaN(slotStartDateTime.getTime()) || isNaN(settingEndDateTime.getTime())) {
-            throw new Error("Invalid time format in setting")
+          if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+            console.warn(
+              `Could not parse time for day ${day}: start=${dayAvailability.start_time}, end=${dayAvailability.end_time}`,
+            )
+            continue
           }
 
-          let currentSlotStart = slotStartDateTime
+          let currentTime = startTime
 
-          while (currentSlotStart < settingEndDateTime) {
-            const currentSlotEnd = new Date(currentSlotStart.getTime() + slotInterval * 60 * 1000)
-            if (currentSlotEnd > settingEndDateTime) break
+          while (isBefore(currentTime, endTime)) {
+            const slotEnd = addMinutes(currentTime, duration)
+            if (isAfter(slotEnd, endTime)) break
 
-            // Check against booked slots using UTC ISO strings for consistency
-            const isBooked = bookedSlots.has(currentSlotStart.toISOString())
+            const isBooked = existingReservations.some((r) => {
+              if (!r.reservation_date || !r.start_time || !r.end_time) return false
 
-            allSlots.push({
-              start_time: currentSlotStart.toISOString(),
-              end_time: currentSlotEnd.toISOString(),
-              is_available: !isBooked,
+              try {
+                const reservationStart = parseISO(`${r.reservation_date}T${r.start_time}`)
+                const reservationEnd = parseISO(`${r.reservation_date}T${r.end_time}`)
+
+                if (isNaN(reservationStart.getTime()) || isNaN(reservationEnd.getTime())) {
+                  console.warn(`Invalid reservation time found for date ${r.reservation_date}`)
+                  return false
+                }
+
+                return areIntervalsOverlapping(
+                  { start: currentTime, end: slotEnd },
+                  { start: reservationStart, end: reservationEnd },
+                  { inclusive: true },
+                )
+              } catch (e) {
+                console.warn(`Error parsing reservation time: ${r.reservation_date}T${r.start_time}`)
+                return false
+              }
             })
 
-            currentSlotStart = currentSlotEnd
+            slots.push({
+              start_time: formatISO(currentTime),
+              end_time: formatISO(slotEnd),
+              is_available: !isBooked,
+            })
+            // The interval for generating the next potential slot.
+            // This could be different from the service duration.
+            currentTime = addMinutes(currentTime, 30)
           }
         } catch (e) {
-          console.error(
-            `Skipping availability setting due to an error. Setting ID: ${setting.id}, Error: ${
-              e instanceof Error ? e.message : "Unknown error"
-            }`,
-          )
-          continue
+          console.error(`Error processing availability for day ${day}:`, e)
         }
       }
     }
-
-    return allSlots
+    return slots
   } catch (error) {
     console.error("Error in getAvailableSlots:", error instanceof Error ? error.message : "Unknown error")
     return []
