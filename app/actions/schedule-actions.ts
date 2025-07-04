@@ -157,25 +157,30 @@ export async function getAvailableTimeSlots(serviceTypeId: number, date: string)
     }
 
     // 既存の予約を取得して利用可能な時間枠をフィルタリング
-    const { data: existingAppointments, error: appointmentsError } = await supabase
-      .from("appointments")
-      .select("*")
+    const { data: existingReservations, error: reservationsError } = await supabase
+      .from("reservations")
+      .select("start_time, end_time")
       .eq("service_type_id", serviceTypeId)
-      .eq("appointment_date", date)
+      .eq("reservation_date", date)
       .neq("status", "cancelled")
 
-    if (appointmentsError) {
-      console.error("予約の取得エラー:", appointmentsError)
+    if (reservationsError) {
+      console.error("予約の取得エラー:", reservationsError)
       throw new Error("予約情報の取得に失敗しました")
     }
 
     // 既存の予約と重複する時間枠を除外
     const availableTimeSlots = timeSlots.filter((slot) => {
-      return !existingAppointments.some((appointment) => {
+      return !existingReservations.some((reservation) => {
+        const reservationStartTime = reservation.start_time.substring(0, 5)
+        const reservationEndTime = reservation.end_time.substring(0, 5)
+        const slotStartTime = slot.startTime
+        const slotEndTime = slot.endTime
+
         return (
-          (slot.startTime >= appointment.start_time && slot.startTime < appointment.end_time) ||
-          (slot.endTime > appointment.start_time && slot.endTime <= appointment.end_time) ||
-          (slot.startTime <= appointment.start_time && slot.endTime >= appointment.end_time)
+          (slotStartTime >= reservationStartTime && slotStartTime < reservationEndTime) ||
+          (slotEndTime > reservationStartTime && slotEndTime <= reservationEndTime) ||
+          (slotStartTime <= reservationStartTime && slotEndTime >= reservationEndTime)
         )
       })
     })

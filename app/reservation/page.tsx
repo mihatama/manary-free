@@ -1,5 +1,4 @@
-import { Suspense } from "react"
-import { ReservationCalendarView } from "@/components/reservation-calendar-view"
+import { PhoneAuthReservationManager } from "@/components/phone-auth-reservation-manager"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -13,20 +12,17 @@ export default function ReservationPage() {
             <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
           </div>
           <div>
-            <Link href="/reservation/manage" className="text-sm text-[#f8a0a0] hover:underline">
-              予約の確認・変更
+            <Link href="/reservation/new-calendar" className="text-sm text-[#f8a0a0] hover:underline">
+              新規予約
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-center mb-8">予約システム</h1>
-
-        <div className="max-w-5xl mx-auto">
-          <Suspense fallback={<div className="text-center py-8">読み込み中...</div>}>
-            <ReservationCalendarView />
-          </Suspense>
+      <main className="container mx-auto px-4 py-12">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">予約の確認・変更・追加</h1>
+          <PhoneAuthReservationManager />
         </div>
       </main>
 

@@ -1,8 +1,9 @@
-import { PhoneAuthReservationManager } from "@/components/phone-auth-reservation-manager"
+import { Suspense } from "react"
+import { ReservationCalendarView } from "@/components/reservation-calendar-view"
 import Image from "next/image"
 import Link from "next/link"
 
-export default function ManagePage() {
+export default function NewCalendarPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-100">
@@ -13,16 +14,19 @@ export default function ManagePage() {
           </div>
           <div>
             <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
-              新規予約
+              予約の確認・変更
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">予約の確認・変更</h1>
-          <PhoneAuthReservationManager />
+      <main className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold text-center mb-8 text-[#f8a0a0]">新規予約</h1>
+
+        <div className="max-w-5xl mx-auto">
+          <Suspense fallback={<div className="text-center py-8">読み込み中...</div>}>
+            <ReservationCalendarView />
+          </Suspense>
         </div>
       </main>
 
