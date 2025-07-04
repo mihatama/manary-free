@@ -37,17 +37,18 @@ interface ReservationCalendarProps {
 
 function safeParseISO(dateString: string | null | undefined): Date | null {
   if (!dateString) {
+    console.warn("[safeParseISO] Received null or undefined dateString.")
     return null
   }
   try {
     const date = parseISO(dateString)
     if (isNaN(date.getTime())) {
-      console.warn("Invalid date string provided to safeParseISO:", dateString)
+      console.warn("[safeParseISO] Invalid date string provided:", dateString)
       return null
     }
     return date
   } catch (error) {
-    console.error("Error parsing date string in safeParseISO:", dateString, error)
+    console.error("[safeParseISO] Error parsing date string:", dateString, error)
     return null
   }
 }
@@ -95,12 +96,17 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
         const month = format(currentDate, "yyyy-MM")
         const slots = await getAvailableSlots(serviceType!.id, month)
 
+        // --- DEBUG LOGGING: Inspect raw data from server action ---
+        console.log("[ReservationCalendar] Received slots from server:", JSON.stringify(slots, null, 2))
+        // --- END DEBUG LOGGING ---
+
         const calendarEvents: CalendarEvent[] = slots
-          .map((slot) => {
+          .map((slot, index) => {
             const startTime = safeParseISO(slot.start_time)
             const endTime = safeParseISO(slot.end_time)
 
             if (!startTime || !endTime) {
+              console.warn(`[ReservationCalendar] Skipping slot #${index} due to invalid time.`, slot)
               return null
             }
 
@@ -112,6 +118,8 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
             }
           })
           .filter((event): event is CalendarEvent => event !== null)
+
+        console.log("[ReservationCalendar] Processed calendar events:", calendarEvents)
         setEvents(calendarEvents)
       } catch (err) {
         console.error("Failed to fetch available slots:", err)
