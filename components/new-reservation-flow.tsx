@@ -22,8 +22,8 @@ interface NewReservationFlowProps {
 }
 
 export function NewReservationFlow({
-  clinics = [],
-  serviceTypes = [],
+  clinics,
+  serviceTypes,
   initialClinicId,
   initialServiceTypeId,
 }: NewReservationFlowProps) {

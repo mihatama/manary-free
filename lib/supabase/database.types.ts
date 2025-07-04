@@ -219,7 +219,6 @@ export interface Database {
           },
         ]
       }
-      // ... other tables
     }
     Views: {
       [_ in never]: never
