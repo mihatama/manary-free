@@ -153,59 +153,26 @@ export async function getAppointmentByToken(token: string): Promise<ReservationW
   }
 }
 
-export async function createReservation(formData: FormData) {
+export async function createReservation(reservationData: Database["public"]["Tables"]["reservations"]["Insert"]) {
   const supabase = createClient()
-  const rawData = Object.fromEntries(formData.entries())
 
-  // Validate required fields
-  const clinicId = rawData.clinic_id ? Number(rawData.clinic_id) : null
-  const serviceTypeId = rawData.service_type_id ? Number(rawData.service_type_id) : null
-  const reservationDate = rawData.reservation_date ? String(rawData.reservation_date) : null
-  const startTime = rawData.start_time ? String(rawData.start_time) : null
-  const endTime = rawData.end_time ? String(rawData.end_time) : null
-  const patientName = rawData.patient_name ? String(rawData.patient_name) : null
-
-  if (!clinicId || !serviceTypeId || !reservationDate || !startTime || !endTime || !patientName) {
-    const missingFields = []
-    if (!clinicId) missingFields.push("クリニック")
-    if (!serviceTypeId) missingFields.push("診療種別")
-    if (!reservationDate || !startTime) missingFields.push("予約日時")
-    if (!patientName) missingFields.push("患者名")
-    return {
-      success: false,
-      message: `必須項目が不足しています: ${missingFields.join(", ")}`,
-      data: null,
-    }
+  const dataToInsert = {
+    ...reservationData,
+    access_token: reservationData.access_token || uuidv4(),
   }
 
-  const reservationData: Database["public"]["Tables"]["reservations"]["Insert"] = {
-    clinic_id: clinicId,
-    service_type_id: serviceTypeId,
-    reservation_date: reservationDate,
-    start_time: startTime,
-    end_time: endTime,
-    patient_name: patientName,
-    patient_email: String(rawData.patient_email || ""),
-    patient_phone: String(rawData.patient_phone),
-    note: String(rawData.note || ""),
-    status: "confirmed",
-    access_token: uuidv4(),
-  }
-
-  const { data, error } = await supabase.from("reservations").insert(reservationData).select().single()
+  const { data, error } = await supabase.from("reservations").insert(dataToInsert).select("id").single()
 
   if (error) {
     console.error("Error creating reservation:", error.message)
-    if (error.message.includes("violates foreign key constraint")) {
-      return { success: false, message: "選択されたクリニックまたは診療種別が無効です。", data: null }
-    }
-    return { success: false, message: `予約の作成に失敗しました: ${error.message}`, data: null }
+    return { success: false, message: `予約の作成に失敗しました: ${error.message}`, reservationId: null }
   }
 
   revalidatePath("/dashboard/appointments")
   revalidatePath("/reservation")
   revalidatePath("/reservation/new-calendar")
-  return { success: true, message: "予約が作成されました。", data }
+
+  return { success: true, message: "予約が作成されました。", reservationId: data.id }
 }
 
 export const createAppointment = createReservation
