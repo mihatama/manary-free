@@ -176,7 +176,7 @@ export function AppointmentEditor({ appointment, onClose, onComplete }: Appointm
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <Button
             variant="outline"
-            className="text-red-500 border-red-200 hover:bg-red-50"
+            className="text-red-500 border-red-200 hover:bg-red-50 bg-transparent"
             onClick={() => setIsDialogOpen(true)}
           >
             予約をキャンセル
