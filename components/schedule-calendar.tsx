@@ -226,41 +226,49 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
       const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
       if (!serviceType || !setting.specific_date) return
 
-      const specificDate = parseISO(setting.specific_date)
+      try {
+        const specificDate = parseISO(setting.specific_date)
+        if (isNaN(specificDate.getTime())) {
+          console.warn("Skipping setting with invalid specific_date:", setting)
+          return
+        }
 
-      if (specificDate >= firstDay && specificDate <= lastDay) {
-        const [startHour, startMinute] = setting.start_time.split(":").map(Number)
-        const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+        if (specificDate >= firstDay && specificDate <= lastDay) {
+          const [startHour, startMinute] = setting.start_time.split(":").map(Number)
+          const [endHour, endMinute] = setting.end_time.split(":").map(Number)
 
-        const start = new Date(
-          specificDate.getFullYear(),
-          specificDate.getMonth(),
-          specificDate.getDate(),
-          startHour,
-          startMinute,
-        )
-        const end = new Date(
-          specificDate.getFullYear(),
-          specificDate.getMonth(),
-          specificDate.getDate(),
-          endHour,
-          endMinute,
-        )
+          const start = new Date(
+            specificDate.getFullYear(),
+            specificDate.getMonth(),
+            specificDate.getDate(),
+            startHour,
+            startMinute,
+          )
+          const end = new Date(
+            specificDate.getFullYear(),
+            specificDate.getMonth(),
+            specificDate.getDate(),
+            endHour,
+            endMinute,
+          )
 
-        const uniqueId = `specific-${setting.id}`
+          const uniqueId = `specific-${setting.id}`
 
-        newEvents.push({
-          id: uniqueId,
-          title: `${serviceType.name} (特別設定)`,
-          start,
-          end,
-          serviceTypeId: serviceType.id,
-          color: serviceType.color,
-          availabilityId: setting.id,
-          isRecurring: false,
-          dayOfWeek: getDay(specificDate),
-          specificDate: setting.specific_date,
-        })
+          newEvents.push({
+            id: uniqueId,
+            title: `${serviceType.name} (特別設定)`,
+            start,
+            end,
+            serviceTypeId: serviceType.id,
+            color: serviceType.color,
+            availabilityId: setting.id,
+            isRecurring: false,
+            dayOfWeek: getDay(specificDate),
+            specificDate: setting.specific_date,
+          })
+        }
+      } catch (error) {
+        console.error("Error parsing specific_date:", error)
       }
     })
 
@@ -280,8 +288,12 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
           const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
           if (!serviceType) return
 
-          if (setting.end_date && parseISO(setting.end_date) < day) {
-            return
+          try {
+            if (setting.end_date && parseISO(setting.end_date) < day) {
+              return
+            }
+          } catch (error) {
+            console.error("Error parsing end_date:", error)
           }
 
           const [startHour, startMinute] = setting.start_time.split(":").map(Number)

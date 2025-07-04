@@ -79,16 +79,28 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
         const month = format(currentDate, "yyyy-MM")
         const slots = await getAvailableSlots(serviceType!.id, month)
 
-        const calendarEvents: CalendarEvent[] = slots.map((slot) => {
-          const startTime = parseISO(slot.start_time)
-          const endTime = parseISO(slot.end_time)
-          return {
-            title: slot.is_available ? format(startTime, "HH:mm") : "予約済",
-            start: startTime,
-            end: endTime,
-            isAvailable: slot.is_available,
-          }
-        })
+        const calendarEvents: CalendarEvent[] = slots
+          .filter((slot) => slot.start_time && slot.end_time)
+          .map((slot) => {
+            try {
+              const startTime = parseISO(slot.start_time!)
+              const endTime = parseISO(slot.end_time!)
+              if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                console.warn("Skipping slot with invalid time:", slot)
+                return null
+              }
+              return {
+                title: slot.is_available ? format(startTime, "HH:mm") : "予約済",
+                start: startTime,
+                end: endTime,
+                isAvailable: slot.is_available,
+              }
+            } catch (error) {
+              console.error("Error parsing slot time:", error)
+              return null
+            }
+          })
+          .filter((event): event is CalendarEvent => event !== null)
         setEvents(calendarEvents)
       } catch (err) {
         console.error("Failed to fetch available slots:", err)
