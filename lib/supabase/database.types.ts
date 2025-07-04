@@ -149,9 +149,9 @@ export interface Database {
       reservations: {
         Row: {
           access_token: string
-          clinic_id: number
+          clinic_id: number | null
           created_at: string
-          end_time: string
+          end_time: string | null
           id: number
           note: string | null
           patient_email: string | null
@@ -165,9 +165,9 @@ export interface Database {
         }
         Insert: {
           access_token: string
-          clinic_id: number
+          clinic_id?: number | null
           created_at?: string
-          end_time: string
+          end_time?: string | null
           id?: number
           note?: string | null
           patient_email?: string | null
@@ -181,9 +181,9 @@ export interface Database {
         }
         Update: {
           access_token?: string
-          clinic_id?: number
+          clinic_id?: number | null
           created_at?: string
-          end_time?: string
+          end_time?: string | null
           id?: number
           note?: string | null
           patient_email?: string | null
@@ -219,6 +219,7 @@ export interface Database {
           },
         ]
       }
+      // ... other tables
     }
     Views: {
       [_ in never]: never
