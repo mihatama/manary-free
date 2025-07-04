@@ -5,7 +5,7 @@ import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse } from "date-fns"
-import { zonedTimeToUtc } from "date-fns-tz"
+import { zonedTimeToUtc, utcToZonedTime } from "date-fns-tz"
 
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
@@ -264,11 +264,18 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
 
     for (const day of allDays) {
       const dateStr = format(day, "yyyy-MM-dd")
-      const settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
+
+      // --- START OF FIX ---
+      // First, check for specific date settings.
+      let settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
+
+      // If no specific settings are found, use weekly settings based on JST day of week.
       if (settingsToUse.length === 0) {
-        const dayOfWeek = day.getDay()
-        settingsToUse.push(...weeklySettings.filter((s) => s.day_of_week === dayOfWeek))
+        const jstDay = utcToZonedTime(day, JST_TIMEZONE)
+        const jstDayOfWeek = jstDay.getDay() // 0 for Sunday, 1 for Monday, etc.
+        settingsToUse = weeklySettings.filter((s) => s.day_of_week === jstDayOfWeek)
       }
+      // --- END OF FIX ---
 
       for (const setting of settingsToUse) {
         try {
