@@ -77,7 +77,7 @@ export async function getAppointmentsByPhone(phoneNumber: string) {
   const supabase = createClient()
   try {
     const { data, error } = await supabase
-      .from("appointments")
+      .from("reservations")
       .select(`
         *,
         service_types (
@@ -93,7 +93,7 @@ export async function getAppointmentsByPhone(phoneNumber: string) {
       `)
       .eq("patient_phone", phoneNumber)
       .neq("status", "cancelled")
-      .order("appointment_date", { ascending: true })
+      .order("reservation_date", { ascending: true })
       .order("start_time", { ascending: true })
 
     if (error) {
