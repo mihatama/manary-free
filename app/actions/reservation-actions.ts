@@ -149,7 +149,6 @@ export async function createReservation(formData: FormData) {
     service_type_id: Number(rawData.service_type_id),
     reservation_date: String(rawData.reservation_date),
     start_time: String(rawData.start_time),
-    end_time: String(rawData.end_time),
     patient_name: String(rawData.patient_name),
     patient_email: String(rawData.patient_email),
     patient_phone: String(rawData.patient_phone),
