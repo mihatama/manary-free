@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent } from "react-big-calendar"
 import { format, parse, startOfWeek, getDay, parseISO, addMonths, subMonths } from "date-fns"
 import { ja } from "date-fns/locale"
-import { formatInTimeZone } from "date-fns-tz"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
@@ -12,8 +11,6 @@ import { getAvailableSlots } from "@/app/actions/reservation-actions"
 import type { Database } from "@/lib/supabase/database.types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import ErrorBoundary from "./error-boundary"
-
-const JST_TIMEZONE = "Asia/Tokyo"
 
 // date-fns localizer setup
 const locales = {
@@ -73,10 +70,13 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
       try {
         setIsLoading(true)
         setError(null)
-        const month = formatInTimeZone(currentDate, JST_TIMEZONE, "yyyy-MM")
+        const month = format(currentDate, "yyyy-MM")
         const slots = await getAvailableSlots(serviceType!.id, month)
 
+        console.log("[CLIENT LOG] STEP 1: Raw slots received from server:", JSON.stringify(slots))
+
         if (!Array.isArray(slots)) {
+          console.error("[CLIENT LOG] FATAL: Data from server is not an array!", slots)
           setError("サーバーから予期しない形式のデータを受信しました。")
           setEvents([])
           setIsLoading(false)
@@ -84,9 +84,10 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
         }
 
         const processedEvents: CalendarEvent[] = []
-        for (const slot of slots) {
+        for (const [index, slot] of slots.entries()) {
           try {
             if (!slot || typeof slot.start_time !== "string" || typeof slot.end_time !== "string") {
+              console.warn(`[CLIENT LOG] STEP 2: Skipping invalid slot object at index ${index}:`, slot)
               continue
             }
 
@@ -94,22 +95,34 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
             const endTime = parseISO(slot.end_time)
 
             if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+              console.warn(
+                `[CLIENT LOG] STEP 2: Skipping slot at index ${index} due to invalid date after parsing. Original:`,
+                slot,
+              )
               continue
             }
 
             processedEvents.push({
-              title: slot.is_available ? formatInTimeZone(startTime, JST_TIMEZONE, "HH:mm") : "予約済",
+              title: slot.is_available ? format(startTime, "HH:mm") : "予約済",
               start: startTime,
               end: endTime,
               isAvailable: slot.is_available,
             })
           } catch (e) {
-            console.error("Error processing a single slot, skipping.", { slot, error: e })
+            console.error(`[CLIENT LOG] STEP 2: Error processing a single slot at index ${index}, skipping.`, {
+              slot,
+              error: e,
+            })
           }
         }
+
+        console.log(
+          `[CLIENT LOG] STEP 3: Final processed events to be rendered (${processedEvents.length} of ${slots.length}):`,
+          processedEvents,
+        )
         setEvents(processedEvents)
       } catch (err) {
-        console.error("Failed to fetch or process available slots:", err)
+        console.error("[CLIENT LOG] FATAL: Failed to fetch or process available slots:", err)
         setError("予約枠の読み込み中に重大なエラーが発生しました。")
       } finally {
         setIsLoading(false)
@@ -150,20 +163,6 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
   const goToPreviousMonth = () => setCurrentDate((prev) => subMonths(prev, 1))
   const goToNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1))
   const goToToday = () => setCurrentDate(new Date())
-
-  const calendarFormats = {
-    monthHeaderFormat: (date: Date) => formatInTimeZone(date, JST_TIMEZONE, "yyyy年M月", { locale: ja }),
-    weekdayFormat: (date: Date) => formatInTimeZone(date, JST_TIMEZONE, "E", { locale: ja }),
-    dayHeaderFormat: (date: Date) => formatInTimeZone(date, JST_TIMEZONE, "M月d日(E)", { locale: ja }),
-    dayRangeHeaderFormat: ({ start, end }: { start: Date; end: Date }) =>
-      `${formatInTimeZone(start, JST_TIMEZONE, "yyyy年M月d日", { locale: ja })} - ${formatInTimeZone(
-        end,
-        JST_TIMEZONE,
-        "M月d日",
-        { locale: ja },
-      )}`,
-    timeGutterFormat: (date: Date) => formatInTimeZone(date, JST_TIMEZONE, "H:mm"),
-  }
 
   return (
     <Card>
@@ -208,7 +207,14 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
               onSelectEvent={handleSelectEvent}
               selectable={false}
               culture="ja"
-              formats={calendarFormats}
+              formats={{
+                monthHeaderFormat: (date) => format(date, "yyyy年M月", { locale: ja }),
+                weekdayFormat: (date) => format(date, "E", { locale: ja }),
+                dayHeaderFormat: (date) => format(date, "M月d日(E)", { locale: ja }),
+                dayRangeHeaderFormat: ({ start, end }) =>
+                  `${format(start, "yyyy年M月d日", { locale: ja })} - ${format(end, "M月d日", { locale: ja })}`,
+                timeGutterFormat: (date) => format(date, "H:mm"),
+              }}
               messages={{
                 today: "今日",
                 previous: "前へ",

@@ -5,13 +5,10 @@ import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse } from "date-fns"
-import { zonedTimeToUtc, utcToZonedTime } from "date-fns-tz"
 
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
-
-const JST_TIMEZONE = "Asia/Tokyo"
 
 // This type represents a reservation with its related service type information joined.
 export type ReservationWithService = Reservation & {
@@ -216,6 +213,7 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       .single()
 
     if (serviceTypeError || !serviceType || !serviceType.duration) {
+      console.error("[getAvailableSlots] Error fetching service type or duration is null:", serviceTypeError?.message)
       throw new Error("サービス情報の取得に失敗しました。")
     }
     const slotInterval = serviceType.duration
@@ -230,9 +228,10 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     if (availabilityError) throw new Error("予約可能時間の設定の取得に失敗しました。")
     if (!availabilitySettings) return []
 
+    // Fetch existing reservations with their IDs for better logging
     const { data: existingReservations, error: reservationError } = await supabase
       .from("reservations")
-      .select("id, reservation_date, start_time")
+      .select("id, reservation_date, start_time") // Added 'id'
       .eq("service_type_id", serviceTypeId)
       .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
       .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
@@ -243,13 +242,22 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     const bookedSlots = new Set(
       existingReservations
         .map((r) => {
-          if (!r.reservation_date || !r.start_time) return null
+          if (!r.reservation_date || !r.start_time) {
+            console.warn(`[SERVER LOG] Skipping reservation ID ${r.id} due to null date/time.`)
+            return null
+          }
           try {
             const dateStr = `${r.reservation_date}T${r.start_time}`
-            const dateInJst = zonedTimeToUtc(dateStr, JST_TIMEZONE)
-            if (isNaN(dateInJst.getTime())) return null
-            return dateInJst.toISOString()
-          } catch {
+            const date = new Date(dateStr)
+            if (isNaN(date.getTime())) {
+              console.error(
+                `[SERVER LOG] Invalid reservation data. ID: ${r.id}. Could not parse date string: "${dateStr}"`,
+              )
+              return null
+            }
+            return date.toISOString()
+          } catch (e) {
+            console.error(`[SERVER LOG] CRITICAL ERROR parsing reservation data. ID: ${r.id}. Data:`, r)
             return null
           }
         })
@@ -262,20 +270,9 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     const weeklySettings = availabilitySettings.filter((s) => !s.specific_date)
     const specificDateSettings = availabilitySettings.filter((s) => s.specific_date)
 
-    for (const day of allDays) {
-      const dateStr = format(day, "yyyy-MM-dd")
-
-      // --- START OF FIX ---
-      // First, check for specific date settings.
-      let settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
-
-      // If no specific settings are found, use weekly settings based on JST day of week.
-      if (settingsToUse.length === 0) {
-        const jstDay = utcToZonedTime(day, JST_TIMEZONE)
-        const jstDayOfWeek = jstDay.getDay() // 0 for Sunday, 1 for Monday, etc.
-        settingsToUse = weeklySettings.filter((s) => s.day_of_week === jstDayOfWeek)
-      }
-      // --- END OF FIX ---
+    for (const date of allDays) {
+      const dateStr = format(date, "yyyy-MM-dd")
+      const settingsToUse = specificDateSettings.find((s) => s.specific_date === dateStr) || weeklySettings
 
       for (const setting of settingsToUse) {
         try {
@@ -287,20 +284,30 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             !timeFormatRegex.test(setting.start_time) ||
             !timeFormatRegex.test(setting.end_time)
           ) {
+            console.warn(
+              `[SERVER LOG] Skipping availability setting ID ${setting.id} due to invalid time format. Start: "${setting.start_time}", End: "${setting.end_time}"`,
+            )
             continue
           }
 
           const startDateTimeStr = `${dateStr}T${setting.start_time}`
-          const slotStartDateTime = zonedTimeToUtc(startDateTimeStr, JST_TIMEZONE)
+          const slotStartDateTime = new Date(startDateTimeStr)
 
+          // --- START OF FIX ---
+          // Handle overnight availability settings
           const endDateTimeStr = `${dateStr}T${setting.end_time}`
-          const settingEndDateTime = zonedTimeToUtc(endDateTimeStr, JST_TIMEZONE)
+          const settingEndDateTime = new Date(endDateTimeStr)
 
           if (setting.end_time <= setting.start_time) {
+            // If end time is on or before start time, it's for the next day.
             settingEndDateTime.setDate(settingEndDateTime.getDate() + 1)
           }
+          // --- END OF FIX ---
 
           if (isNaN(slotStartDateTime.getTime()) || isNaN(settingEndDateTime.getTime())) {
+            console.error(
+              `[SERVER LOG] CRITICAL: Skipping setting ID ${setting.id}. Failed to create valid Date object. Invalid string was: Start: "${startDateTimeStr}", End: "${endDateTimeStr}"`,
+            )
             continue
           }
 
@@ -318,13 +325,20 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             currentSlotStart = currentSlotEnd
           }
         } catch (e) {
-          console.error(`Error processing setting ID ${setting.id}:`, e)
+          console.error(
+            `[SERVER LOG] CRITICAL ERROR processing setting ID ${setting.id}. Skipping. Error: ${
+              e instanceof Error ? e.message : "Unknown error"
+            }`,
+          )
         }
       }
     }
     return allSlots
   } catch (error) {
-    console.error("Error in getAvailableSlots:", error)
+    console.error(
+      "[getAvailableSlots] FATAL ERROR in function:",
+      error instanceof Error ? error.message : "Unknown error",
+    )
     return []
   }
 }
