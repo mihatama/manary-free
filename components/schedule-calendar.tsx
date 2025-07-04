@@ -212,8 +212,17 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
       if (!specificDate) return
 
       if (specificDate >= firstDay && specificDate <= lastDay) {
+        if (!setting.start_time || !setting.end_time) {
+          console.warn("Skipping setting with null time:", setting)
+          return
+        }
         const [startHour, startMinute] = setting.start_time.split(":").map(Number)
         const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+
+        if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+          console.warn("Skipping setting with invalid time format:", setting)
+          return
+        }
         const start = new Date(
           specificDate.getFullYear(),
           specificDate.getMonth(),
@@ -261,8 +270,17 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
             return
           }
 
+          if (!setting.start_time || !setting.end_time) {
+            console.warn("Skipping setting with null time:", setting)
+            return
+          }
           const [startHour, startMinute] = setting.start_time.split(":").map(Number)
           const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+
+          if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+            console.warn("Skipping setting with invalid time format:", setting)
+            return
+          }
           const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour, startMinute)
           const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour, endMinute)
           newEvents.push({
