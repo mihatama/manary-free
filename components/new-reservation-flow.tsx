@@ -102,19 +102,20 @@ export function NewReservationFlow({
     setError(null)
 
     try {
-      const formData = new FormData()
-      formData.append("clinic_id", selectedClinicId)
-      formData.append("service_type_id", selectedServiceTypeId)
-      formData.append("reservation_date", format(selectedSlot.start as Date, "yyyy-MM-dd"))
-      formData.append("start_time", format(selectedSlot.start as Date, "HH:mm:ss"))
-      formData.append("end_time", format(selectedSlot.end as Date, "HH:mm:ss"))
-      formData.append("patient_name", patientName)
-      formData.append("patient_phone", phoneNumber)
-      formData.append("patient_email", patientEmail)
-      formData.append("status", "confirmed")
-      formData.append("note", "患者による予約")
+      const reservationData: Database["public"]["Tables"]["reservations"]["Insert"] = {
+        clinic_id: Number(selectedClinicId),
+        service_type_id: Number(selectedServiceTypeId),
+        reservation_date: format(selectedSlot.start as Date, "yyyy-MM-dd"),
+        start_time: format(selectedSlot.start as Date, "HH:mm:ss"),
+        end_time: format(selectedSlot.end as Date, "HH:mm:ss"),
+        patient_name: patientName,
+        patient_phone: phoneNumber,
+        patient_email: patientEmail,
+        status: "confirmed",
+        note: "患者による予約",
+      }
 
-      const result = await createAppointment(formData)
+      const result = await createAppointment(reservationData)
 
       if (result.success) {
         setIsModalOpen(false)
