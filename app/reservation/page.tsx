@@ -1,36 +1,31 @@
-import { PhoneAuthReservationManager } from "@/components/phone-auth-reservation-manager"
-import Image from "next/image"
-import Link from "next/link"
+import { Suspense } from "react"
+import { NewReservationFlow } from "@/components/new-reservation-flow"
+import { getClinics, getServiceTypes } from "@/app/actions/schedule-actions"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
-export default function ReservationPage() {
+export default async function ReservationPage() {
+  const clinics = await getClinics()
+  const serviceTypes = await getServiceTypes()
+
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
-            <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
-          </div>
-          <div>
-            <Link href="/reservation/new-calendar" className="text-sm text-[#f8a0a0] hover:underline">
-              新規予約
-            </Link>
-          </div>
-        </div>
+    <div className="container mx-auto p-4 md:p-8">
+      <header className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-pink-500">ご予約</h1>
+        <p className="text-gray-600">オンラインで簡単にご予約いただけます。</p>
       </header>
-
-      <main className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">予約の確認・変更・追加</h1>
-          <PhoneAuthReservationManager />
-        </div>
+      <main>
+        <Card>
+          <CardHeader>
+            <CardTitle>新規予約作成</CardTitle>
+            <CardDescription>以下のステップに従って予約を完了してください。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<div>読み込み中...</div>}>
+              <NewReservationFlow clinics={clinics} serviceTypes={serviceTypes} />
+            </Suspense>
+          </CardContent>
+        </Card>
       </main>
-
-      <footer className="mt-auto py-6 border-t border-gray-100">
-        <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          &copy; {new Date().getFullYear()} Manary. All rights reserved.
-        </div>
-      </footer>
     </div>
   )
 }
