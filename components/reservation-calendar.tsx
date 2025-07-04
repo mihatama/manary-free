@@ -35,7 +35,23 @@ interface ReservationCalendarProps {
   selectedSlot: CalendarEvent | null
 }
 
-// Add this helper function before the ReservationCalendar component definition
+function safeParseISO(dateString: string | null | undefined): Date | null {
+  if (!dateString) {
+    return null
+  }
+  try {
+    const date = parseISO(dateString)
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid date string provided to safeParseISO:", dateString)
+      return null
+    }
+    return date
+  } catch (error) {
+    console.error("Error parsing date string in safeParseISO:", dateString, error)
+    return null
+  }
+}
+
 function getContrastingTextColor(hexColor: string): string {
   if (!hexColor) return "#000000"
 
@@ -80,24 +96,19 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
         const slots = await getAvailableSlots(serviceType!.id, month)
 
         const calendarEvents: CalendarEvent[] = slots
-          .filter((slot) => slot.start_time && slot.end_time)
           .map((slot) => {
-            try {
-              const startTime = parseISO(slot.start_time!)
-              const endTime = parseISO(slot.end_time!)
-              if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-                console.warn("Skipping slot with invalid time:", slot)
-                return null
-              }
-              return {
-                title: slot.is_available ? format(startTime, "HH:mm") : "予約済",
-                start: startTime,
-                end: endTime,
-                isAvailable: slot.is_available,
-              }
-            } catch (error) {
-              console.error("Error parsing slot time:", error)
+            const startTime = safeParseISO(slot.start_time)
+            const endTime = safeParseISO(slot.end_time)
+
+            if (!startTime || !endTime) {
               return null
+            }
+
+            return {
+              title: slot.is_available ? format(startTime, "HH:mm") : "予約済",
+              start: startTime,
+              end: endTime,
+              isAvailable: slot.is_available,
             }
           })
           .filter((event): event is CalendarEvent => event !== null)

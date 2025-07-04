@@ -66,13 +66,11 @@ const localizer = dateFnsLocalizer({
 
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 type AvailabilitySetting = Database["public"]["Tables"]["availability_settings"]["Row"]
-type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 
 interface ScheduleCalendarProps {
   clinicId: number | null
 }
 
-// カレンダーイベントの型定義
 interface CalendarEvent {
   id: string
   title: string
@@ -80,13 +78,12 @@ interface CalendarEvent {
   end: Date
   serviceTypeId: number
   color: string
-  availabilityId?: number // 既存の予約可能時間ID
-  isRecurring: boolean // 定期的な予約可能時間かどうか
-  dayOfWeek: number // 曜日（0: 日曜日, 1: 月曜日, ...）
-  specificDate?: string // 特定の日付
+  availabilityId?: number
+  isRecurring: boolean
+  dayOfWeek: number
+  specificDate?: string
 }
 
-// 時間オプションの生成
 const TIME_OPTIONS = Array.from({ length: 24 * 4 }).map((_, i) => {
   const hour = Math.floor(i / 4)
   const minute = (i % 4) * 15
@@ -96,21 +93,29 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }).map((_, i) => {
   }
 })
 
-// Add this helper function before the ScheduleCalendar component definition
+function safeParseISO(dateString: string | null | undefined): Date | null {
+  if (!dateString) {
+    return null
+  }
+  try {
+    const date = parseISO(dateString)
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid date string provided to safeParseISO:", dateString)
+      return null
+    }
+    return date
+  } catch (error) {
+    console.error("Error parsing date string in safeParseISO:", dateString, error)
+    return null
+  }
+}
+
 function getContrastingTextColor(hexColor: string): string {
   if (!hexColor) return "#000000"
-
   const cleanHex = hexColor.startsWith("#") ? hexColor.slice(1) : hexColor
-
   let hex = cleanHex
-  if (hex.length === 8) {
-    // RRGGBBAA
-    hex = hex.slice(0, 6)
-  } else if (hex.length === 4) {
-    // RGBA
-    hex = hex.slice(0, 3)
-  }
-
+  if (hex.length === 8) hex = hex.slice(0, 6)
+  else if (hex.length === 4) hex = hex.slice(0, 3)
   const fullHex =
     hex.length === 3
       ? hex
@@ -118,15 +123,11 @@ function getContrastingTextColor(hexColor: string): string {
           .map((char) => char + char)
           .join("")
       : hex
-
   if (fullHex.length !== 6) return "#000000"
-
   const r = Number.parseInt(fullHex.substring(0, 2), 16)
   const g = Number.parseInt(fullHex.substring(2, 4), 16)
   const b = Number.parseInt(fullHex.substring(4, 6), 16)
-
   const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
-
   return luma > 0.5 ? "#212529" : "#FFFFFF"
 }
 
@@ -138,33 +139,25 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [selectedServiceTypes, setSelectedServiceTypes] = useState<number[]>([])
-
-  // 編集ダイアログの状態
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isNewEventDialogOpen, setIsNewEventDialogOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [newEventSlot, setNewEventSlot] = useState<SlotInfo | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-
-  // 編集フォームの状態
   const [editServiceTypeId, setEditServiceTypeId] = useState<string>("")
   const [editStartTime, setEditStartTime] = useState<string>("")
   const [editEndTime, setEditEndTime] = useState<string>("")
   const [editIsRecurring, setEditIsRecurring] = useState<boolean>(true)
   const [editSpecificDate, setEditSpecificDate] = useState<Date | undefined>(undefined)
-
   const { csrfToken } = useCSRF()
 
-  // 診療種別を取得
   useEffect(() => {
     if (!clinicId) return
-
     async function loadServiceTypes() {
       try {
         setIsLoading(true)
         const data = await getServiceTypes(clinicId)
         setServiceTypes(data)
-        // 初期状態ですべての診療種別を選択
         setSelectedServiceTypes(data.map((st) => st.id))
       } catch (err) {
         setError("診療種別の読み込みに失敗しました")
@@ -173,29 +166,22 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         setIsLoading(false)
       }
     }
-
     loadServiceTypes()
   }, [clinicId])
 
-  // 選択された診療種別の予約可能時間を取得
   useEffect(() => {
     async function loadAllAvailabilitySettings() {
       if (!selectedServiceTypes.length) {
         setAvailabilitySettings([])
         return
       }
-
       try {
         setIsLoading(true)
         const allSettings: AvailabilitySetting[] = []
-
-        // 選択された各診療種別の予約可能時間を取得
         for (const serviceTypeId of selectedServiceTypes) {
           const settings = await getAvailabilitySettings(serviceTypeId)
           allSettings.push(...settings)
         }
-
-        // 完全に新しい配列で置き換え、古いデータを残さない
         setAvailabilitySettings(allSettings)
       } catch (err) {
         setError("予約可能時間の読み込みに失敗しました")
@@ -204,11 +190,9 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         setIsLoading(false)
       }
     }
-
     loadAllAvailabilitySettings()
   }, [selectedServiceTypes])
 
-  // カレンダーイベントを生成
   useEffect(() => {
     if (!availabilitySettings.length) {
       setEvents([])
@@ -217,95 +201,72 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
     const firstDay = startOfMonth(currentDate)
     const lastDay = endOfMonth(currentDate)
-
     const newEvents: CalendarEvent[] = []
 
     const specificDateSettings = availabilitySettings.filter((setting) => setting.specific_date)
-
     specificDateSettings.forEach((setting) => {
       const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
-      if (!serviceType || !setting.specific_date) return
+      if (!serviceType) return
 
-      try {
-        const specificDate = parseISO(setting.specific_date)
-        if (isNaN(specificDate.getTime())) {
-          console.warn("Skipping setting with invalid specific_date:", setting)
-          return
-        }
+      const specificDate = safeParseISO(setting.specific_date)
+      if (!specificDate) return
 
-        if (specificDate >= firstDay && specificDate <= lastDay) {
-          const [startHour, startMinute] = setting.start_time.split(":").map(Number)
-          const [endHour, endMinute] = setting.end_time.split(":").map(Number)
-
-          const start = new Date(
-            specificDate.getFullYear(),
-            specificDate.getMonth(),
-            specificDate.getDate(),
-            startHour,
-            startMinute,
-          )
-          const end = new Date(
-            specificDate.getFullYear(),
-            specificDate.getMonth(),
-            specificDate.getDate(),
-            endHour,
-            endMinute,
-          )
-
-          const uniqueId = `specific-${setting.id}`
-
-          newEvents.push({
-            id: uniqueId,
-            title: `${serviceType.name} (特別設定)`,
-            start,
-            end,
-            serviceTypeId: serviceType.id,
-            color: serviceType.color,
-            availabilityId: setting.id,
-            isRecurring: false,
-            dayOfWeek: getDay(specificDate),
-            specificDate: setting.specific_date,
-          })
-        }
-      } catch (error) {
-        console.error("Error parsing specific_date:", error)
+      if (specificDate >= firstDay && specificDate <= lastDay) {
+        const [startHour, startMinute] = setting.start_time.split(":").map(Number)
+        const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+        const start = new Date(
+          specificDate.getFullYear(),
+          specificDate.getMonth(),
+          specificDate.getDate(),
+          startHour,
+          startMinute,
+        )
+        const end = new Date(
+          specificDate.getFullYear(),
+          specificDate.getMonth(),
+          specificDate.getDate(),
+          endHour,
+          endMinute,
+        )
+        newEvents.push({
+          id: `specific-${setting.id}`,
+          title: `${serviceType.name} (特別設定)`,
+          start,
+          end,
+          serviceTypeId: serviceType.id,
+          color: serviceType.color,
+          availabilityId: setting.id,
+          isRecurring: false,
+          dayOfWeek: getDay(specificDate),
+          specificDate: setting.specific_date!,
+        })
       }
     })
 
     const weeklySettings = availabilitySettings.filter((setting) => !setting.specific_date)
     const daysInMonth = eachDayOfInterval({ start: firstDay, end: lastDay })
-
     daysInMonth.forEach((day) => {
       const dayOfWeek = getDay(day)
       const currentDateStr = format(day, "yyyy-MM-dd")
-
       const hasSpecificDateSetting = specificDateSettings.some((setting) => setting.specific_date === currentDateStr)
 
       if (!hasSpecificDateSetting) {
         const daySettings = weeklySettings.filter((setting) => setting.day_of_week === dayOfWeek)
-
         daySettings.forEach((setting) => {
           const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
           if (!serviceType) return
 
-          try {
-            if (setting.end_date && parseISO(setting.end_date) < day) {
-              return
-            }
-          } catch (error) {
-            console.error("Error parsing end_date:", error)
+          const endDate = safeParseISO(setting.end_date)
+          if (endDate && endDate < day) {
+            return
           }
 
           const [startHour, startMinute] = setting.start_time.split(":").map(Number)
           const [endHour, endMinute] = setting.end_time.split(":").map(Number)
-
           const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour, startMinute)
           const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour, endMinute)
-
-          const uniqueId = `weekly-${setting.id}-${format(day, "yyyy-MM-dd")}`
-
           newEvents.push({
-            id: uniqueId,
+            id: `weekly-${setting.id}-${format(day, "yyyy-MM-dd")}`,
             title: serviceType.name,
             start,
             end,
@@ -318,26 +279,18 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         })
       }
     })
-
     setEvents(newEvents)
   }, [availabilitySettings, currentDate, serviceTypes])
 
-  // 診療種別の選択を切り替える
   const toggleServiceType = (serviceTypeId: number) => {
-    setSelectedServiceTypes((prev) => {
-      if (prev.includes(serviceTypeId)) {
-        return prev.filter((id) => id !== serviceTypeId)
-      } else {
-        return [...prev, serviceTypeId]
-      }
-    })
+    setSelectedServiceTypes((prev) =>
+      prev.includes(serviceTypeId) ? prev.filter((id) => id !== serviceTypeId) : [...prev, serviceTypeId],
+    )
   }
 
-  // カスタムイベントスタイル
   const eventStyleGetter = (event: CalendarEvent) => {
     const backgroundColor = event.specificDate ? event.color : `${event.color}CC`
     const textColor = getContrastingTextColor(event.color)
-
     return {
       style: {
         backgroundColor,
@@ -351,71 +304,47 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
     }
   }
 
-  // 前月へ
-  const goToPreviousMonth = () => {
-    setCurrentDate((prev) => subMonths(prev, 1))
-  }
+  const goToPreviousMonth = () => setCurrentDate((prev) => subMonths(prev, 1))
+  const goToNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1))
+  const goToToday = () => setCurrentDate(new Date())
 
-  // 次月へ
-  const goToNextMonth = () => {
-    setCurrentDate((prev) => addMonths(prev, 1))
-  }
-
-  // 今月へ
-  const goToToday = () => {
-    setCurrentDate(new Date())
-  }
-
-  // イベントクリック時のハンドラー
   const handleSelectEvent = (event: CalendarEvent) => {
     setSelectedEvent(event)
     setEditServiceTypeId(event.serviceTypeId.toString())
     setEditStartTime(format(event.start, "HH:mm"))
     setEditEndTime(format(event.end, "HH:mm"))
     setEditIsRecurring(event.isRecurring)
-
     if (event.specificDate) {
-      setEditSpecificDate(parseISO(event.specificDate))
+      const specificDate = safeParseISO(event.specificDate)
+      setEditSpecificDate(specificDate ?? undefined)
     } else {
       setEditSpecificDate(undefined)
     }
-
     setIsEditDialogOpen(true)
   }
 
-  // 空白部分クリック時のハンドラー（新規作成用）
   const handleSelectSlot = (slotInfo: SlotInfo) => {
     setNewEventSlot(slotInfo)
-
-    const startTime = format(slotInfo.start, "HH:mm")
-    const endTime = format(slotInfo.end, "HH:mm")
-
     setEditServiceTypeId(serviceTypes.length > 0 ? serviceTypes[0].id.toString() : "")
-    setEditStartTime(startTime)
-    setEditEndTime(endTime)
+    setEditStartTime(format(slotInfo.start, "HH:mm"))
+    setEditEndTime(format(slotInfo.end, "HH:mm"))
     setEditIsRecurring(true)
     setEditSpecificDate(new Date(slotInfo.start))
-
     setIsNewEventDialogOpen(true)
   }
 
-  // 予約可能時間の更新
   const handleUpdateAvailability = async () => {
     if (!selectedEvent || !csrfToken) return
-
     try {
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
-
       if (selectedEvent.availabilityId) {
         const deleteFormData = new FormData()
         deleteFormData.append("csrf_token", csrfToken)
         deleteFormData.append("id", selectedEvent.availabilityId.toString())
         await deleteAvailabilitySetting(deleteFormData)
       }
-
       formData.append("service_type_id", editServiceTypeId)
-
       if (editIsRecurring) {
         formData.append("day_of_week", selectedEvent.dayOfWeek.toString())
       } else {
@@ -426,20 +355,16 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         formData.append("day_of_week", getDay(editSpecificDate).toString())
         formData.append("specific_date", format(editSpecificDate, "yyyy-MM-dd"))
       }
-
       formData.append("start_time", editStartTime)
       formData.append("end_time", editEndTime)
       formData.append("is_available", "true")
-
       await upsertAvailabilitySetting(formData)
-
       const allSettings: AvailabilitySetting[] = []
       for (const serviceTypeId of selectedServiceTypes) {
         const settings = await getAvailabilitySettings(serviceTypeId)
         allSettings.push(...settings)
       }
       setAvailabilitySettings(allSettings)
-
       setIsEditDialogOpen(false)
     } catch (err) {
       console.error("Failed to update availability", err)
@@ -447,24 +372,19 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
     }
   }
 
-  // 予約可能時間の削除
   const handleDeleteAvailability = async () => {
     if (!selectedEvent?.availabilityId || !csrfToken) return
-
     try {
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
       formData.append("id", selectedEvent.availabilityId.toString())
-
       await deleteAvailabilitySetting(formData)
-
       const allSettings: AvailabilitySetting[] = []
       for (const serviceTypeId of selectedServiceTypes) {
         const settings = await getAvailabilitySettings(serviceTypeId)
         allSettings.push(...settings)
       }
       setAvailabilitySettings(allSettings)
-
       setIsDeleteDialogOpen(false)
       setIsEditDialogOpen(false)
     } catch (err) {
@@ -473,18 +393,14 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
     }
   }
 
-  // 新しい予約可能時間の作成
   const handleCreateAvailability = async () => {
     if (!newEventSlot || !csrfToken) return
-
     try {
       const formData = new FormData()
       formData.append("csrf_token", csrfToken)
       formData.append("service_type_id", editServiceTypeId)
-
       if (editIsRecurring) {
-        const dayOfWeek = getDay(newEventSlot.start)
-        formData.append("day_of_week", dayOfWeek.toString())
+        formData.append("day_of_week", getDay(newEventSlot.start).toString())
       } else {
         if (!editSpecificDate) {
           setError("日付を選択してください")
@@ -493,20 +409,16 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         formData.append("day_of_week", getDay(editSpecificDate).toString())
         formData.append("specific_date", format(editSpecificDate, "yyyy-MM-dd"))
       }
-
       formData.append("start_time", editStartTime)
       formData.append("end_time", editEndTime)
       formData.append("is_available", "true")
-
       await upsertAvailabilitySetting(formData)
-
       const allSettings: AvailabilitySetting[] = []
       for (const serviceTypeId of selectedServiceTypes) {
         const settings = await getAvailabilitySettings(serviceTypeId)
         allSettings.push(...settings)
       }
       setAvailabilitySettings(allSettings)
-
       setIsNewEventDialogOpen(false)
     } catch (err) {
       console.error("Failed to create availability", err)
@@ -574,7 +486,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                       </label>
                     </div>
                   ))}
-
                   {serviceTypes.length === 0 && (
                     <div className="text-sm text-gray-500">診療種別が登録されていません</div>
                   )}
@@ -582,7 +493,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
               )}
             </CardContent>
           </Card>
-
           <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
             <div className="flex items-start">
               <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
@@ -622,9 +532,7 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                     weekdayFormat: (date) => format(date, "E", { locale: ja }),
                     dayHeaderFormat: (date) => format(date, "M月d日(E)", { locale: ja }),
                     dayRangeHeaderFormat: ({ start, end }) =>
-                      `${format(start, "yyyy年M月d日", { locale: ja })} - ${format(end, "M月d日", {
-                        locale: ja,
-                      })}`,
+                      `${format(start, "yyyy年M月d日", { locale: ja })} - ${format(end, "M月d日", { locale: ja })}`,
                   }}
                   messages={{
                     today: "今日",
@@ -647,7 +555,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         </div>
       </div>
 
-      {/* 編集ダイアログ */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -670,7 +577,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="edit-is-recurring">繰り返し設定</Label>
@@ -682,7 +588,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </div>
               </div>
             </div>
-
             {!editIsRecurring && (
               <div className="space-y-2">
                 <Label htmlFor="edit-specific-date">日付</Label>
@@ -713,7 +618,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </Popover>
               </div>
             )}
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-start-time">開始時間</Label>
@@ -763,7 +667,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         </DialogContent>
       </Dialog>
 
-      {/* 削除確認ダイアログ */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -781,7 +684,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 新規作成ダイアログ */}
       <Dialog open={isNewEventDialogOpen} onOpenChange={setIsNewEventDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -804,7 +706,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="new-is-recurring">繰り返し設定</Label>
@@ -816,7 +717,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </div>
               </div>
             </div>
-
             {!editIsRecurring && (
               <div className="space-y-2">
                 <Label htmlFor="new-specific-date">日付</Label>
@@ -847,7 +747,6 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
                 </Popover>
               </div>
             )}
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="new-start-time">開始時間</Label>
