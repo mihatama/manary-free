@@ -71,13 +71,14 @@ export async function getAvailabilitySettings(serviceTypeId: number) {
       .order("day_of_week")
 
     if (error) {
-      console.error("Database query error", error)
+      console.error("Database query error in getAvailabilitySettings:", error)
       throw new Error("データの取得に失敗しました")
     }
 
-    // デバッグ用
-    console.log(`サービスタイプID ${serviceTypeId} の予約可能時間:`, data)
-    console.log("特定日の設定数:", data.filter((s) => s.specific_date).length)
+    // --- DEBUG LOGGING: Inspect raw data from DB ---
+    console.log(`[Server Action] Fetched availability settings for service_type_id: ${serviceTypeId}`)
+    console.log(JSON.stringify(data, null, 2))
+    // --- END DEBUG LOGGING ---
 
     return data
   } catch (error) {

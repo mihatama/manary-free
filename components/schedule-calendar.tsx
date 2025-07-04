@@ -93,6 +93,8 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }).map((_, i) => {
   }
 })
 
+const timeFormatRegex = /^\d{2}:\d{2}$/
+
 function safeParseISO(dateString: string | null | undefined): Date | null {
   if (!dateString) {
     return null
@@ -199,56 +201,81 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
       return
     }
 
+    console.log("[Client Component] Processing availability settings:", availabilitySettings)
+
     const firstDay = startOfMonth(currentDate)
     const lastDay = endOfMonth(currentDate)
     const newEvents: CalendarEvent[] = []
 
     const specificDateSettings = availabilitySettings.filter((setting) => setting.specific_date)
-    specificDateSettings.forEach((setting) => {
-      const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
-      if (!serviceType) return
+    specificDateSettings.forEach((setting, index) => {
+      try {
+        console.log(`[Client Component] Processing specific setting #${index}:`, JSON.stringify(setting))
 
-      const specificDate = safeParseISO(setting.specific_date)
-      if (!specificDate) return
-
-      if (specificDate >= firstDay && specificDate <= lastDay) {
-        if (!setting.start_time || !setting.end_time) {
-          console.warn("Skipping setting with null time:", setting)
+        const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
+        if (!serviceType) {
+          console.warn("Skipping setting due to missing service type:", setting)
           return
         }
-        const [startHour, startMinute] = setting.start_time.split(":").map(Number)
-        const [endHour, endMinute] = setting.end_time.split(":").map(Number)
 
-        if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
-          console.warn("Skipping setting with invalid time format:", setting)
+        const specificDate = safeParseISO(setting.specific_date)
+        if (!specificDate) {
+          console.warn("Skipping setting due to invalid specific_date:", setting)
           return
         }
-        const start = new Date(
-          specificDate.getFullYear(),
-          specificDate.getMonth(),
-          specificDate.getDate(),
-          startHour,
-          startMinute,
-        )
-        const end = new Date(
-          specificDate.getFullYear(),
-          specificDate.getMonth(),
-          specificDate.getDate(),
-          endHour,
-          endMinute,
-        )
-        newEvents.push({
-          id: `specific-${setting.id}`,
-          title: `${serviceType.name} (特別設定)`,
-          start,
-          end,
-          serviceTypeId: serviceType.id,
-          color: serviceType.color,
-          availabilityId: setting.id,
-          isRecurring: false,
-          dayOfWeek: getDay(specificDate),
-          specificDate: setting.specific_date!,
-        })
+
+        if (specificDate >= firstDay && specificDate <= lastDay) {
+          if (
+            !setting.start_time ||
+            !setting.end_time ||
+            !timeFormatRegex.test(setting.start_time) ||
+            !timeFormatRegex.test(setting.end_time)
+          ) {
+            console.warn("Skipping setting with invalid or null time format:", setting)
+            return
+          }
+          const [startHour, startMinute] = setting.start_time.split(":").map(Number)
+          const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+
+          if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+            console.warn("Skipping setting with non-numeric time parts:", setting)
+            return
+          }
+          const start = new Date(
+            specificDate.getFullYear(),
+            specificDate.getMonth(),
+            specificDate.getDate(),
+            startHour,
+            startMinute,
+          )
+          const end = new Date(
+            specificDate.getFullYear(),
+            specificDate.getMonth(),
+            specificDate.getDate(),
+            endHour,
+            endMinute,
+          )
+
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.error("Created an invalid date from setting:", setting)
+            return
+          }
+
+          newEvents.push({
+            id: `specific-${setting.id}`,
+            title: `${serviceType.name} (特別設定)`,
+            start,
+            end,
+            serviceTypeId: serviceType.id,
+            color: serviceType.color,
+            availabilityId: setting.id,
+            isRecurring: false,
+            dayOfWeek: getDay(specificDate),
+            specificDate: setting.specific_date!,
+          })
+        }
+      } catch (e) {
+        console.error(`[Client Component] CRITICAL ERROR processing specific setting:`, setting, e)
       }
     })
 
@@ -261,42 +288,66 @@ export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
 
       if (!hasSpecificDateSetting) {
         const daySettings = weeklySettings.filter((setting) => setting.day_of_week === dayOfWeek)
-        daySettings.forEach((setting) => {
-          const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
-          if (!serviceType) return
+        daySettings.forEach((setting, index) => {
+          try {
+            console.log(
+              `[Client Component] Processing weekly setting #${index} for date ${currentDateStr}:`,
+              JSON.stringify(setting),
+            )
 
-          const endDate = safeParseISO(setting.end_date)
-          if (endDate && endDate < day) {
-            return
-          }
+            const serviceType = serviceTypes.find((st) => st.id === setting.service_type_id)
+            if (!serviceType) {
+              console.warn("Skipping setting due to missing service type:", setting)
+              return
+            }
 
-          if (!setting.start_time || !setting.end_time) {
-            console.warn("Skipping setting with null time:", setting)
-            return
-          }
-          const [startHour, startMinute] = setting.start_time.split(":").map(Number)
-          const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+            const endDate = safeParseISO(setting.end_date)
+            if (endDate && endDate < day) {
+              return
+            }
 
-          if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
-            console.warn("Skipping setting with invalid time format:", setting)
-            return
+            if (
+              !setting.start_time ||
+              !setting.end_time ||
+              !timeFormatRegex.test(setting.start_time) ||
+              !timeFormatRegex.test(setting.end_time)
+            ) {
+              console.warn("Skipping setting with invalid or null time format:", setting)
+              return
+            }
+            const [startHour, startMinute] = setting.start_time.split(":").map(Number)
+            const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+
+            if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+              console.warn("Skipping setting with non-numeric time parts:", setting)
+              return
+            }
+            const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour, startMinute)
+            const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour, endMinute)
+
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+              console.error("Created an invalid date from setting:", setting)
+              return
+            }
+
+            newEvents.push({
+              id: `weekly-${setting.id}-${format(day, "yyyy-MM-dd")}`,
+              title: serviceType.name,
+              start,
+              end,
+              serviceTypeId: serviceType.id,
+              color: serviceType.color,
+              availabilityId: setting.id,
+              isRecurring: true,
+              dayOfWeek: dayOfWeek,
+            })
+          } catch (e) {
+            console.error(`[Client Component] CRITICAL ERROR processing weekly setting:`, setting, e)
           }
-          const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour, startMinute)
-          const end = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour, endMinute)
-          newEvents.push({
-            id: `weekly-${setting.id}-${format(day, "yyyy-MM-dd")}`,
-            title: serviceType.name,
-            start,
-            end,
-            serviceTypeId: serviceType.id,
-            color: serviceType.color,
-            availabilityId: setting.id,
-            isRecurring: true,
-            dayOfWeek: dayOfWeek,
-          })
         })
       }
     })
+    console.log("[Client Component] Generated events:", newEvents)
     setEvents(newEvents)
   }, [availabilitySettings, currentDate, serviceTypes])
 
