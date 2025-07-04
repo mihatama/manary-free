@@ -153,26 +153,34 @@ export async function getAppointmentByToken(token: string): Promise<ReservationW
   }
 }
 
-export async function createReservation(reservationData: Database["public"]["Tables"]["reservations"]["Insert"]) {
+export async function createReservation(formData: FormData) {
   const supabase = createClient()
+  const rawData = Object.fromEntries(formData.entries())
 
-  const dataToInsert = {
-    ...reservationData,
-    access_token: reservationData.access_token || uuidv4(),
+  const reservationData: Database["public"]["Tables"]["reservations"]["Insert"] = {
+    clinic_id: Number(rawData.clinic_id),
+    service_type_id: Number(rawData.service_type_id),
+    reservation_date: String(rawData.reservation_date),
+    start_time: String(rawData.start_time),
+    end_time: String(rawData.end_time),
+    patient_name: String(rawData.patient_name),
+    patient_email: String(rawData.patient_email),
+    patient_phone: String(rawData.patient_phone),
+    note: String(rawData.note),
+    status: "confirmed",
+    access_token: uuidv4(),
   }
 
-  const { data, error } = await supabase.from("reservations").insert(dataToInsert).select("id").single()
+  const { data, error } = await supabase.from("reservations").insert(reservationData).select().single()
 
   if (error) {
     console.error("Error creating reservation:", error.message)
-    return { success: false, message: `予約の作成に失敗しました: ${error.message}`, reservationId: null }
+    return { success: false, message: `予約の作成に失敗しました: ${error.message}`, data: null }
   }
 
   revalidatePath("/dashboard/appointments")
   revalidatePath("/reservation")
-  revalidatePath("/reservation/new-calendar")
-
-  return { success: true, message: "予約が作成されました。", reservationId: data.id }
+  return { success: true, message: "予約が作成されました。", data }
 }
 
 export const createAppointment = createReservation

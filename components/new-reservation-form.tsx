@@ -7,8 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { CSRFForm } from "@/components/csrf-form" // 修正: CsrfForm → CSRFForm
 import { createReservation } from "@/app/actions/reservation-actions"
-import type { Database } from "@/lib/supabase/database.types"
-import { v4 as uuidv4 } from "uuid"
 
 interface NewReservationFormProps {
   clinicId: number
@@ -38,19 +36,17 @@ export function NewReservationForm({
     try {
       console.log("予約フォーム送信開始", { formData })
 
-      // 予約データを作成 (snake_case keys)
-      const reservationData: Database["public"]["Tables"]["reservations"]["Insert"] = {
-        clinic_id: clinicId,
-        service_type_id: serviceTypeId,
-        reservation_date: date,
-        start_time: startTime,
-        end_time: endTime,
-        patient_name: formData.get("name") as string,
-        patient_phone: phoneNumber,
-        patient_email: formData.get("email") as string,
-        note: formData.get("notes") as string,
-        status: "confirmed",
-        access_token: uuidv4(),
+      // 予約データを作成
+      const reservationData = {
+        clinicId,
+        serviceTypeId,
+        date,
+        startTime,
+        endTime,
+        patientName: formData.get("name") as string,
+        phoneNumber,
+        email: formData.get("email") as string,
+        notes: formData.get("notes") as string,
       }
 
       console.log("予約データ", reservationData)
@@ -60,7 +56,7 @@ export function NewReservationForm({
       console.log("予約作成結果", result)
 
       if (!result.success) {
-        throw new Error(result.message || "予約の作成に失敗しました")
+        throw new Error(result.error || "予約の作成に失敗しました")
       }
 
       // 予約確認ページにリダイレクト
