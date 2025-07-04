@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { getAvailableSlots } from "@/app/actions/reservation-actions"
 import type { Database } from "@/lib/supabase/database.types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import ErrorBoundary from "./error-boundary"
 
 // date-fns localizer setup
 const locales = {
@@ -35,29 +36,9 @@ interface ReservationCalendarProps {
   selectedSlot: CalendarEvent | null
 }
 
-function safeParseISO(dateString: string | null | undefined): Date | null {
-  if (!dateString) {
-    console.warn("[safeParseISO] Received null or undefined dateString.")
-    return null
-  }
-  try {
-    const date = parseISO(dateString)
-    if (isNaN(date.getTime())) {
-      console.warn("[safeParseISO] Invalid date string provided:", dateString)
-      return null
-    }
-    return date
-  } catch (error) {
-    console.error("[safeParseISO] Error parsing date string:", dateString, error)
-    return null
-  }
-}
-
 function getContrastingTextColor(hexColor: string): string {
   if (!hexColor) return "#000000"
-
   const cleanHex = hexColor.startsWith("#") ? hexColor.slice(1) : hexColor
-
   const fullHex =
     cleanHex.length === 3
       ? cleanHex
@@ -65,15 +46,11 @@ function getContrastingTextColor(hexColor: string): string {
           .map((char) => char + char)
           .join("")
       : cleanHex
-
   if (fullHex.length !== 6) return "#000000"
-
   const r = Number.parseInt(fullHex.substring(0, 2), 16)
   const g = Number.parseInt(fullHex.substring(2, 4), 16)
   const b = Number.parseInt(fullHex.substring(4, 6), 16)
-
   const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
-
   return luma > 0.5 ? "#212529" : "#FFFFFF"
 }
 
@@ -89,60 +66,79 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
       return
     }
 
-    async function fetchAvailableSlots() {
+    async function fetchAndProcessSlots() {
       try {
         setIsLoading(true)
         setError(null)
         const month = format(currentDate, "yyyy-MM")
         const slots = await getAvailableSlots(serviceType!.id, month)
 
-        // --- DEBUG LOGGING: Inspect raw data from server action ---
-        console.log("[ReservationCalendar] Received slots from server:", JSON.stringify(slots, null, 2))
-        // --- END DEBUG LOGGING ---
+        console.log("[ReservationCalendar] STEP 1: Raw slots received from server:", JSON.stringify(slots))
 
-        const calendarEvents: CalendarEvent[] = slots
-          .map((slot, index) => {
-            const startTime = safeParseISO(slot.start_time)
-            const endTime = safeParseISO(slot.end_time)
+        if (!Array.isArray(slots)) {
+          console.error("[ReservationCalendar] FATAL: Data from server is not an array!", slots)
+          setError("サーバーから予期しない形式のデータを受信しました。")
+          setEvents([])
+          setIsLoading(false)
+          return
+        }
 
-            if (!startTime || !endTime) {
-              console.warn(`[ReservationCalendar] Skipping slot #${index} due to invalid time.`, slot)
-              return null
+        const processedEvents: CalendarEvent[] = []
+        for (const [index, slot] of slots.entries()) {
+          try {
+            if (!slot || typeof slot.start_time !== "string" || typeof slot.end_time !== "string") {
+              console.warn(`[ReservationCalendar] STEP 2: Skipping invalid slot object at index ${index}:`, slot)
+              continue
             }
 
-            return {
+            const startTime = parseISO(slot.start_time)
+            const endTime = parseISO(slot.end_time)
+
+            if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+              console.warn(
+                `[ReservationCalendar] STEP 2: Skipping slot at index ${index} due to invalid date after parsing. Original:`,
+                slot,
+              )
+              continue
+            }
+
+            processedEvents.push({
               title: slot.is_available ? format(startTime, "HH:mm") : "予約済",
               start: startTime,
               end: endTime,
               isAvailable: slot.is_available,
-            }
-          })
-          .filter((event): event is CalendarEvent => event !== null)
+            })
+          } catch (e) {
+            console.error(`[ReservationCalendar] STEP 2: Error processing a single slot at index ${index}, skipping.`, {
+              slot,
+              error: e,
+            })
+          }
+        }
 
-        console.log("[ReservationCalendar] Processed calendar events:", calendarEvents)
-        setEvents(calendarEvents)
+        console.log(
+          `[ReservationCalendar] STEP 3: Final processed events to be rendered (${processedEvents.length} of ${slots.length}):`,
+          processedEvents,
+        )
+        setEvents(processedEvents)
       } catch (err) {
-        console.error("Failed to fetch available slots:", err)
-        setError("予約枠の読み込みに失敗しました。")
+        console.error("[ReservationCalendar] FATAL: Failed to fetch or process available slots:", err)
+        setError("予約枠の読み込み中に重大なエラーが発生しました。")
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchAvailableSlots()
+    fetchAndProcessSlots()
   }, [serviceType, currentDate])
 
   const eventStyleGetter = (event: CalendarEvent) => {
     const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.start?.getTime()
-
     const selectedColor = "#f78989"
     const availableColor = "#a8d8ea"
     const unavailableColor = "#e0e0e0"
-
     const backgroundColor = isSelected ? selectedColor : event.isAvailable ? availableColor : unavailableColor
-
     const textColor = getContrastingTextColor(backgroundColor)
-
     const style = {
       backgroundColor: backgroundColor,
       borderRadius: "4px",
@@ -155,9 +151,7 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
       fontSize: "0.8em",
       textAlign: "center" as const,
     }
-    return {
-      style: style,
-    }
+    return { style }
   }
 
   const handleSelectEvent = (event: CalendarEvent) => {
@@ -166,17 +160,9 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
     }
   }
 
-  const goToPreviousMonth = () => {
-    setCurrentDate((prev) => subMonths(prev, 1))
-  }
-
-  const goToNextMonth = () => {
-    setCurrentDate((prev) => addMonths(prev, 1))
-  }
-
-  const goToToday = () => {
-    setCurrentDate(new Date())
-  }
+  const goToPreviousMonth = () => setCurrentDate((prev) => subMonths(prev, 1))
+  const goToNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1))
+  const goToToday = () => setCurrentDate(new Date())
 
   return (
     <Card>
@@ -206,45 +192,45 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
         )}
         {isLoading && <p className="text-center p-4">予約枠を読み込み中...</p>}
         <div style={{ height: "600px" }}>
-          <Calendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: "100%" }}
-            date={currentDate}
-            onNavigate={(date) => setCurrentDate(date)}
-            views={["month", "week", "day"]}
-            defaultView="month"
-            eventPropGetter={eventStyleGetter}
-            onSelectEvent={handleSelectEvent}
-            selectable={false}
-            culture="ja"
-            formats={{
-              monthHeaderFormat: (date) => format(date, "yyyy年M月", { locale: ja }),
-              weekdayFormat: (date) => format(date, "E", { locale: ja }),
-              dayHeaderFormat: (date) => format(date, "M月d日(E)", { locale: ja }),
-              dayRangeHeaderFormat: ({ start, end }) =>
-                `${format(start, "yyyy年M月d日", { locale: ja })} - ${format(end, "M月d日", {
-                  locale: ja,
-                })}`,
-              timeGutterFormat: (date) => format(date, "H:mm"),
-            }}
-            messages={{
-              today: "今日",
-              previous: "前へ",
-              next: "次へ",
-              month: "月",
-              week: "週",
-              day: "日",
-              agenda: "予定",
-              date: "日付",
-              time: "時間",
-              event: "イベント",
-              noEventsInRange: "この期間に予約可能な時間はありません",
-              showMore: (total) => `他 ${total} 件`,
-            }}
-          />
+          <ErrorBoundary>
+            <Calendar
+              localizer={localizer}
+              events={events}
+              startAccessor="start"
+              endAccessor="end"
+              style={{ height: "100%" }}
+              date={currentDate}
+              onNavigate={(date) => setCurrentDate(date)}
+              views={["month", "week", "day"]}
+              defaultView="month"
+              eventPropGetter={eventStyleGetter}
+              onSelectEvent={handleSelectEvent}
+              selectable={false}
+              culture="ja"
+              formats={{
+                monthHeaderFormat: (date) => format(date, "yyyy年M月", { locale: ja }),
+                weekdayFormat: (date) => format(date, "E", { locale: ja }),
+                dayHeaderFormat: (date) => format(date, "M月d日(E)", { locale: ja }),
+                dayRangeHeaderFormat: ({ start, end }) =>
+                  `${format(start, "yyyy年M月d日", { locale: ja })} - ${format(end, "M月d日", { locale: ja })}`,
+                timeGutterFormat: (date) => format(date, "H:mm"),
+              }}
+              messages={{
+                today: "今日",
+                previous: "前へ",
+                next: "次へ",
+                month: "月",
+                week: "週",
+                day: "日",
+                agenda: "予定",
+                date: "日付",
+                time: "時間",
+                event: "イベント",
+                noEventsInRange: "この期間に予約可能な時間はありません",
+                showMore: (total) => `他 ${total} 件`,
+              }}
+            />
+          </ErrorBoundary>
         </div>
       </CardContent>
     </Card>
