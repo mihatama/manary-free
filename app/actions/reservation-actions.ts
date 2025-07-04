@@ -4,17 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
-import {
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  format,
-  parse,
-  setHours,
-  setMinutes,
-  setSeconds,
-  getDay,
-} from "date-fns"
+import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse, getDay } from "date-fns"
 
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
@@ -259,7 +249,22 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       throw new Error("既存の予約情報の取得に失敗しました。")
     }
 
-    const bookedSlots = new Set(existingReservations.map((r) => `${r.reservation_date}T${r.start_time}`))
+    const bookedSlots = new Set(
+      existingReservations
+        .map((r) => {
+          if (!r.reservation_date || !r.start_time) return null
+          // Ensure start_time has seconds for robust parsing
+          const time = r.start_time.split(":").length === 2 ? `${r.start_time}:00` : r.start_time
+          try {
+            // Parse as JST (+09:00) and convert to UTC ISO string
+            return new Date(`${r.reservation_date}T${time}+09:00`).toISOString()
+          } catch (e) {
+            console.error(`Invalid date format in reservation: ${r.reservation_date} ${time}`)
+            return null
+          }
+        })
+        .filter((d): d is string => d !== null),
+    )
 
     // 4. Generate all possible slots based on availability settings
     const allSlots: { start_time: string; end_time: string; is_available: boolean }[] = []
@@ -288,31 +293,34 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
         }
 
         try {
-          const [startHour, startMinute] = setting.start_time.split(":").map(Number)
-          const [endHour, endMinute] = setting.end_time.split(":").map(Number)
+          // Ensure time strings have seconds for robust parsing
+          const startTime = setting.start_time.split(":").length === 2 ? `${setting.start_time}:00` : setting.start_time
+          const endTime = setting.end_time.split(":").length === 2 ? `${setting.end_time}:00` : setting.end_time
 
-          if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+          // Construct Date objects by parsing time strings as JST (+09:00)
+          const slotStartDateTime = new Date(`${dateStr}T${startTime}+09:00`)
+          const settingEndDateTime = new Date(`${dateStr}T${endTime}+09:00`)
+
+          if (isNaN(slotStartDateTime.getTime()) || isNaN(settingEndDateTime.getTime())) {
             throw new Error("Invalid time format in setting")
           }
 
-          let slotStart = setSeconds(setMinutes(setHours(day, startHour), startMinute), 0)
-          const settingEnd = setSeconds(setMinutes(setHours(day, endHour), endMinute), 0)
+          let currentSlotStart = slotStartDateTime
 
-          while (slotStart < settingEnd) {
-            const slotEnd = new Date(slotStart.getTime() + slotInterval * 60 * 1000)
-            if (slotEnd > settingEnd) break
+          while (currentSlotStart < settingEndDateTime) {
+            const currentSlotEnd = new Date(currentSlotStart.getTime() + slotInterval * 60 * 1000)
+            if (currentSlotEnd > settingEndDateTime) break
 
-            const formattedDate = format(slotStart, "yyyy-MM-dd")
-            const formattedTime = format(slotStart, "HH:mm:ss")
-            const isBooked = bookedSlots.has(`${formattedDate}T${formattedTime}`)
+            // Check against booked slots using UTC ISO strings for consistency
+            const isBooked = bookedSlots.has(currentSlotStart.toISOString())
 
             allSlots.push({
-              start_time: slotStart.toISOString(),
-              end_time: slotEnd.toISOString(),
+              start_time: currentSlotStart.toISOString(),
+              end_time: currentSlotEnd.toISOString(),
               is_available: !isBooked,
             })
 
-            slotStart = slotEnd
+            currentSlotStart = currentSlotEnd
           }
         } catch (e) {
           console.error(
