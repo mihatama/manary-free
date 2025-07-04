@@ -145,6 +145,7 @@ export async function createReservation(formData: FormData) {
   const rawData = Object.fromEntries(formData.entries())
 
   const reservationData: Database["public"]["Tables"]["reservations"]["Insert"] = {
+    clinic_id: Number(rawData.clinic_id),
     service_type_id: Number(rawData.service_type_id),
     reservation_date: String(rawData.reservation_date),
     start_time: String(rawData.start_time),
@@ -160,7 +161,7 @@ export async function createReservation(formData: FormData) {
 
   if (error) {
     console.error("Error creating reservation:", error.message)
-    return { success: false, message: "予約の作成に失敗しました。", data: null }
+    return { success: false, message: `予約の作成に失敗しました: ${error.message}`, data: null }
   }
 
   revalidatePath("/dashboard/appointments")
