@@ -1,47 +1,45 @@
 "use client"
 
-import React from "react"
+import { Component, type ErrorInfo, type ReactNode } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle } from "lucide-react"
+import { TriangleAlert } from "lucide-react"
 
-interface ErrorBoundaryProps {
-  children: React.ReactNode
+interface Props {
+  children: ReactNode
 }
 
-interface ErrorBoundaryState {
+interface State {
   hasError: boolean
-  error: Error | null
+  error?: Error
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props)
-    this.state = { hasError: false, error: null }
+class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    // Update state so the next render will show the fallback UI.
+  public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // You can also log the error to an error reporting service
-    console.error("ErrorBoundary caught an error:", error, errorInfo)
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error in ErrorBoundary:", error, errorInfo)
   }
 
-  render() {
+  public render() {
     if (this.state.hasError) {
-      // You can render any custom fallback UI
       return (
-        <div className="p-4">
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
+        <div className="flex items-center justify-center h-full">
+          <Alert variant="destructive" className="max-w-md">
+            <TriangleAlert className="h-4 w-4" />
             <AlertTitle>エラーが発生しました</AlertTitle>
             <AlertDescription>
-              コンポーネントの表示中に問題が発生しました。時間をおいて再度お試しください。
+              カレンダーの表示中に問題が発生しました。ページを再読み込みするか、時間をおいて再度お試しください。
               <details className="mt-2 text-xs text-muted-foreground">
                 <summary>エラー詳細</summary>
-                <pre className="mt-1 whitespace-pre-wrap break-all">{this.state.error?.toString()}</pre>
+                <pre className="mt-1 p-2 bg-secondary rounded text-secondary-foreground overflow-auto">
+                  {this.state.error?.toString()}
+                </pre>
               </details>
             </AlertDescription>
           </Alert>

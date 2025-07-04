@@ -4,11 +4,14 @@ import { createClient } from "@/lib/supabase/server"
 import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
-import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse, getDay } from "date-fns"
+import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse } from "date-fns"
+import { zonedTimeToUtc } from "date-fns-tz"
 
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
+
+const JST_TIMEZONE = "Asia/Tokyo"
 
 // This type represents a reservation with its related service type information joined.
 export type ReservationWithService = Reservation & {
@@ -199,15 +202,13 @@ export async function cancelAppointment(id: number) {
 export async function getAvailableSlots(serviceTypeId: number, month: string) {
   noStore()
   const supabase = createClient()
-  const timeFormatRegex = /^\d{2}:\d{2}(:\d{2})?$/ // Matches HH:mm or HH:mm:ss
+  const timeFormatRegex = /^\d{2}:\d{2}(:\d{2})?$/
 
   try {
-    console.log(`[getAvailableSlots] Fetching for serviceTypeId: ${serviceTypeId}, month: ${month}`)
     const monthDate = parse(month, "yyyy-MM", new Date())
     const startDate = startOfMonth(monthDate)
     const endDate = endOfMonth(monthDate)
 
-    // 1. Fetch service type to get duration
     const { data: serviceType, error: serviceTypeError } = await supabase
       .from("service_types")
       .select("duration")
@@ -215,68 +216,46 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       .single()
 
     if (serviceTypeError || !serviceType || !serviceType.duration) {
-      console.error("[getAvailableSlots] Error fetching service type or duration is null:", serviceTypeError?.message)
       throw new Error("サービス情報の取得に失敗しました。")
     }
     const slotInterval = serviceType.duration
-    if (slotInterval <= 0) {
-      console.error(`[getAvailableSlots] Invalid slot interval for service type ${serviceTypeId}: ${slotInterval}`)
-      return []
-    }
-    console.log(`[getAvailableSlots] Slot interval: ${slotInterval} minutes`)
+    if (slotInterval <= 0) return []
 
-    // 2. Fetch availability settings for the service type
     const { data: availabilitySettings, error: availabilityError } = await supabase
       .from("availability_settings")
       .select("*")
       .eq("service_type_id", serviceTypeId)
       .eq("is_available", true)
 
-    if (availabilityError) {
-      console.error("[getAvailableSlots] Error fetching availability settings:", availabilityError.message)
-      throw new Error("予約可能時間の設定の取得に失敗しました。")
-    }
-    if (!availabilitySettings) {
-      console.log("[getAvailableSlots] No availability settings found.")
-      return []
-    }
-    console.log(`[getAvailableSlots] Fetched ${availabilitySettings.length} availability settings.`)
+    if (availabilityError) throw new Error("予約可能時間の設定の取得に失敗しました。")
+    if (!availabilitySettings) return []
 
-    // 3. Fetch existing reservations for the month
     const { data: existingReservations, error: reservationError } = await supabase
       .from("reservations")
-      .select("reservation_date, start_time")
+      .select("id, reservation_date, start_time")
       .eq("service_type_id", serviceTypeId)
       .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
       .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
       .in("status", ["confirmed", "pending"])
 
-    if (reservationError) {
-      console.error("[getAvailableSlots] Error fetching existing reservations:", reservationError.message)
-      throw new Error("既存の予約情報の取得に失敗しました。")
-    }
-    console.log(`[getAvailableSlots] Fetched ${existingReservations.length} existing reservations.`)
+    if (reservationError) throw new Error("既存の予約情報の取得に失敗しました。")
 
     const bookedSlots = new Set(
       existingReservations
         .map((r) => {
           if (!r.reservation_date || !r.start_time) return null
           try {
-            const date = new Date(`${r.reservation_date}T${r.start_time}`)
-            if (isNaN(date.getTime())) return null
-            return date.toISOString()
-          } catch (e) {
-            console.error(
-              `[getAvailableSlots] Invalid date format in reservation: ${r.reservation_date} ${r.start_time}`,
-            )
+            const dateStr = `${r.reservation_date}T${r.start_time}`
+            const dateInJst = zonedTimeToUtc(dateStr, JST_TIMEZONE)
+            if (isNaN(dateInJst.getTime())) return null
+            return dateInJst.toISOString()
+          } catch {
             return null
           }
         })
         .filter((d): d is string => d !== null),
     )
-    console.log(`[getAvailableSlots] Processed ${bookedSlots.size} booked slots.`)
 
-    // 4. Generate all possible slots based on availability settings
     const allSlots: { start_time: string; end_time: string; is_available: boolean }[] = []
     const allDays = eachDayOfInterval({ start: startDate, end: endDate })
 
@@ -284,26 +263,16 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     const specificDateSettings = availabilitySettings.filter((s) => s.specific_date)
 
     for (const day of allDays) {
-      const dayOfWeek = getDay(day)
       const dateStr = format(day, "yyyy-MM-dd")
-
-      const hasSpecificSettingForDay = specificDateSettings.some((s) => s.specific_date === dateStr)
-      let settingsToUse = []
-
-      if (hasSpecificSettingForDay) {
-        settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
-      } else {
-        settingsToUse = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
+      const settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
+      if (settingsToUse.length === 0) {
+        const dayOfWeek = day.getDay()
+        settingsToUse.push(...weeklySettings.filter((s) => s.day_of_week === dayOfWeek))
       }
 
       for (const setting of settingsToUse) {
         try {
-          if (setting.end_date) {
-            const settingEndDate = new Date(setting.end_date)
-            if (!isNaN(settingEndDate.getTime()) && day > settingEndDate) {
-              continue
-            }
-          }
+          if (setting.end_date && new Date(dateStr) > new Date(setting.end_date)) continue
 
           if (
             !setting.start_time ||
@@ -311,56 +280,44 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             !timeFormatRegex.test(setting.start_time) ||
             !timeFormatRegex.test(setting.end_time)
           ) {
-            console.warn(
-              `[getAvailableSlots] Skipping setting ID ${setting.id} due to invalid time format. Start: ${setting.start_time}, End: ${setting.end_time}`,
-            )
             continue
           }
 
-          const slotStartDateTime = new Date(`${dateStr}T${setting.start_time}`)
-          const settingEndDateTime = new Date(`${dateStr}T${setting.end_time}`)
+          const startDateTimeStr = `${dateStr}T${setting.start_time}`
+          const slotStartDateTime = zonedTimeToUtc(startDateTimeStr, JST_TIMEZONE)
+
+          const endDateTimeStr = `${dateStr}T${setting.end_time}`
+          const settingEndDateTime = zonedTimeToUtc(endDateTimeStr, JST_TIMEZONE)
+
+          if (setting.end_time <= setting.start_time) {
+            settingEndDateTime.setDate(settingEndDateTime.getDate() + 1)
+          }
 
           if (isNaN(slotStartDateTime.getTime()) || isNaN(settingEndDateTime.getTime())) {
-            console.warn(
-              `[getAvailableSlots] Skipping setting ID ${setting.id} because it resulted in an invalid Date object.`,
-            )
             continue
           }
 
           let currentSlotStart = slotStartDateTime
-
           while (currentSlotStart < settingEndDateTime) {
             const currentSlotEnd = new Date(currentSlotStart.getTime() + slotInterval * 60 * 1000)
             if (currentSlotEnd > settingEndDateTime) break
 
             const isBooked = bookedSlots.has(currentSlotStart.toISOString())
-
             allSlots.push({
               start_time: currentSlotStart.toISOString(),
               end_time: currentSlotEnd.toISOString(),
               is_available: !isBooked,
             })
-
             currentSlotStart = currentSlotEnd
           }
         } catch (e) {
-          console.error(
-            `[getAvailableSlots] CRITICAL ERROR processing setting ID ${setting.id}. Skipping. Error: ${
-              e instanceof Error ? e.message : "Unknown error"
-            }`,
-            setting,
-          )
-          continue
+          console.error(`Error processing setting ID ${setting.id}:`, e)
         }
       }
     }
-    console.log(`[getAvailableSlots] Generated ${allSlots.length} total slots.`)
     return allSlots
   } catch (error) {
-    console.error(
-      "[getAvailableSlots] FATAL ERROR in function:",
-      error instanceof Error ? error.message : "Unknown error",
-    )
+    console.error("Error in getAvailableSlots:", error)
     return []
   }
 }
