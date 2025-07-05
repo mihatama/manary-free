@@ -6,7 +6,7 @@ import { ja } from "date-fns/locale"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CalendarIcon, Clock, MapPin, Phone } from "lucide-react"
+import { CalendarIcon, Clock, MapPin, Phone } from 'lucide-react'
 import { AppointmentEditor } from "@/components/appointment-editor"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
