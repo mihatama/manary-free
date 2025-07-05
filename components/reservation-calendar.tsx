@@ -1,134 +1,276 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import FullCalendar from "@fullcalendar/react"
-import dayGridPlugin from "@fullcalendar/daygrid"
-import timeGridPlugin from "@fullcalendar/timegrid"
-import interactionPlugin from "@fullcalendar/interaction"
+import { useState, useEffect } from "react"
+import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent, type View } from "react-big-calendar"
+import { format, parse, startOfWeek, getDay } from "date-fns"
+import { ja } from "date-fns/locale"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import type { Database } from "@/lib/supabase/database.types"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import ErrorBoundary from "./error-boundary"
+import "react-big-calendar/lib/css/react-big-calendar.css"
 import { getCalendarEventsForMonth } from "@/app/actions/reservation-actions"
-import { format } from "date-fns"
-import { useToast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+
+const locales = {
+  ja: ja,
+}
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: (date) => startOfWeek(date, { locale: ja }),
+  getDay,
+  locales,
+})
+
+type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
+
+export interface CalendarEvent extends BigCalendarEvent {
+  isAvailable: boolean
+}
 
 interface ReservationCalendarProps {
   clinicId: number
-  serviceTypeId: number
-  onSelectSlot: (slot: { start: Date; end: Date }) => void
+  serviceType: ServiceType
+  onSelectSlot: (event: CalendarEvent) => void
+  selectedSlot: CalendarEvent | null
 }
 
-export function ReservationCalendar({ clinicId, serviceTypeId, onSelectSlot }: ReservationCalendarProps) {
-  const [events, setEvents] = useState<any[]>([])
-  const [currentMonth, setCurrentMonth] = useState(format(new Date(), "yyyy-MM"))
-  const [isLoading, setIsLoading] = useState(true)
-  const { toast } = useToast()
+function getContrastingTextColor(hexColor: string): string {
+  if (!hexColor) return "#000000"
+  const cleanHex = hexColor.startsWith("#") ? hexColor.slice(1) : hexColor
+  const fullHex =
+    cleanHex.length === 3
+      ? cleanHex
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : cleanHex
+  if (fullHex.length !== 6) return "#000000"
+  const r = Number.parseInt(fullHex.substring(0, 2), 16)
+  const g = Number.parseInt(fullHex.substring(2, 4), 16)
+  const b = Number.parseInt(fullHex.substring(4, 6), 16)
+  const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  return luma > 0.5 ? "#212529" : "#FFFFFF"
+}
 
-  const fetchEvents = useCallback(
-    async (month: string) => {
-      setIsLoading(true)
-      try {
-        const result = await getCalendarEventsForMonth(clinicId, serviceTypeId, month)
-        if (result.error) {
-          throw new Error(result.error)
-        }
-        setEvents(result.events || [])
-      } catch (error) {
-        console.error("Failed to fetch calendar events:", error)
-        toast({
-          title: "エラー",
-          description: "カレンダーの読み込みに失敗しました。",
-          variant: "destructive",
-        })
-        setEvents([])
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [clinicId, serviceTypeId, toast],
-  )
-
-  useEffect(() => {
-    fetchEvents(currentMonth)
-  }, [currentMonth, fetchEvents])
-
-  const handleDatesSet = (arg: any) => {
-    const newMonth = format(arg.view.currentStart, "yyyy-MM")
-    if (newMonth !== currentMonth) {
-      setCurrentMonth(newMonth)
-    }
+// Helper to parse time robustly, with detailed logging
+const parseISO = (isoString: string | null): Date | null => {
+  if (!isoString) {
+    return null
   }
-
-  const handleEventClick = (clickInfo: any) => {
-    if (clickInfo.event.extendedProps.isAvailable) {
-      onSelectSlot({
-        start: clickInfo.event.start,
-        end: clickInfo.event.end,
-      })
-    }
+  const date = new Date(isoString)
+  if (isNaN(date.getTime())) {
+    console.error(`[ReservationCalendar:parseISO] FAILED: Invalid Date for string: '${isoString}'`)
+    return null
   }
+  return date
+}
 
-  const eventContent = (eventInfo: any) => {
-    const { event, view } = eventInfo
-    const isAvailable = event.extendedProps.isAvailable
-
-    if (isAvailable) {
-      const startTime = format(new Date(event.start), "HH:mm")
-      const endTime = format(new Date(event.end), "HH:mm")
-      const serviceName = event.extendedProps.serviceName || "予約枠"
-
-      if (view.type === "timeGridWeek" || view.type === "timeGridDay") {
-        return (
-          <div className="p-1 text-white text-xs h-full flex flex-col justify-center">
-            <div>{`${startTime} - ${endTime}`}</div>
-            <div className="font-bold">{serviceName}</div>
-          </div>
-        )
-      }
-      return (
-        <div className="p-1 text-xs">
-          <b>{startTime}</b>
-        </div>
-      )
-    }
-
-    return (
-      <div className="p-1 bg-gray-300 text-gray-600 text-xs rounded-sm h-full flex items-center justify-center">
-        <div>予約済</div>
-      </div>
-    )
+const CustomToolbar = ({ label, onNavigate, onView, view, views }: any) => {
+  const viewNames: { [key: string]: string } = {
+    month: "月",
+    week: "週",
+    day: "日",
   }
 
   return (
-    <div className="relative">
-      {isLoading && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      )}
-      <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        headerToolbar={{
-          left: "prev,next today",
-          center: "title",
-          right: "dayGridMonth,timeGridWeek,timeGridDay",
-        }}
-        locale="ja"
-        events={events}
-        datesSet={handleDatesSet}
-        eventClick={handleEventClick}
-        selectable={false}
-        editable={false}
-        allDaySlot={false}
-        slotMinTime="08:00:00"
-        slotMaxTime="20:00:00"
-        eventContent={eventContent}
-        eventClassNames={(arg) => {
-          if (arg.event.extendedProps.isAvailable) {
-            return ["cursor-pointer", "bg-primary", "border-primary"]
-          }
-          return ["bg-gray-200", "border-gray-200", "opacity-70"]
-        }}
-      />
+    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+      <div className="flex items-center space-x-2">
+        <Button variant="outline" size="sm" onClick={() => onNavigate("PREV")}>
+          <ChevronLeft className="h-4 w-4" />
+          <span className="sr-only">前へ</span>
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onNavigate("TODAY")}>
+          今日
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onNavigate("NEXT")}>
+          <ChevronRight className="h-4 w-4" />
+          <span className="sr-only">次へ</span>
+        </Button>
+      </div>
+      <div className="text-lg font-bold order-first sm:order-none">{label}</div>
+      <div className="flex items-center space-x-2">
+        {(views as View[]).map((v) => (
+          <Button key={v} variant={view === v ? "default" : "outline"} size="sm" onClick={() => onView(v)}>
+            {viewNames[v]}
+          </Button>
+        ))}
+      </div>
     </div>
+  )
+}
+
+export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selectedSlot }: ReservationCalendarProps) {
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [memoizedEvents, setMemoizedEvents] = useState<{ [key: string]: CalendarEvent[] }>({})
+
+  console.log(`[ReservationCalendar] Rendering. Props:`, {
+    clinicId,
+    serviceTypeName: serviceType?.name,
+    selectedSlot,
+  })
+
+  useEffect(() => {
+    if (!clinicId || !serviceType) {
+      setEvents([])
+      return
+    }
+
+    async function fetchMonthEvents() {
+      const monthStr = format(currentDate, "yyyy-MM")
+      if (memoizedEvents[monthStr]) {
+        setEvents(memoizedEvents[monthStr])
+        return
+      }
+
+      setIsLoading(true)
+      setError(null)
+      console.log(
+        `[ReservationCalendar:useEffect] Fetching events for clinic ${clinicId}, service type ${serviceType.id}, month ${monthStr}`,
+      )
+      try {
+        const result = await getCalendarEventsForMonth(clinicId, serviceType.id, monthStr)
+
+        if (result.error) {
+          throw new Error(result.error)
+        }
+
+        const processedEvents: CalendarEvent[] = (result.events || [])
+          .map((event) => {
+            const startDate = parseISO(event.start)
+            const endDate = parseISO(event.end)
+
+            if (!startDate || !endDate) {
+              console.error("[ReservationCalendar] Skipping invalid event due to date parsing failure:", event)
+              return null
+            }
+
+            return {
+              title: event.isAvailable ? format(startDate, "HH:mm") : "予約済",
+              start: startDate,
+              end: endDate,
+              isAvailable: event.isAvailable,
+            }
+          })
+          .filter((e): e is CalendarEvent => e !== null) // Filter out nulls
+
+        console.log(`[ReservationCalendar:useEffect] Total processed events for month: ${processedEvents.length}`)
+        setMemoizedEvents((prev) => ({ ...prev, [monthStr]: processedEvents }))
+        setEvents(processedEvents)
+      } catch (err: any) {
+        console.error("[ReservationCalendar] A top-level error occurred:", err)
+        setError(err.message || "予約枠の読み込み中にエラーが発生しました。")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchMonthEvents()
+  }, [clinicId, serviceType, currentDate, memoizedEvents])
+
+  const eventStyleGetter = (event: CalendarEvent) => {
+    const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.start?.getTime()
+    const selectedColor = serviceType.color || "#f78989"
+    const availableColor = "#a8d8ea"
+    const unavailableColor = "#e0e0e0"
+
+    let backgroundColor = event.isAvailable ? availableColor : unavailableColor
+    if (isSelected) {
+      backgroundColor = selectedColor
+    }
+
+    const textColor = getContrastingTextColor(backgroundColor)
+    const style = {
+      backgroundColor: backgroundColor,
+      borderRadius: "4px",
+      opacity: 0.9,
+      color: event.isAvailable ? textColor : "#616161",
+      border: "none",
+      display: "block",
+      cursor: event.isAvailable ? "pointer" : "not-allowed",
+      padding: "2px 4px",
+      fontSize: "0.8em",
+      textAlign: "center" as const,
+    }
+    return { style }
+  }
+
+  const handleSelectEvent = (event: CalendarEvent) => {
+    if (event.isAvailable && event.start) {
+      onSelectSlot(event)
+    }
+  }
+
+  const DayWeekEvent = ({ event }: { event: CalendarEvent }) => {
+    if (event.isAvailable) {
+      return <div className="text-center text-xs leading-tight">{serviceType.name}</div>
+    }
+    return <div className="text-center text-xs leading-tight">予約済</div>
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">{serviceType.name} - 予約日時選択</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {isLoading && <p className="text-center p-4">予約枠を読み込み中...</p>}
+        <div style={{ height: "600px" }}>
+          <ErrorBoundary>
+            <Calendar
+              localizer={localizer}
+              events={events}
+              startAccessor="start"
+              endAccessor="end"
+              style={{ height: "100%" }}
+              date={currentDate}
+              onNavigate={(date) => setCurrentDate(date)}
+              views={["month", "week", "day"]}
+              defaultView="month"
+              eventPropGetter={eventStyleGetter}
+              onSelectEvent={handleSelectEvent}
+              selectable={false}
+              culture="ja"
+              components={{
+                toolbar: CustomToolbar,
+                day: { event: DayWeekEvent },
+                week: { event: DayWeekEvent },
+              }}
+              formats={{
+                monthHeaderFormat: (date) => format(date, "yyyy年M月", { locale: ja }),
+                weekdayFormat: (date) => format(date, "E", { locale: ja }),
+                dayHeaderFormat: (date) => format(date, "yyyy年M月d日 (E)", { locale: ja }),
+                dayRangeHeaderFormat: ({ start, end }) => `${format(start, "M月d日")} - ${format(end, "M月d日")}`,
+                timeGutterFormat: (date) => format(date, "H:mm"),
+              }}
+              messages={{
+                today: "今日",
+                previous: "前へ",
+                next: "次へ",
+                month: "月",
+                week: "週",
+                day: "日",
+                agenda: "予定",
+                date: "日付",
+                time: "時間",
+                event: "イベント",
+                noEventsInRange: "この期間に予約可能な時間はありません",
+                showMore: (total) => `他 ${total} 件`,
+              }}
+            />
+          </ErrorBoundary>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
