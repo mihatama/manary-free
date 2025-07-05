@@ -1,148 +1,149 @@
 import { createClient } from "@/lib/supabase/server"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CalendarDays, Users, Clock, CheckCircle } from "lucide-react"
+import { redirect } from "next/navigation"
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { format } from "date-fns"
+import { ja } from "date-fns/locale"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Calendar, AlertCircle } from "lucide-react"
 
-export const dynamic = "force-dynamic"
-
-async function getDashboardStats() {
+// Helper function to safely format dates and times
+const safeFormat = (dateStr: string, timeStr: string | null, formatStr: string) => {
+  if (!dateStr || !timeStr) return "無効な日時"
   try {
-    const supabase = createClient()
-
-    // Get total reservations
-    const { count: totalAppointments } = await supabase.from("reservations").select("*", { count: "exact", head: true })
-
-    // Get today's reservations
-    const today = new Date().toISOString().split("T")[0]
-    const { count: todayAppointments } = await supabase
-      .from("reservations")
-      .select("*", { count: "exact", head: true })
-      .eq("reservation_date", today)
-      .neq("status", "cancelled")
-
-    // Get confirmed reservations
-    const { count: confirmedAppointments } = await supabase
-      .from("reservations")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "confirmed")
-
-    // Get total questionnaires
-    const { count: totalQuestionnaires } = await supabase
-      .from("questionnaires")
-      .select("*", { count: "exact", head: true })
-
-    return {
-      totalAppointments: totalAppointments || 0,
-      todayAppointments: todayAppointments || 0,
-      confirmedAppointments: confirmedAppointments || 0,
-      totalQuestionnaires: totalQuestionnaires || 0,
+    const date = new Date(`${dateStr}T${timeStr}`)
+    if (isNaN(date.getTime())) {
+      // Log the error and the invalid data for debugging
+      console.error("Invalid date/time value encountered in dashboard:", { dateStr, timeStr })
+      return "無効な日時"
     }
-  } catch (error) {
-    console.error("Error fetching dashboard stats:", error)
-    return {
-      totalAppointments: 0,
-      todayAppointments: 0,
-      confirmedAppointments: 0,
-      totalQuestionnaires: 0,
-    }
+    return format(date, formatStr, { locale: ja })
+  } catch (e) {
+    console.error("Error formatting date/time in dashboard:", e, { dateStr, timeStr })
+    return "フォーマットエラー"
   }
 }
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats()
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return redirect("/")
+  }
+
+  const today = format(new Date(), "yyyy-MM-dd")
+
+  const { data: appointments, error } = await supabase
+    .from("reservations")
+    .select(
+      `
+      id,
+      reservation_date,
+      start_time,
+      end_time,
+      status,
+      service_types (name),
+      users (full_name)
+    `,
+    )
+    .gte("reservation_date", today)
+    .order("reservation_date", { ascending: true })
+    .order("start_time", { ascending: true })
+    .limit(10)
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>予約情報の読み込み中にエラーが発生しました: {error.message}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">ダッシュボード</h2>
-        <p className="text-muted-foreground">システムの概要と統計情報</p>
       </div>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">総予約数</CardTitle>
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAppointments}</div>
-            <p className="text-xs text-muted-foreground">全期間の予約数</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">本日の予約</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.todayAppointments}</div>
-            <p className="text-xs text-muted-foreground">今日の予約数</p>
+            <div className="text-2xl font-bold">
+              {appointments?.filter((a) => a.reservation_date === today).length ?? 0}
+            </div>
+            <p className="text-xs text-muted-foreground">件</p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">確定予約</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.confirmedAppointments}</div>
-            <p className="text-xs text-muted-foreground">確定済みの予約数</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">問診票</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalQuestionnaires}</div>
-            <p className="text-xs text-muted-foreground">登録済み問診票数</p>
-          </CardContent>
-        </Card>
+        {/* Other summary cards can go here */}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>最近の活動</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <div className="ml-4 space-y-1">
-                  <p className="text-sm font-medium leading-none">予約システムが正常に動作しています</p>
-                  <p className="text-sm text-muted-foreground">すべての機能が利用可能です</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>クイックアクション</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-sm">
-              <a href="/dashboard/appointments" className="text-blue-600 hover:underline">
-                予約一覧を見る
-              </a>
-            </div>
-            <div className="text-sm">
-              <a href="/dashboard/settings" className="text-blue-600 hover:underline">
-                設定を変更する
-              </a>
-            </div>
-            <div className="text-sm">
-              <a href="/dashboard/users" className="text-blue-600 hover:underline">
-                ユーザー管理
-              </a>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>今後の予約</CardTitle>
+          <CardDescription>直近10件の予約が表示されています。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>日時</TableHead>
+                <TableHead>患者名</TableHead>
+                <TableHead>診療内容</TableHead>
+                <TableHead>ステータス</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {appointments && appointments.length > 0 ? (
+                appointments.map((apt) => (
+                  <TableRow key={apt.id}>
+                    <TableCell>
+                      <div className="font-medium">
+                        {safeFormat(apt.reservation_date, apt.start_time, "M月d日 (E)")}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {safeFormat(apt.reservation_date, apt.start_time, "HH:mm")} -{" "}
+                        {safeFormat(apt.reservation_date, apt.end_time, "HH:mm")}
+                      </div>
+                    </TableCell>
+                    <TableCell>{(apt.users as any)?.full_name || "N/A"}</TableCell>
+                    <TableCell>{(apt.service_types as any)?.name || "N/A"}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          apt.status === "confirmed"
+                            ? "default"
+                            : apt.status === "cancelled"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {apt.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center">
+                    今後の予約はありません。
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }
