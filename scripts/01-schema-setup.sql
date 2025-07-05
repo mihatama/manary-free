@@ -24,6 +24,7 @@ CREATE TABLE "service_types" (
   "description" TEXT,
   "duration_minutes" INT NOT NULL,
   "price" INT NOT NULL,
+  "color" VARCHAR(7) DEFAULT '#808080',
   "created_at" TIMESTAMPTZ DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
@@ -49,8 +50,11 @@ CREATE TABLE "reservations" (
   "start_time" TIME NOT NULL,
   "end_time" TIME NOT NULL,
   "status" VARCHAR(50) DEFAULT 'confirmed',
+  "note" TEXT,
+  "access_token" UUID,
   "created_at" TIMESTAMPTZ DEFAULT NOW(),
-  "updated_at" TIMESTAMPTZ DEFAULT NOW()
+  "updated_at" TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE("access_token")
 );
 
 -- Create availability_settings table
@@ -102,12 +106,12 @@ INSERT INTO "clinics" ("name", "address", "phone_number") VALUES
 ('助産院2', '東京都新宿区', '03-2222-2222'),
 ('助産院3', '東京都港区', '03-3333-3333');
 
-INSERT INTO "service_types" ("name", "description", "duration_minutes", "price") VALUES
-('初回相談', '初めての方の相談メニュー', 60, 5000),
-('産後ケア', '産後の体と心のケア', 90, 8000),
-('母乳相談', '母乳育児に関する相談', 60, 6000),
-('沐浴指導', '赤ちゃんの沐浴指導', 45, 4000),
-('育児相談', '育児全般に関する相談', 60, 5000);
+INSERT INTO "service_types" ("name", "description", "duration_minutes", "price", "color") VALUES
+('初回相談', '初めての方の相談メニュー', 60, 5000, '#3498db'),
+('産後ケア', '産後の体と心のケア', 90, 8000, '#2ecc71'),
+('母乳相談', '母乳育児に関する相談', 60, 6000, '#f1c40f'),
+('沐浴指導', '赤ちゃんの沐浴指導', 45, 4000, '#e74c3c'),
+('育児相談', '育児全般に関する相談', 60, 5000, '#9b59b6');
 
 -- Add some availability for clinic 1 (Monday to Friday, 9am to 5pm)
 INSERT INTO "availability_settings" ("clinic_id", "day_of_week", "start_time", "end_time", "is_available") VALUES
