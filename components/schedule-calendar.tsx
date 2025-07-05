@@ -93,7 +93,8 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }).map((_, i) => {
   }
 })
 
-const timeFormatRegex = /^\d{2}:\d{2}$/
+// 修正: HH:mm と HH:mm:ss の両方の形式を許容する正規表現
+const timeFormatRegex = /^\d{2}:\d{2}(:\d{2})?$/
 
 function safeParseISO(dateString: string | null | undefined): Date | null {
   if (!dateString) {
