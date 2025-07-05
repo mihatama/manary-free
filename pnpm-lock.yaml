@@ -8,9 +8,24 @@ importers:
 
   .:
     dependencies:
+      '@fullcalendar/core':
+        specifier: latest
+        version: 6.1.18
+      '@fullcalendar/daygrid':
+        specifier: latest
+        version: 6.1.18(@fullcalendar/core@6.1.18)
+      '@fullcalendar/interaction':
+        specifier: latest
+        version: 6.1.18(@fullcalendar/core@6.1.18)
+      '@fullcalendar/react':
+        specifier: latest
+        version: 6.1.18(@fullcalendar/core@6.1.18)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@fullcalendar/timegrid':
+        specifier: latest
+        version: 6.1.18(@fullcalendar/core@6.1.18)
       '@hookform/resolvers':
         specifier: latest
-        version: 5.1.1(react-hook-form@7.59.0(react@19.0.0))
+        version: 5.1.1(react-hook-form@7.60.0(react@19.0.0))
       '@radix-ui/react-accordion':
         specifier: latest
         version: 1.2.11(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -148,7 +163,7 @@ importers:
         version: 19.0.0(react@19.0.0)
       react-hook-form:
         specifier: latest
-        version: 7.59.0(react@19.0.0)
+        version: 7.60.0(react@19.0.0)
       react-resizable-panels:
         specifier: latest
         version: 3.0.3(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -181,7 +196,7 @@ importers:
         version: 1.1.2(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       zod:
         specifier: latest
-        version: 3.25.72
+        version: 3.25.74
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -232,6 +247,31 @@ packages:
 
   '@floating-ui/utils@0.2.9':
     resolution: {integrity: sha512-MDWhGtE+eHw5JW7lq4qhc5yRLS11ERl1c7Z6Xd0a58DozHES6EnNNwUWbMiG4J9Cgj053Bhk8zvlhFYKVhULwg==}
+
+  '@fullcalendar/core@6.1.18':
+    resolution: {integrity: sha512-cD7XtZIZZ87Cg2+itnpsONCsZ89VIfLLDZ22pQX4IQVWlpYUB3bcCf878DhWkqyEen6dhi5ePtBoqYgm5K+0fQ==}
+
+  '@fullcalendar/daygrid@6.1.18':
+    resolution: {integrity: sha512-s452Zle1SdMEzZDw+pDczm8m3JLIZzS9ANMThXTnqeqJewW1gqNFYas18aHypJSgF9Fh9rDJjTSUw04BpXB/Mg==}
+    peerDependencies:
+      '@fullcalendar/core': ~6.1.18
+
+  '@fullcalendar/interaction@6.1.18':
+    resolution: {integrity: sha512-f/mD5RTjzw+Q6MGTMZrLCgIrQLIUUO9NV/58aM2J6ZBQZeRlNizDqmqldqyG+j49zj2vFhUfZibPrVKWm5yA4Q==}
+    peerDependencies:
+      '@fullcalendar/core': ~6.1.18
+
+  '@fullcalendar/react@6.1.18':
+    resolution: {integrity: sha512-Jwvb+T+/1yGZKe+UYXn0id022HJm0Fq2X/PGFvVh/QRYAI/6xPMRvJrwercBkToxf6LjqYXrDO+/NhRN6IDlmg==}
+    peerDependencies:
+      '@fullcalendar/core': ~6.1.18
+      react: ^16.7.0 || ^17 || ^18 || ^19
+      react-dom: ^16.7.0 || ^17 || ^18 || ^19
+
+  '@fullcalendar/timegrid@6.1.18':
+    resolution: {integrity: sha512-T/ouhs+T1tM8JcW7Cjx+KiohL/qQWKqvRITwjol8ktJ1e1N/6noC40/obR1tyolqOxMRWHjJkYoj9fUqfoez9A==}
+    peerDependencies:
+      '@fullcalendar/core': ~6.1.18
 
   '@hookform/resolvers@5.1.1':
     resolution: {integrity: sha512-J/NVING3LMAEvexJkyTLjruSm7aOFx7QX21pzkiJfMoNG0wl5aFEjLTl7ay7IQb9EWY6AkrBy7tHL2Alijpdcg==}
@@ -1973,6 +2013,9 @@ packages:
     resolution: {integrity: sha512-27VKOqrYfPncKA2NrFOVhP5MGAfHKLYn/Q0mz9cNQyRAKYi3VNHwYU2qKKqPCqgBmeeJ0uAFB56NumXZ5ZReXg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  preact@10.12.1:
+    resolution: {integrity: sha512-l8386ixSsBdbreOAkqtrwqHwdvR35ID8c3rKPa8lCWuO86dBi32QWHV4vfsZK1utLLFMvw+Z5Ad4XLkZzchscg==}
+
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
 
@@ -2003,8 +2046,8 @@ packages:
     peerDependencies:
       react: ^19.0.0
 
-  react-hook-form@7.59.0:
-    resolution: {integrity: sha512-kmkek2/8grqarTJExFNjy+RXDIP8yM+QTl3QL6m6Q8b2bih4ltmiXxH7T9n+yXNK477xPh5yZT/6vD8sYGzJTA==}
+  react-hook-form@7.60.0:
+    resolution: {integrity: sha512-SBrYOvMbDB7cV8ZfNpaiLcgjH/a1c7aK0lK+aNigpf4xWLO8q+o4tcvVurv3c4EOyzn/3dCsYt4GKD42VvJ/+A==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
@@ -2371,8 +2414,8 @@ packages:
     engines: {node: '>= 14.6'}
     hasBin: true
 
-  zod@3.25.72:
-    resolution: {integrity: sha512-Cl+fe4dNL4XumOBNBsr0lHfA80PQiZXHI4xEMTEr8gt6aGz92t3lBA32e71j9+JeF/VAYvdfBnuwJs+BMx/BrA==}
+  zod@3.25.74:
+    resolution: {integrity: sha512-J8poo92VuhKjNknViHRAIuuN6li/EwFbAC8OedzI8uxpEPGiXHGQu9wemIAioIpqgfB4SySaJhdk0mH5Y4ICBg==}
 
 snapshots:
 
@@ -2404,10 +2447,33 @@ snapshots:
 
   '@floating-ui/utils@0.2.9': {}
 
-  '@hookform/resolvers@5.1.1(react-hook-form@7.59.0(react@19.0.0))':
+  '@fullcalendar/core@6.1.18':
+    dependencies:
+      preact: 10.12.1
+
+  '@fullcalendar/daygrid@6.1.18(@fullcalendar/core@6.1.18)':
+    dependencies:
+      '@fullcalendar/core': 6.1.18
+
+  '@fullcalendar/interaction@6.1.18(@fullcalendar/core@6.1.18)':
+    dependencies:
+      '@fullcalendar/core': 6.1.18
+
+  '@fullcalendar/react@6.1.18(@fullcalendar/core@6.1.18)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+    dependencies:
+      '@fullcalendar/core': 6.1.18
+      react: 19.0.0
+      react-dom: 19.0.0(react@19.0.0)
+
+  '@fullcalendar/timegrid@6.1.18(@fullcalendar/core@6.1.18)':
+    dependencies:
+      '@fullcalendar/core': 6.1.18
+      '@fullcalendar/daygrid': 6.1.18(@fullcalendar/core@6.1.18)
+
+  '@hookform/resolvers@5.1.1(react-hook-form@7.60.0(react@19.0.0))':
     dependencies:
       '@standard-schema/utils': 0.3.0
-      react-hook-form: 7.59.0(react@19.0.0)
+      react-hook-form: 7.60.0(react@19.0.0)
 
   '@img/sharp-darwin-arm64@0.33.5':
     optionalDependencies:
@@ -4063,6 +4129,8 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  preact@10.12.1: {}
+
   prop-types@15.8.1:
     dependencies:
       loose-envify: 1.4.0
@@ -4110,7 +4178,7 @@ snapshots:
       react: 19.0.0
       scheduler: 0.25.0
 
-  react-hook-form@7.59.0(react@19.0.0):
+  react-hook-form@7.60.0(react@19.0.0):
     dependencies:
       react: 19.0.0
 
@@ -4545,4 +4613,4 @@ snapshots:
 
   yaml@2.8.0: {}
 
-  zod@3.25.72: {}
+  zod@3.25.74: {}

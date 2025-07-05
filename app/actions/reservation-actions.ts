@@ -113,6 +113,8 @@ export async function getAppointments({
   }
 }
 
+export const getReservations = getAppointments
+
 export async function getAppointmentByToken(token: string): Promise<ReservationWithService | null> {
   noStore()
   const supabase = createClient()
