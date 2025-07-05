@@ -34,12 +34,6 @@ export function formatJapanesePhoneNumber(phoneNumber: string): string {
 // Twilio Verify APIを使用して認証コードを送信
 export async function sendVerificationCode(phoneNumber: string): Promise<boolean> {
   try {
-    // 開発環境ではコンソールに出力するだけ
-    if (process.env.NODE_ENV !== "production" || process.env.MOCK_SMS === "true") {
-      console.log(`[DEV] Sending verification code to ${phoneNumber}`)
-      return true
-    }
-
     const client = getTwilioClient()
     const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID
 
@@ -66,13 +60,6 @@ export async function sendVerificationCode(phoneNumber: string): Promise<boolean
 // Twilio Verify APIを使用して認証コードを検証
 export async function verifyCode(phoneNumber: string, code: string): Promise<boolean> {
   try {
-    // 開発環境では常に成功とする
-    if (process.env.NODE_ENV !== "production" || process.env.MOCK_SMS === "true") {
-      console.log(`[DEV] Verifying code ${code} for ${phoneNumber}`)
-      // 開発環境では任意の6桁の数字を有効とする
-      return /^\d{6}$/.test(code)
-    }
-
     const client = getTwilioClient()
     const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID
 
@@ -111,12 +98,6 @@ export async function verifyCode(phoneNumber: string, code: string): Promise<boo
 // SMSを送信する関数
 export async function sendSMS(phoneNumber: string, message: string): Promise<boolean> {
   try {
-    // 開発環境ではコンソールに出力するだけ
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[DEV] SMS to ${phoneNumber}: ${message}`)
-      return true
-    }
-
     const client = getTwilioClient()
     const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER
 
