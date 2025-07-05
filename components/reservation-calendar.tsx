@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent } from "react-big-calendar"
-import { format, parse, startOfWeek, getDay, addMonths, subMonths } from "date-fns"
+import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent, type View } from "react-big-calendar"
+import { format, parse, startOfWeek, getDay } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -68,36 +68,38 @@ const parseISO = (isoString: string | null): Date | null => {
   return date
 }
 
-// Helper to parse time robustly, with detailed logging
-const parseTime = (dateStr: string | null, timeStr: string | null): Date | null => {
-  console.log(`[ReservationCalendar:parseTime] Attempting to parse: date='${dateStr}', time='${timeStr}'`)
-  if (!dateStr || !timeStr) {
-    console.error(`[ReservationCalendar:parseTime] FAILED: Missing date or time string.`)
-    return null
+const CustomToolbar = ({ label, onNavigate, onView, view, views }: any) => {
+  const viewNames: { [key: string]: string } = {
+    month: "月",
+    week: "週",
+    day: "日",
   }
-  // Regex to validate HH:mm or HH:mm:ss
-  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(timeStr)) {
-    console.error(`[ReservationCalendar:parseTime] FAILED: Invalid time format detected: '${timeStr}'`)
-    return null
-  }
-  try {
-    const dateTimeString = `${dateStr}T${timeStr}`
-    const date = new Date(dateTimeString)
-    if (isNaN(date.getTime())) {
-      console.error(
-        `[ReservationCalendar:parseTime] FAILED: new Date() returned Invalid Date for string: '${dateTimeString}'`,
-      )
-      return null
-    }
-    // console.log(`[ReservationCalendar:parseTime] SUCCESS: Parsed to:`, date);
-    return date
-  } catch (e) {
-    console.error(
-      `[ReservationCalendar:parseTime] FAILED: Caught exception while parsing date/time: ${dateStr}T${timeStr}`,
-      e,
-    )
-    return null
-  }
+
+  return (
+    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+      <div className="flex items-center space-x-2">
+        <Button variant="outline" size="sm" onClick={() => onNavigate("PREV")}>
+          <ChevronLeft className="h-4 w-4" />
+          <span className="sr-only">前へ</span>
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onNavigate("TODAY")}>
+          今日
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onNavigate("NEXT")}>
+          <ChevronRight className="h-4 w-4" />
+          <span className="sr-only">次へ</span>
+        </Button>
+      </div>
+      <div className="text-lg font-bold order-first sm:order-none">{label}</div>
+      <div className="flex items-center space-x-2">
+        {(views as View[]).map((v) => (
+          <Button key={v} variant={view === v ? "default" : "outline"} size="sm" onClick={() => onView(v)}>
+            {viewNames[v]}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selectedSlot }: ReservationCalendarProps) {
@@ -105,6 +107,8 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [memoizedEvents, setMemoizedEvents] = useState<{ [key: string]: CalendarEvent[] }>({})
+
   console.log(`[ReservationCalendar] Rendering. Props:`, {
     clinicId,
     serviceTypeName: serviceType?.name,
@@ -118,9 +122,14 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
     }
 
     async function fetchMonthEvents() {
+      const monthStr = format(currentDate, "yyyy-MM")
+      if (memoizedEvents[monthStr]) {
+        setEvents(memoizedEvents[monthStr])
+        return
+      }
+
       setIsLoading(true)
       setError(null)
-      const monthStr = format(currentDate, "yyyy-MM")
       console.log(
         `[ReservationCalendar:useEffect] Fetching events for clinic ${clinicId}, service type ${serviceType.id}, month ${monthStr}`,
       )
@@ -151,6 +160,7 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
           .filter((e): e is CalendarEvent => e !== null) // Filter out nulls
 
         console.log(`[ReservationCalendar:useEffect] Total processed events for month: ${processedEvents.length}`)
+        setMemoizedEvents((prev) => ({ ...prev, [monthStr]: processedEvents }))
         setEvents(processedEvents)
       } catch (err: any) {
         console.error("[ReservationCalendar] A top-level error occurred:", err)
@@ -161,7 +171,7 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
     }
 
     fetchMonthEvents()
-  }, [clinicId, serviceType, currentDate])
+  }, [clinicId, serviceType, currentDate, memoizedEvents])
 
   const eventStyleGetter = (event: CalendarEvent) => {
     const isSelected = selectedSlot && event.start?.getTime() === selectedSlot.start?.getTime()
@@ -196,27 +206,10 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
     }
   }
 
-  const goToPreviousMonth = () => setCurrentDate((prev) => subMonths(prev, 1))
-  const goToNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1))
-  const goToToday = () => setCurrentDate(new Date())
-
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg">{serviceType.name} - 予約日時選択</CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={goToPreviousMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={goToToday}>
-              今月
-            </Button>
-            <Button variant="outline" size="sm" onClick={goToNextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <CardTitle className="text-lg">{serviceType.name} - 予約日時選択</CardTitle>
       </CardHeader>
       <CardContent>
         {error && (
@@ -235,15 +228,21 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
               style={{ height: "100%" }}
               date={currentDate}
               onNavigate={(date) => setCurrentDate(date)}
-              views={["month"]}
+              views={["month", "week", "day"]}
               defaultView="month"
               eventPropGetter={eventStyleGetter}
               onSelectEvent={handleSelectEvent}
               selectable={false}
               culture="ja"
+              components={{
+                toolbar: CustomToolbar,
+              }}
               formats={{
                 monthHeaderFormat: (date) => format(date, "yyyy年M月", { locale: ja }),
                 weekdayFormat: (date) => format(date, "E", { locale: ja }),
+                dayHeaderFormat: (date) => format(date, "yyyy年M月d日 (E)", { locale: ja }),
+                dayRangeHeaderFormat: ({ start, end }) => `${format(start, "M月d日")} - ${format(end, "M月d日")}`,
+                timeGutterFormat: (date) => format(date, "H:mm"),
               }}
               messages={{
                 today: "今日",
