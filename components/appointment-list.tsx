@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { CalendarIcon, Clock, MapPin, Phone } from "lucide-react"
 import { AppointmentEditor } from "@/components/appointment-editor"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { parseDate } from "@/lib/date-utils"
 
 interface AppointmentListProps {
   appointments: any[]
@@ -20,15 +19,28 @@ interface AppointmentListProps {
 export function AppointmentList({ appointments, phoneNumber, onUpdate }: AppointmentListProps) {
   const [editingAppointment, setEditingAppointment] = useState<any | null>(null)
 
+  // 予約の編集が完了したときの処理
   const handleEditComplete = async () => {
     setEditingAppointment(null)
     await onUpdate(phoneNumber)
   }
 
+  // 日付を安全にフォーマットするヘルパー関数
   const safeFormatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "日付情報なし"
-    const date = parseDate(dateString)
-    return date ? format(date, "yyyy年MM月dd日(EEE)", { locale: ja }) : "無効な日付"
+    if (!dateString) {
+      return "日付情報なし"
+    }
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        console.error("Invalid date value received in AppointmentList:", dateString)
+        return "無効な日付"
+      }
+      return format(date, "yyyy年MM月dd日(EEE)", { locale: ja })
+    } catch (error) {
+      console.error("Error formatting date in AppointmentList:", dateString, error)
+      return "日付表示エラー"
+    }
   }
 
   return (
@@ -41,7 +53,7 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
         <CardContent>
           <div className="space-y-4">
             {appointments.map((appointment) => {
-              const reservationDate = parseDate(appointment.reservation_date)
+              const reservationDate = appointment.reservation_date ? new Date(appointment.reservation_date) : null
               const isChangeable = reservationDate ? isBefore(startOfDay(new Date()), reservationDate) : false
 
               return (
@@ -122,7 +134,7 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
         <AppointmentEditor
           appointment={editingAppointment}
           onClose={() => setEditingAppointment(null)}
-          onUpdate={handleEditComplete}
+          onComplete={handleEditComplete}
         />
       )}
     </div>

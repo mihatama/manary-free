@@ -47,7 +47,7 @@ export async function getAppointments({
   try {
     let query = supabase
       .from("reservations")
-      .select("*, service_types(name, color, duration), clinics(name, phone, address)", { count: "exact" })
+      .select("*, service_types(name, color), patients!inner(name, kana, email, phone_number)", { count: "exact" })
 
     if (search) {
       query = query.ilike("patients.name", `%${search}%`)
@@ -61,7 +61,9 @@ export async function getAppointments({
     }
     const dbSortBy = sortableColumns[sortBy] || "reservation_date"
 
-    query = query.order(dbSortBy, { ascending: sortOrder === "asc" }).range(offset, offset + limit - 1)
+    query = query
+      .order(dbSortBy, { ascending: sortOrder === "asc", referencedTable: "patients" })
+      .range(offset, offset + limit - 1)
 
     const { data, error, count } = await query
 
@@ -105,7 +107,7 @@ export async function getAppointmentByToken(token: string): Promise<ReservationW
   }
 }
 
-export async function updateReservation(
+export async function updateAppointment(
   id: number,
   updates: Partial<Database["public"]["Tables"]["reservations"]["Update"]>,
 ) {
@@ -113,7 +115,7 @@ export async function updateReservation(
   const { error } = await supabase.from("reservations").update(updates).eq("id", id)
 
   if (error) {
-    console.error("Error updating reservation:", error.message)
+    console.error("Error updating appointment:", error.message)
     return { success: false, message: "予約の更新に失敗しました。" }
   }
 
@@ -121,7 +123,6 @@ export async function updateReservation(
   revalidatePath("/reservation")
   return { success: true, message: "予約が更新されました。" }
 }
-export const updateAppointment = updateReservation
 
 export async function getAvailableSlots(clinicId: number, date: string) {
   console.log(`[Action:getAvailableSlots] ClinicID: ${clinicId}, Date: ${date}`)
@@ -150,7 +151,7 @@ export async function getAvailableSlots(clinicId: number, date: string) {
 
     const { data: existingReservations, error: reservationsError } = await supabase
       .from("reservations")
-      .select("reservation_date, start_time, end_time, service_type_id")
+      .select("start_time, end_time")
       .eq("clinic_id", clinicId)
       .eq("reservation_date", date)
       .neq("status", "cancelled")
@@ -204,14 +205,7 @@ export async function getAvailableSlots(clinicId: number, date: string) {
       }
     }
 
-    type ExistingReservation = {
-      reservation_date: string | null
-      start_time: string | null
-      end_time: string | null
-      service_type_id: number | null
-    }
-
-    return { availableSlots, existingReservations: (existingReservations as ExistingReservation[]) || [] }
+    return { availableSlots, existingReservations: (existingReservations as Reservation[]) || [] }
   } catch (error: any) {
     console.error("Error in getAvailableSlots:", error.message)
     return { error: error.message || "利用可能な予約枠の取得中にエラーが発生しました。" }
@@ -287,7 +281,7 @@ export async function createReservation(formData: FormData) {
 
 export const createAppointment = createReservation
 
-export async function cancelReservation(id: number) {
+export async function cancelAppointment(id: number) {
   const supabase = createClient()
   const { data, error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id).select()
 
@@ -299,10 +293,9 @@ export async function cancelReservation(id: number) {
   revalidatePath("/dashboard/appointments")
   return { success: true, data }
 }
-export const cancelAppointment = cancelReservation
 
 export async function updateReservationStatus(id: number, status: string) {
-  return updateReservation(id, { status })
+  return updateAppointment(id, { status })
 }
 
 export async function deleteReservation(id: number) {
