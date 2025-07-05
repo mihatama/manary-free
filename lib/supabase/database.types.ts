@@ -5,41 +5,44 @@ export type Database = {
     Tables: {
       availability_settings: {
         Row: {
-          clinic_id: number
-          created_at: string | null
-          day_of_week: number
+          created_at: string
+          day_of_week: number | null
           end_time: string
           id: number
-          is_available: boolean | null
+          is_available: boolean
+          service_type_id: number
+          specific_date: string | null
           start_time: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
-          clinic_id: number
-          created_at?: string | null
-          day_of_week: number
+          created_at?: string
+          day_of_week?: number | null
           end_time: string
           id?: number
-          is_available?: boolean | null
+          is_available?: boolean
+          service_type_id: number
+          specific_date?: string | null
           start_time: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
-          clinic_id?: number
-          created_at?: string | null
-          day_of_week?: number
+          created_at?: string
+          day_of_week?: number | null
           end_time?: string
           id?: number
-          is_available?: boolean | null
+          is_available?: boolean
+          service_type_id?: number
+          specific_date?: string | null
           start_time?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "availability_settings_clinic_id_fkey"
-            columns: ["clinic_id"]
+            foreignKeyName: "availability_settings_service_type_id_fkey"
+            columns: ["service_type_id"]
             isOneToOne: false
-            referencedRelation: "clinics"
+            referencedRelation: "service_types"
             referencedColumns: ["id"]
           },
         ]
@@ -48,40 +51,40 @@ export type Database = {
         Row: {
           care_details: string | null
           concerns: string | null
-          created_at: string | null
+          created_at: string
           id: number
           left_breast_condition: Json | null
           patient_id: number
           practitioner_name: string | null
           recommendations: string | null
           right_breast_condition: Json | null
-          updated_at: string | null
+          updated_at: string
           visit_date: string
         }
         Insert: {
           care_details?: string | null
           concerns?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: number
           left_breast_condition?: Json | null
           patient_id: number
           practitioner_name?: string | null
           recommendations?: string | null
           right_breast_condition?: Json | null
-          updated_at?: string | null
+          updated_at?: string
           visit_date: string
         }
         Update: {
           care_details?: string | null
           concerns?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: number
           left_breast_condition?: Json | null
           patient_id?: number
           practitioner_name?: string | null
           recommendations?: string | null
-          right_breast_condition?: string | null
-          updated_at?: string | null
+          right_breast_condition?: Json | null
+          updated_at?: string
           visit_date?: string
         }
         Relationships: [
@@ -97,97 +100,97 @@ export type Database = {
       clinics: {
         Row: {
           address: string | null
-          created_at: string | null
+          created_at: string
           id: number
           name: string
           phone_number: string | null
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           address?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: number
           name: string
           phone_number?: string | null
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           address?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: number
           name?: string
           phone_number?: string | null
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
       patients: {
         Row: {
-          created_at: string | null
+          created_at: string
           email: string | null
           id: number
           kana: string
           name: string
           phone_number: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           id?: number
           kana: string
           name: string
           phone_number: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           id?: number
           kana?: string
           name?: string
           phone_number?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
       postpartum_care_charts: {
         Row: {
           care_provided: string | null
-          created_at: string | null
+          created_at: string
           guidance: string | null
           id: number
           mental_condition: string | null
           patient_id: number
           physical_condition: string | null
           practitioner_name: string | null
-          updated_at: string | null
+          updated_at: string
           visit_date: string
           weeks_postpartum: number | null
         }
         Insert: {
           care_provided?: string | null
-          created_at?: string | null
+          created_at?: string
           guidance?: string | null
           id?: number
           mental_condition?: string | null
           patient_id: number
           physical_condition?: string | null
           practitioner_name?: string | null
-          updated_at?: string | null
+          updated_at?: string
           visit_date: string
           weeks_postpartum?: number | null
         }
         Update: {
           care_provided?: string | null
-          created_at?: string | null
+          created_at?: string
           guidance?: string | null
           id?: number
           mental_condition?: string | null
           patient_id?: number
           physical_condition?: string | null
           practitioner_name?: string | null
-          updated_at?: string | null
+          updated_at?: string
           visit_date?: string
           weeks_postpartum?: number | null
         }
@@ -205,7 +208,7 @@ export type Database = {
         Row: {
           access_token: string | null
           clinic_id: number
-          created_at: string | null
+          created_at: string
           end_time: string
           id: number
           note: string | null
@@ -213,13 +216,13 @@ export type Database = {
           reservation_date: string
           service_type_id: number
           start_time: string
-          status: string | null
-          updated_at: string | null
+          status: string
+          updated_at: string
         }
         Insert: {
           access_token?: string | null
           clinic_id: number
-          created_at?: string | null
+          created_at?: string
           end_time: string
           id?: number
           note?: string | null
@@ -227,13 +230,13 @@ export type Database = {
           reservation_date: string
           service_type_id: number
           start_time: string
-          status?: string | null
-          updated_at?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
           access_token?: string | null
           clinic_id?: number
-          created_at?: string | null
+          created_at?: string
           end_time?: string
           id?: number
           note?: string | null
@@ -241,8 +244,8 @@ export type Database = {
           reservation_date?: string
           service_type_id?: number
           start_time?: string
-          status?: string | null
-          updated_at?: string | null
+          status?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -270,36 +273,47 @@ export type Database = {
       }
       service_types: {
         Row: {
+          clinic_id: number
           color: string | null
-          created_at: string | null
+          created_at: string
           description: string | null
-          duration_minutes: number
+          duration: number
           id: number
           name: string
           price: number
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
+          clinic_id: number
           color?: string | null
-          created_at?: string | null
+          created_at?: string
           description?: string | null
-          duration_minutes: number
+          duration: number
           id?: number
           name: string
           price: number
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
+          clinic_id?: number
           color?: string | null
-          created_at?: string | null
+          created_at?: string
           description?: string | null
-          duration_minutes?: number
+          duration?: number
           id?: number
           name?: string
           price?: number
-          updated_at?: string | null
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "service_types_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
