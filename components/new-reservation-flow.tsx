@@ -2,19 +2,40 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import { ClinicSelector } from "@/components/clinic-selector"
-import { ReservationCalendar, type CalendarEvent } from "@/components/reservation-calendar"
-import { NewReservationForm } from "@/components/new-reservation-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { getClinics, getServiceTypesForClinic } from "@/app/actions/clinic-actions"
-import type { Database } from "@/lib/supabase/database.types"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getClinics, getServiceTypesForClinic } from "@/app/actions/clinic-actions"
+import { ReservationCalendar, type CalendarEvent } from "@/components/reservation-calendar"
+import { NewReservationForm } from "@/components/new-reservation-form"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
+import type { Database } from "@/lib/supabase/database.types"
 
 type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
+
+// A simple, robust component to render a list of clinics as buttons.
+const ClinicSelector = ({
+  clinics,
+  onSelectClinic,
+}: {
+  clinics: Clinic[]
+  onSelectClinic: (clinic: Clinic) => void
+}) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {clinics.map((clinic) => (
+      <Button
+        key={clinic.id}
+        variant="outline"
+        className="h-auto p-4 text-left bg-transparent"
+        onClick={() => onSelectClinic(clinic)}
+      >
+        <span className="font-semibold">{clinic.name || "名称未設定"}</span>
+      </Button>
+    ))}
+  </div>
+)
 
 function NewReservationFlowContent() {
   const searchParams = useSearchParams()
@@ -25,32 +46,39 @@ function NewReservationFlowContent() {
   const [selectedServiceType, setSelectedServiceType] = useState<ServiceType | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<CalendarEvent | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchClinics() {
       setIsLoading(true)
-      const fetchedClinics = await getClinics()
-      setClinics(fetchedClinics)
-
-      const urlClinicId = searchParams.get("clinicId")
-      if (urlClinicId) {
-        const preselectedClinic = fetchedClinics.find((c) => c.id === Number.parseInt(urlClinicId, 10))
-        if (preselectedClinic) {
-          handleClinicSelect(preselectedClinic)
-        }
+      setError(null)
+      try {
+        const fetchedClinics = await getClinics()
+        setClinics(fetchedClinics)
+      } catch (err) {
+        setError("クリニックの読み込みに失敗しました。")
+        console.error(err)
+      } finally {
+        setIsLoading(false)
       }
-      setIsLoading(false)
     }
     fetchClinics()
-  }, [searchParams])
+  }, [])
 
   const handleClinicSelect = async (clinic: Clinic) => {
     setSelectedClinic(clinic)
     setIsLoading(true)
-    const fetchedServiceTypes = await getServiceTypesForClinic(clinic.id)
-    setServiceTypes(fetchedServiceTypes)
-    setStep(2)
-    setIsLoading(false)
+    setError(null)
+    try {
+      const fetchedServiceTypes = await getServiceTypesForClinic(clinic.id)
+      setServiceTypes(fetchedServiceTypes)
+      setStep(2)
+    } catch (err) {
+      setError("診療メニューの読み込みに失敗しました。")
+      console.error(err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleServiceTypeSelect = (serviceType: ServiceType) => {
@@ -67,11 +95,22 @@ function NewReservationFlowContent() {
     setSelectedClinic(null)
     setSelectedServiceType(null)
     setSelectedSlot(null)
+    setError(null)
   }
 
-  const renderStep = () => {
+  const renderStepContent = () => {
     if (isLoading) {
       return <Skeleton className="w-full h-64" />
+    }
+    if (error) {
+      return (
+        <div className="text-red-500 p-4 border border-red-200 bg-red-50 rounded-md">
+          <p>{error}</p>
+          <Button onClick={resetFlow} variant="outline" className="mt-2 bg-transparent">
+            やり直す
+          </Button>
+        </div>
+      )
     }
 
     switch (step) {
@@ -92,24 +131,23 @@ function NewReservationFlowContent() {
           <Card>
             <CardHeader>
               <CardTitle>ステップ2: ご希望のメニューを選択</CardTitle>
-              <CardDescription>{selectedClinic?.name}で受けられるメニューです。</CardDescription>
+              <CardDescription>{selectedClinic?.name || ""}で受けられるメニューです。</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {serviceTypes.map((st) => (
                 <Button
                   key={st.id}
                   variant="outline"
-                  className="h-auto py-4 bg-transparent"
+                  className="h-auto py-4 bg-transparent text-left flex flex-col items-start"
                   onClick={() => handleServiceTypeSelect(st)}
                   style={{ borderColor: st.color || undefined }}
                 >
-                  <div className="flex flex-col items-start w-full">
-                    <span className="font-bold">{st.name}</span>
-                    <span className="text-sm text-gray-500">{st.description}</span>
-                    <span className="text-sm font-semibold mt-2">
-                      {st.price?.toLocaleString()}円 / {st.duration}分
-                    </span>
-                  </div>
+                  <span className="font-bold">{st.name || "名称未設定"}</span>
+                  <span className="text-sm text-gray-500 mt-1">{st.description || ""}</span>
+                  <span className="text-sm font-semibold mt-2">
+                    {typeof st.price === "number" ? `${st.price.toLocaleString()}円` : "価格未定"} /{" "}
+                    {typeof st.duration === "number" ? `${st.duration}分` : ""}
+                  </span>
                 </Button>
               ))}
             </CardContent>
@@ -170,10 +208,10 @@ function NewReservationFlowContent() {
     <div className="w-full max-w-4xl mx-auto p-4">
       {step > 1 && (
         <Button variant="link" onClick={resetFlow} className="mb-4 px-0">
-          最初からやり直す
+          ← クリニック選択に戻る
         </Button>
       )}
-      {renderStep()}
+      {renderStepContent()}
     </div>
   )
 }
