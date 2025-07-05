@@ -65,20 +65,23 @@ function getContrastingTextColor(hexColor: string): string {
   return luma > 0.5 ? "#212529" : "#FFFFFF"
 }
 
-// Helper to parse time robustly, accepting HH:mm and HH:mm:ss
-const parseTime = (dateStr: string, timeStr: string | null): Date | null => {
-  if (!dateStr || !timeStr) return null
+// Helper to parse time robustly, inspired by schedule-calendar.tsx
+const parseTime = (baseDate: Date, timeStr: string | null): Date | null => {
+  if (!baseDate || !timeStr) {
+    return null
+  }
   // Regex to validate HH:mm or HH:mm:ss
   if (!/^\d{2}:\d{2}(:\d{2})?$/.test(timeStr)) {
     console.error(`[ReservationCalendar] Invalid time format detected: ${timeStr}`)
     return null
   }
   try {
-    // IMPORTANT: Do NOT append 'Z'. This will parse the date in the browser's local timezone (JST).
-    // Appending 'Z' would incorrectly interpret the local time as UTC.
-    return new Date(`${dateStr}T${timeStr}`)
+    const [hours, minutes, seconds] = timeStr.split(":").map(Number)
+    const newDate = new Date(baseDate)
+    newDate.setHours(hours, minutes, seconds || 0, 0)
+    return newDate
   } catch (e) {
-    console.error(`[ReservationCalendar] Error parsing date/time: ${dateStr}T${timeStr}`, e)
+    console.error(`[ReservationCalendar] Error setting time on date: ${timeStr} with base date ${baseDate}`, e)
     return null
   }
 }
@@ -112,7 +115,9 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
         const processedEvents: CalendarEvent[] = []
 
         dailyResults.forEach((dayResult, i) => {
-          const dayStr = format(days[i], "yyyy-MM-dd")
+          const day = days[i] // This is a valid Date object for the current iteration
+          const dayStr = format(day, "yyyy-MM-dd")
+
           if (dayResult.error) {
             console.warn(`[ReservationCalendar] Could not fetch slots for ${dayStr}:`, dayResult.error)
             if (!error) setError("一部の日付の予約枠が読み込めませんでした。")
@@ -123,10 +128,10 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
           const serviceTypeSlots = allAvailableSlots.filter((slot) => slot.serviceTypeId === serviceType.id)
 
           serviceTypeSlots.forEach((slot) => {
-            const startTime = parseTime(slot.date, slot.startTime)
-            const endTime = parseTime(slot.date, slot.endTime)
-            if (!startTime || !endTime || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-              console.error("[ReservationCalendar] Skipping invalid available slot:", slot)
+            const startTime = parseTime(day, slot.startTime)
+            const endTime = parseTime(day, slot.endTime)
+            if (!startTime || !endTime) {
+              console.error("[ReservationCalendar] Skipping invalid available slot due to parsing failure:", slot)
               return
             }
             processedEvents.push({
@@ -139,12 +144,10 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
 
           dayResult.existingReservations?.forEach((reservation) => {
             if (reservation.service_type_id === serviceType.id) {
-              // FIX: Use `dayStr` which is guaranteed to be valid for this loop iteration,
-              // instead of `reservation.reservation_date` which might be problematic.
-              const startTime = parseTime(dayStr, reservation.start_time)
-              const endTime = parseTime(dayStr, reservation.end_time)
-              if (!startTime || !endTime || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-                console.error("[ReservationCalendar] Skipping invalid reservation:", {
+              const startTime = parseTime(day, reservation.start_time)
+              const endTime = parseTime(day, reservation.end_time)
+              if (!startTime || !endTime) {
+                console.error("[ReservationCalendar] Skipping invalid reservation due to parsing failure:", {
                   ...reservation,
                   dateUsed: dayStr,
                 })
