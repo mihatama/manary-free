@@ -15,6 +15,21 @@ export type ReservationWithService = Reservation & {
   service_types: Pick<ServiceType, "name" | "color"> | null
 }
 
+// Helper function to validate time strings (HH:mm or HH:mm:ss)
+function isValidTime(time: string | null | undefined): time is string {
+  if (!time) return false
+  const parts = time.split(":").map(Number)
+  if (parts.length < 2 || parts.length > 3) return false
+  const [hour, minute, second] = parts
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return false
+  }
+  if (second !== undefined && (second < 0 || second > 59)) {
+    return false
+  }
+  return true
+}
+
 export async function getAppointments({
   page = 1,
   limit = 10,
@@ -199,7 +214,6 @@ export async function cancelAppointment(id: number) {
 export async function getAvailableSlots(serviceTypeId: number, month: string) {
   noStore()
   const supabase = createClient()
-  const timeFormatRegex = /^\d{2}:\d{2}(:\d{2})?$/
 
   try {
     const monthDate = parse(month, "yyyy-MM", new Date())
@@ -241,8 +255,8 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     const bookedSlots = new Set(
       existingReservations
         .map((r) => {
-          if (!r.reservation_date || !r.start_time) {
-            console.warn(`[SERVER LOG] Skipping reservation ID ${r.id} due to null date/time.`)
+          if (!r.reservation_date || !isValidTime(r.start_time)) {
+            console.warn(`[SERVER LOG] Skipping reservation ID ${r.id} due to null/invalid date/time. Data:`, r)
             return null
           }
           try {
@@ -250,7 +264,6 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             if (/^\d{2}:\d{2}$/.test(time)) {
               time = `${time}:00`
             }
-            // IMPORTANT: Construct date string with JST offset to create correct Date object
             const dateStr = `${r.reservation_date}T${time}+09:00`
             const date = new Date(dateStr)
             if (isNaN(date.getTime())) {
@@ -259,7 +272,6 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
               )
               return null
             }
-            // Store the canonical UTC representation in the Set
             return date.toISOString()
           } catch (e) {
             console.error(`[SERVER LOG] CRITICAL ERROR parsing reservation data. ID: ${r.id}. Data:`, r)
@@ -279,10 +291,8 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       const dateStr = format(date, "yyyy-MM-dd")
       const dayOfWeek = date.getDay()
 
-      // Prioritize specific date settings for the current day
       let settingsForThisDay = specificDateSettings.filter((s) => s.specific_date === dateStr)
 
-      // If no specific settings, use weekly settings for this day of the week
       if (settingsForThisDay.length === 0) {
         settingsForThisDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
       }
@@ -291,12 +301,7 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
         try {
           if (setting.end_date && new Date(dateStr) > new Date(setting.end_date)) continue
 
-          if (
-            !setting.start_time ||
-            !setting.end_time ||
-            !timeFormatRegex.test(setting.start_time) ||
-            !timeFormatRegex.test(setting.end_time)
-          ) {
+          if (!isValidTime(setting.start_time) || !isValidTime(setting.end_time)) {
             console.warn(
               `[SERVER LOG] Skipping availability setting ID ${setting.id} due to invalid time format. Start: "${setting.start_time}", End: "${setting.end_time}"`,
             )
@@ -312,14 +317,12 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             endTime = `${endTime}:00`
           }
 
-          // Construct date strings with JST timezone offset (+09:00) to ensure correct time interpretation
           const startDateTimeStr = `${dateStr}T${startTime}+09:00`
           const slotStartDateTime = new Date(startDateTimeStr)
 
           const endDateTimeStr = `${dateStr}T${endTime}+09:00`
           const settingEndDateTime = new Date(endDateTimeStr)
 
-          // Handle overnight availability (e.g., 22:00 to 02:00)
           if (endTime <= startTime) {
             settingEndDateTime.setDate(settingEndDateTime.getDate() + 1)
           }
