@@ -4,8 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { CSRFForm } from "@/components/csrf-form" // 修正: CsrfForm → CSRFForm
+import { CSRFForm } from "@/components/csrf-form"
 import { createReservation } from "@/app/actions/reservation-actions"
 
 interface NewReservationFormProps {
@@ -34,33 +33,26 @@ export function NewReservationForm({
     setError(null)
 
     try {
-      console.log("予約フォーム送信開始", { formData })
+      // Append data from props to the FormData object
+      formData.append("clinic_id", String(clinicId))
+      formData.append("service_type_id", String(serviceTypeId))
+      formData.append("reservation_date", date)
+      formData.append("start_time", startTime)
+      formData.append("end_time", endTime)
+      formData.append("patient_phone", phoneNumber)
 
-      // 予約データを作成
-      const reservationData = {
-        clinicId,
-        serviceTypeId,
-        date,
-        startTime,
-        endTime,
-        patientName: formData.get("name") as string,
-        phoneNumber,
-        email: formData.get("email") as string,
-        notes: formData.get("notes") as string,
+      console.log("Submitting FormData to createReservation:", Object.fromEntries(formData.entries()))
+
+      // Call the action with the complete FormData object
+      const result = await createReservation(formData)
+      console.log("Reservation creation result:", result)
+
+      if (!result.success || !result.data) {
+        throw new Error(result.message || "予約の作成に失敗しました")
       }
 
-      console.log("予約データ", reservationData)
-
-      // 予約を作成
-      const result = await createReservation(reservationData)
-      console.log("予約作成結果", result)
-
-      if (!result.success) {
-        throw new Error(result.error || "予約の作成に失敗しました")
-      }
-
-      // 予約確認ページにリダイレクト
-      router.push(`/reservation/confirmation?id=${result.reservationId}`)
+      // Redirect to confirmation page using the ID from the returned data
+      router.push(`/reservation/confirmation?id=${result.data.id}`)
     } catch (err) {
       console.error("予約フォーム送信エラー:", err)
       setError(err instanceof Error ? err.message : "予約の作成中にエラーが発生しました")
@@ -74,24 +66,24 @@ export function NewReservationForm({
       <CSRFForm action={handleSubmit} className="space-y-6">
         <div className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="patient_name" className="block text-sm font-medium text-gray-700">
               お名前 <span className="text-red-500">*</span>
             </label>
-            <Input id="name" name="name" required placeholder="山田 花子" />
+            <Input id="patient_name" name="patient_name" required placeholder="山田 花子" />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              メールアドレス <span className="text-red-500">*</span>
+            <label htmlFor="patient_kana" className="block text-sm font-medium text-gray-700">
+              フリガナ <span className="text-red-500">*</span>
             </label>
-            <Input id="email" name="email" type="email" required placeholder="example@email.com" />
+            <Input id="patient_kana" name="patient_kana" required placeholder="ヤマダ ハナコ" />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-              備考
+            <label htmlFor="patient_email" className="block text-sm font-medium text-gray-700">
+              メールアドレス
             </label>
-            <Textarea id="notes" name="notes" placeholder="予約に関する特別な要望や質問があればご記入ください" />
+            <Input id="patient_email" name="patient_email" type="email" placeholder="example@email.com" />
           </div>
         </div>
 

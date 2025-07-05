@@ -10,7 +10,7 @@ import { cookies } from "next/headers"
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 export type ReservationWithService = Reservation & {
-  service_types: Pick<ServiceType, "name" | "color"> | null
+  service_types: Pick<ServiceType, "id" | "name" | "color"> | null
 }
 
 // Helper to format time from minutes to HH:mm
@@ -223,13 +223,17 @@ export async function createReservation(formData: FormData) {
   const supabase = createClient()
   const cookieStore = cookies()
 
+  console.log("[Action:createReservation] Received FormData:", Object.fromEntries(formData.entries()))
+
   try {
+    const email = formData.get("patient_email") as string
     const patientData = {
       name: formData.get("patient_name") as string,
       kana: formData.get("patient_kana") as string,
       phone_number: formData.get("patient_phone") as string,
-      email: formData.get("patient_email") as string,
+      email: email || null, // Use null if email is empty
     }
+    console.log("[Action:createReservation] Parsed patient data:", patientData)
 
     const reservationData = {
       clinic_id: Number(formData.get("clinic_id")),
@@ -238,41 +242,66 @@ export async function createReservation(formData: FormData) {
       start_time: formData.get("start_time") as string,
       end_time: formData.get("end_time") as string,
       status: "confirmed" as const,
-      note: formData.get("note") as string,
+      note: null, // Notes field is removed from form
       access_token: uuidv4(),
     }
+    console.log("[Action:createReservation] Parsed reservation data:", reservationData)
 
+    // Step 1: Find existing patient
+    console.log("[Action:createReservation] Step 1: Finding patient with phone", patientData.phone_number)
     let { data: patient, error: patientError } = await supabase
       .from("patients")
       .select("id")
       .eq("phone_number", patientData.phone_number)
       .single()
 
-    if (patientError && patientError.code !== "PGRST116") throw patientError
+    if (patientError && patientError.code !== "PGRST116") {
+      // PGRST116: no rows found
+      console.error("[Action:createReservation] Error finding patient:", patientError)
+      throw patientError
+    }
+    console.log("[Action:createReservation] Found patient:", patient)
 
+    // Step 2: Create or update patient
     if (!patient) {
+      console.log("[Action:createReservation] Step 2a: Patient not found, creating new one.")
       const { data: newPatient, error: newPatientError } = await supabase
         .from("patients")
         .insert(patientData)
         .select("id")
         .single()
-      if (newPatientError) throw newPatientError
+      if (newPatientError) {
+        console.error("[Action:createReservation] Error creating new patient:", newPatientError)
+        throw newPatientError
+      }
       patient = newPatient
+      console.log("[Action:createReservation] Created new patient:", patient)
     } else {
+      console.log("[Action:createReservation] Step 2b: Patient found, updating details for patient ID:", patient.id)
       const { error: updateError } = await supabase
         .from("patients")
         .update({ name: patientData.name, kana: patientData.kana, email: patientData.email })
         .eq("id", patient.id)
-      if (updateError) throw updateError
+      if (updateError) {
+        console.error("[Action:createReservation] Error updating patient:", updateError)
+        throw updateError
+      }
+      console.log("[Action:createReservation] Successfully updated patient.")
     }
 
+    // Step 3: Create reservation
+    console.log("[Action:createReservation] Step 3: Creating reservation for patient ID:", patient.id)
     const { data: newReservation, error: reservationError } = await supabase
       .from("reservations")
       .insert({ ...reservationData, patient_id: patient.id })
       .select()
       .single()
 
-    if (reservationError) throw reservationError
+    if (reservationError) {
+      console.error("[Action:createReservation] Error creating reservation:", reservationError)
+      throw reservationError
+    }
+    console.log("[Action:createReservation] Successfully created reservation:", newReservation)
 
     revalidatePath("/reservation/new")
     revalidatePath("/dashboard/appointments")
@@ -282,6 +311,7 @@ export async function createReservation(formData: FormData) {
     return { success: true, data: newReservation }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました。"
+    console.error("[Action:createReservation] CATCH BLOCK:", errorMessage)
     return { success: false, message: `予約の作成に失敗しました: ${errorMessage}`, data: null }
   }
 }
