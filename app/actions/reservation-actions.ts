@@ -6,13 +6,6 @@ import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, parse } from "date-fns"
 
-function normalizeTimeString(timeStr: string): string {
-  if (timeStr && timeStr.match(/^\d{2}:\d{2}$/)) {
-    return `${timeStr}:00`
-  }
-  return timeStr
-}
-
 // Correctly derive types from the master Database type
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
@@ -235,10 +228,9 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     if (availabilityError) throw new Error("予約可能時間の設定の取得に失敗しました。")
     if (!availabilitySettings) return []
 
-    // Fetch existing reservations with their IDs for better logging
     const { data: existingReservations, error: reservationError } = await supabase
       .from("reservations")
-      .select("id, reservation_date, start_time") // Added 'id'
+      .select("id, reservation_date, start_time")
       .eq("service_type_id", serviceTypeId)
       .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
       .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
@@ -254,8 +246,8 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             return null
           }
           try {
-            const normalizedStartTime = normalizeTimeString(r.start_time)
-            const dateStr = `${r.reservation_date}T${normalizedStartTime}+09:00`
+            // IMPORTANT: Construct date string with JST offset to create correct Date object
+            const dateStr = `${r.reservation_date}T${r.start_time}+09:00`
             const date = new Date(dateStr)
             if (isNaN(date.getTime())) {
               console.error(
@@ -263,6 +255,7 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
               )
               return null
             }
+            // Store the canonical UTC representation in the Set
             return date.toISOString()
           } catch (e) {
             console.error(`[SERVER LOG] CRITICAL ERROR parsing reservation data. ID: ${r.id}. Data:`, r)
@@ -282,11 +275,15 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       const dateStr = format(date, "yyyy-MM-dd")
       const dayOfWeek = date.getDay()
 
-      const settingsForDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
-      const specificSettings = specificDateSettings.filter((s) => s.specific_date === dateStr)
-      const settingsToUse = specificSettings.length > 0 ? specificSettings : settingsForDay
+      // Prioritize specific date settings for the current day
+      let settingsForThisDay = specificDateSettings.filter((s) => s.specific_date === dateStr)
 
-      for (const setting of settingsToUse) {
+      // If no specific settings, use weekly settings for this day of the week
+      if (settingsForThisDay.length === 0) {
+        settingsForThisDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
+      }
+
+      for (const setting of settingsForThisDay) {
         try {
           if (setting.end_date && new Date(dateStr) > new Date(setting.end_date)) continue
 
@@ -302,24 +299,23 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             continue
           }
 
-          const normalizedStartTime = normalizeTimeString(setting.start_time)
-          const normalizedEndTime = normalizeTimeString(setting.end_time)
-
-          const startDateTimeStr = `${dateStr}T${normalizedStartTime}+09:00`
+          // Construct date strings with JST timezone offset (+09:00) to ensure correct time interpretation
+          const startDateTimeStr = `${dateStr}T${setting.start_time}+09:00`
           const slotStartDateTime = new Date(startDateTimeStr)
 
-          const endDateTimeStr = `${dateStr}T${normalizedEndTime}+09:00`
+          const endDateTimeStr = `${dateStr}T${setting.end_time}+09:00`
           const settingEndDateTime = new Date(endDateTimeStr)
+
+          // Handle overnight availability (e.g., 22:00 to 02:00)
+          if (setting.end_time <= setting.start_time) {
+            settingEndDateTime.setDate(settingEndDateTime.getDate() + 1)
+          }
 
           if (isNaN(slotStartDateTime.getTime()) || isNaN(settingEndDateTime.getTime())) {
             console.error(
-              `[SERVER LOG] CRITICAL: Skipping setting ID ${setting.id}. Failed to create valid Date object. Invalid string was: Start: "${startDateTimeStr}", End: "${endDateTimeStr}"`,
+              `[SERVER LOG] CRITICAL: Skipping setting ID ${setting.id}. Failed to create valid Date object.`,
             )
             continue
-          }
-
-          if (setting.end_time <= setting.start_time) {
-            settingEndDateTime.setDate(settingEndDateTime.getDate() + 1)
           }
 
           let currentSlotStart = slotStartDateTime
