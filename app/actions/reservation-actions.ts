@@ -346,3 +346,43 @@ export async function deleteReservation(id: number) {
   revalidatePath("/dashboard/appointments")
   return { success: true, message: "予約が削除されました。" }
 }
+
+export async function cancelAndPrepareForNewReservation(id: number) {
+  const supabase = createClient()
+
+  try {
+    const { data: reservationToCancel, error: fetchError } = await supabase
+      .from("reservations")
+      .select("id, clinic_id, service_type_id, patient_phone")
+      .eq("id", id)
+      .single()
+
+    if (fetchError || !reservationToCancel) {
+      console.error("Error fetching reservation to cancel:", fetchError?.message)
+      return { success: false, message: "キャンセル対象の予約が見つかりませんでした。" }
+    }
+
+    const { error: cancelError } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id)
+
+    if (cancelError) {
+      console.error("Error cancelling appointment:", cancelError.message)
+      return { success: false, message: "予約のキャンセルに失敗しました。" }
+    }
+
+    revalidatePath("/reservation")
+    revalidatePath("/dashboard/appointments")
+
+    return {
+      success: true,
+      data: {
+        clinicId: reservationToCancel.clinic_id,
+        serviceTypeId: reservationToCancel.service_type_id,
+        phoneNumber: reservationToCancel.patient_phone,
+      },
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました。"
+    console.error("[Action:cancelAndPrepareForNewReservation] CATCH BLOCK:", errorMessage)
+    return { success: false, message: `処理中にエラーが発生しました: ${errorMessage}` }
+  }
+}
