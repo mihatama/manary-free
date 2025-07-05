@@ -47,7 +47,7 @@ export async function getAppointments({
   try {
     let query = supabase
       .from("reservations")
-      .select("*, service_types(name, color), patients!inner(name, kana, email, phone_number)", { count: "exact" })
+      .select("*, service_types(id, name, color), patients!inner(name, kana, email, phone_number)", { count: "exact" })
 
     if (search) {
       query = query.ilike("patients.name", `%${search}%`)

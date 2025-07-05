@@ -81,6 +81,7 @@ export async function getAppointmentsByPhone(phoneNumber: string) {
       .select(`
         *,
         service_types (
+          id,
           name,
           duration,
           color
