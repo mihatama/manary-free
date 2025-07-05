@@ -12,13 +12,26 @@ import { ReservationCalendar, type CalendarEvent } from "@/components/reservatio
 import { NewReservationForm } from "@/components/new-reservation-form"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
-import { AlertCircle, CheckCircle } from "lucide-react"
+import { AlertCircle, CheckCircle, ArrowLeft } from "lucide-react"
 import type { Database } from "@/lib/supabase/database.types"
+import { Button } from "./ui/button"
 
 type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
-export function NewReservationFlow() {
+interface NewReservationFlowProps {
+  phoneNumber?: string
+  initialPatientName?: string
+  onBack?: () => void
+  onReservationComplete?: () => void
+}
+
+export function NewReservationFlow({
+  phoneNumber,
+  initialPatientName,
+  onBack,
+  onReservationComplete,
+}: NewReservationFlowProps) {
   const [clinics, setClinics] = useState<Clinic[]>([])
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
   const [selectedClinicId, setSelectedClinicId] = useState<string>("")
@@ -77,6 +90,13 @@ export function NewReservationFlow() {
 
   return (
     <div className="space-y-8">
+      {onBack && (
+        <Button variant="outline" onClick={onBack} className="mb-4 bg-transparent">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          予約一覧に戻る
+        </Button>
+      )}
+
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -202,6 +222,9 @@ export function NewReservationFlow() {
               date={format(selectedSlot.start!, "yyyy-MM-dd")}
               startTime={format(selectedSlot.start!, "HH:mm")}
               endTime={format(selectedSlot.end!, "HH:mm")}
+              phoneNumber={phoneNumber}
+              initialPatientName={initialPatientName}
+              onReservationComplete={onReservationComplete}
             />
           </CardContent>
         </Card>
