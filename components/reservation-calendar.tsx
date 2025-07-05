@@ -65,6 +65,22 @@ function getContrastingTextColor(hexColor: string): string {
   return luma > 0.5 ? "#212529" : "#FFFFFF"
 }
 
+// Helper to parse time robustly, accepting HH:mm and HH:mm:ss
+const parseTime = (dateStr: string, timeStr: string): Date | null => {
+  if (!dateStr || !timeStr) return null
+  // Regex to validate HH:mm or HH:mm:ss
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(timeStr)) {
+    console.error(`Invalid time format detected: ${timeStr}`)
+    return null
+  }
+  try {
+    return new Date(`${dateStr}T${timeStr}`)
+  } catch (e) {
+    console.error(`Error parsing date/time: ${dateStr}T${timeStr}`, e)
+    return null
+  }
+}
+
 export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selectedSlot }: ReservationCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -80,6 +96,9 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
     async function fetchAndProcessSlots() {
       setIsLoading(true)
       setError(null)
+      console.log(
+        `[ReservationCalendar] Fetching slots for clinic ${clinicId} and service type ${serviceType.id} for month ${format(currentDate, "yyyy-MM")}`,
+      )
       try {
         const startDate = startOfMonth(currentDate)
         const endDate = endOfMonth(currentDate)
@@ -87,61 +106,73 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
 
         const dailySlotsPromises = days.map((day) => getAvailableSlots(clinicId, format(day, "yyyy-MM-dd")))
         const dailyResults = await Promise.all(dailySlotsPromises)
+        console.log("[ReservationCalendar] Raw daily results from getAvailableSlots:", dailyResults)
 
         const processedEvents: CalendarEvent[] = []
 
-        dailyResults.forEach((dayResult) => {
+        dailyResults.forEach((dayResult, i) => {
+          const dayStr = format(days[i], "yyyy-MM-dd")
           if (dayResult.error) {
-            console.warn(`Could not fetch slots for a day:`, dayResult.error)
+            console.warn(`[ReservationCalendar] Could not fetch slots for ${dayStr}:`, dayResult.error)
             return
           }
 
           // Process available slots for the selected service type
-          const serviceTypeSlots =
-            dayResult.availableSlots?.filter((slot) => slot.serviceTypeId === serviceType.id) || []
+          const allAvailableSlots = dayResult.availableSlots || []
+          const serviceTypeSlots = allAvailableSlots.filter((slot) => slot.serviceTypeId === serviceType.id)
+
+          if (i < 3) {
+            // Log first 3 days for debugging
+            console.log(
+              `[ReservationCalendar] Day ${dayStr}: Found ${allAvailableSlots.length} total available slots. Filtered to ${serviceTypeSlots.length} slots for service type ${serviceType.id}.`,
+            )
+          }
+
           serviceTypeSlots.forEach((slot) => {
-            try {
-              const startTime = new Date(`${slot.date}T${slot.startTime}`)
-              const endTime = new Date(`${slot.date}T${slot.endTime}`)
-              if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-                console.error("Skipping invalid available slot:", slot)
-                return
-              }
-              processedEvents.push({
-                title: format(startTime, "HH:mm"),
-                start: startTime,
-                end: endTime,
-                isAvailable: true,
-              })
-            } catch (e) {
-              console.error("Error processing available slot:", e, slot)
+            const startTime = parseTime(slot.date, slot.startTime)
+            const endTime = parseTime(slot.date, slot.endTime)
+            if (!startTime || !endTime || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+              console.error(
+                "[ReservationCalendar] Skipping invalid available slot due to date/time parsing error:",
+                slot,
+              )
+              return
             }
+            processedEvents.push({
+              title: format(startTime, "HH:mm"),
+              start: startTime,
+              end: endTime,
+              isAvailable: true,
+            })
           })
 
           // Process all existing reservations for the clinic as unavailable slots
           dayResult.existingReservations?.forEach((reservation) => {
-            try {
-              const startTime = new Date(`${reservation.reservation_date}T${reservation.start_time}`)
-              const endTime = new Date(`${reservation.reservation_date}T${reservation.end_time}`)
-              if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-                console.error("Skipping invalid reservation:", reservation)
-                return
-              }
-              processedEvents.push({
-                title: "予約済",
-                start: startTime,
-                end: endTime,
-                isAvailable: false,
-              })
-            } catch (e) {
-              console.error("Error processing reservation:", e, reservation)
+            const startTime = parseTime(reservation.reservation_date, reservation.start_time)
+            const endTime = parseTime(reservation.reservation_date, reservation.end_time)
+            if (!startTime || !endTime || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+              console.error(
+                "[ReservationCalendar] Skipping invalid reservation due to date/time parsing error:",
+                reservation,
+              )
+              return
             }
+            processedEvents.push({
+              title: "予約済",
+              start: startTime,
+              end: endTime,
+              isAvailable: false,
+            })
           })
         })
 
+        console.log(
+          `[ReservationCalendar] Total processed events for month: ${processedEvents.length}`,
+          processedEvents,
+        )
         setEvents(processedEvents)
       } catch (err) {
-        console.error("A top-level error occurred while fetching or processing slots:", err)
+        console.error("[ReservationCalendar] A top-level error occurred while fetching or processing slots:", err)
         setError("予約枠の読み込み中にエラーが発生しました。")
       } finally {
         setIsLoading(false)
