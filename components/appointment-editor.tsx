@@ -3,213 +3,154 @@
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { updateAppointment, cancelAppointment } from "@/app/actions/reservation-actions"
-import { useCSRF } from "@/hooks/use-csrf"
-import { CalendarTimePicker } from "@/components/calendar-time-picker"
+import { ReservationCalendar, type CalendarEvent } from "@/components/reservation-calendar"
+import { updateAppointment } from "@/app/actions/reservation-actions"
+import { Loader2 } from "lucide-react"
+import type { Database } from "@/lib/supabase/database.types"
 
-interface AppointmentEditorProps {
+type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
+
+// Helper to parse date string safely.
+// An invalid date string from the database can cause a crash.
+// This function ensures we always have a valid Date object.
+const parseDateString = (dateStr: string | null | undefined): Date => {
+  console.log(`[AppointmentEditor:parseDateString] Parsing date string:`, dateStr)
+  // If date string is missing or empty, default to today.
+  if (!dateStr) {
+    console.warn(`[AppointmentEditor:parseDateString] Received null or empty date string. Defaulting to today.`)
+    return new Date()
+  }
+  // Use 'T00:00:00' to ensure parsing in local timezone, not UTC.
+  const date = new Date(`${dateStr}T00:00:00`)
+  // If parsing fails, default to today and log the error.
+  if (isNaN(date.getTime())) {
+    console.error(
+      `[AppointmentEditor:parseDateString] Invalid date string received: "${dateStr}". Defaulting to today.`,
+    )
+    return new Date()
+  }
+  console.log(`[AppointmentEditor:parseDateString] Successfully parsed to:`, date)
+  return date
+}
+
+export function AppointmentEditor({
+  appointment,
+  onClose,
+  onComplete,
+}: {
   appointment: any
   onClose: () => void
   onComplete: () => void
-}
-
-export function AppointmentEditor({ appointment, onClose, onComplete }: AppointmentEditorProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ start: string; end: string } | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isCancelling, setIsCancelling] = useState(false)
+}) {
+  console.log("[AppointmentEditor] Component rendered with appointment data:", appointment)
+  const [isOpen, setIsOpen] = useState(true)
+  const [selectedSlot, setSelectedSlot] = useState<CalendarEvent | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  const { csrfToken, isLoading: isLoadingCSRF } = useCSRF()
+  // Safely parse the appointment date to prevent crashes.
+  const initialDate = parseDateString(appointment.reservation_date)
+  const [serviceType, setServiceType] = useState<ServiceType | null>(null)
 
-  // 初期値を設定
   useEffect(() => {
-    if (appointment) {
-      const appointmentDate = new Date(appointment.appointment_date)
-      setSelectedDate(appointmentDate)
-
-      const startTime = appointment.start_time.substring(0, 5)
-      const endTime = appointment.end_time.substring(0, 5)
-      setSelectedTimeSlot({ start: startTime, end: endTime })
+    if (appointment?.service_types) {
+      setServiceType(appointment.service_types)
     }
   }, [appointment])
 
-  // 日時が選択されたときのハンドラー
-  const handleDateTimeSelect = (date: Date, startTime: string, endTime: string) => {
-    setSelectedDate(date)
-    setSelectedTimeSlot({ start: startTime, end: endTime })
+  const handleSelectSlot = (slot: CalendarEvent) => {
+    setSelectedSlot(slot)
+    setError(null)
   }
 
-  // 予約を更新
-  const handleUpdate = async () => {
-    if (!csrfToken || !selectedDate || !selectedTimeSlot) return
+  const handleSubmit = async () => {
+    if (!selectedSlot?.start || !selectedSlot?.end) {
+      setError("新しい予約日時を選択してください。")
+      return
+    }
 
-    setIsSubmitting(true)
+    setIsLoading(true)
     setError(null)
-    setSuccessMessage(null)
 
-    try {
-      const formData = new FormData()
-      formData.append("csrf_token", csrfToken)
-      formData.append("token", appointment.token)
-      formData.append("appointment_date", format(selectedDate, "yyyy-MM-dd"))
-      formData.append("start_time", selectedTimeSlot.start)
-      formData.append("end_time", selectedTimeSlot.end)
-      formData.append("patient_name", appointment.patient_name)
-      formData.append("patient_phone", appointment.patient_phone)
-      formData.append("patient_email", appointment.patient_email || "")
+    const updates = {
+      reservation_date: format(selectedSlot.start, "yyyy-MM-dd"),
+      start_time: format(selectedSlot.start, "HH:mm:ss"),
+      end_time: format(selectedSlot.end, "HH:mm:ss"),
+    }
 
-      const result = await updateAppointment(formData)
+    const result = await updateAppointment(appointment.id, updates)
+    setIsLoading(false)
 
-      if (result.success) {
-        setSuccessMessage("予約が更新されました")
-        setTimeout(() => {
-          onComplete()
-        }, 1500)
-      } else {
-        setError(result.error || "予約の更新に失敗しました")
-      }
-    } catch (err: any) {
-      setError(err.message || "予約の更新に失敗しました")
-    } finally {
-      setIsSubmitting(false)
+    if (result.success) {
+      onComplete()
+    } else {
+      setError(result.message || "予約の変更に失敗しました。")
     }
   }
 
-  // 予約をキャンセル
-  const handleCancel = async () => {
-    if (!csrfToken) return
+  const handleClose = () => {
+    setIsOpen(false)
+    // Delay closing to allow for animation
+    setTimeout(onClose, 300)
+  }
 
-    setIsCancelling(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const formData = new FormData()
-      formData.append("csrf_token", csrfToken)
-      formData.append("token", appointment.token)
-
-      const result = await cancelAppointment(formData)
-
-      if (result.success) {
-        setSuccessMessage("予約がキャンセルされました")
-        setIsDialogOpen(false)
-        setTimeout(() => {
-          onComplete()
-        }, 1500)
-      } else {
-        setError(result.error || "予約のキャンセルに失敗しました")
-      }
-    } catch (err: any) {
-      setError(err.message || "予約のキャンセルに失敗しました")
-    } finally {
-      setIsCancelling(false)
-    }
+  if (!serviceType) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent>
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            <p className="ml-4">読み込み中...</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   return (
-    <Card className="w-full shadow-md border-gray-100">
-      <CardHeader>
-        <CardTitle className="text-xl text-center text-gray-800">予約の変更</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>予約の変更</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            現在の予約: {format(initialDate, "M月d日")} {appointment.start_time?.substring(0, 5)}
+          </p>
+        </DialogHeader>
+
+        <div className="py-4">
+          <ReservationCalendar
+            clinicId={appointment.clinic_id}
+            serviceType={serviceType}
+            onSelectSlot={handleSelectSlot}
+            selectedSlot={selectedSlot}
+          />
+        </div>
+
+        {selectedSlot?.start && (
+          <div className="text-center font-semibold text-lg p-2 bg-green-100 text-green-800 rounded-md">
+            新しい予約日時: {format(selectedSlot.start, "M月d日 (E) HH:mm", { locale: ja })}
+          </div>
+        )}
+
         {error && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        {successMessage && (
-          <Alert className="mb-4 bg-green-50 border-green-200">
-            <AlertDescription className="text-green-700">{successMessage}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">診療種別</h3>
-              <p className="text-lg">{appointment.service_types.name}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">助産院</h3>
-              <p className="text-lg">{appointment.clinics.name}</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-500">日付と時間</h3>
-            <div className="border rounded-md p-4">
-              <CalendarTimePicker
-                clinicId={appointment.clinic_id}
-                serviceTypeId={appointment.service_type_id}
-                onSelectDateTime={handleDateTimeSelect}
-                selectedDate={selectedDate}
-                selectedTime={selectedTimeSlot}
-              />
-            </div>
-            {selectedDate && selectedTimeSlot && (
-              <div className="mt-2 p-2 bg-blue-50 rounded-md">
-                <p className="text-blue-700">
-                  選択された日時: {format(selectedDate, "yyyy年MM月dd日(EEE)", { locale: ja })} {selectedTimeSlot.start}{" "}
-                  - {selectedTimeSlot.end}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row justify-between gap-4 pt-4">
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <Button
-            variant="outline"
-            className="text-red-500 border-red-200 hover:bg-red-50"
-            onClick={() => setIsDialogOpen(true)}
-          >
-            予約をキャンセル
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>
+            キャンセル
           </Button>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>予約のキャンセル</DialogTitle>
-              <DialogDescription>予約をキャンセルしますか？この操作は取り消せません。</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                戻る
-              </Button>
-              <Button variant="destructive" onClick={handleCancel} disabled={isCancelling}>
-                {isCancelling ? "処理中..." : "キャンセルする"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-            閉じる
+          <Button onClick={handleSubmit} disabled={!selectedSlot || isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            変更を確定する
           </Button>
-          <Button
-            className="bg-[#f8a0a0] hover:bg-[#f78989] text-white"
-            onClick={handleUpdate}
-            disabled={isSubmitting || !selectedDate || !selectedTimeSlot}
-          >
-            {isSubmitting ? "更新中..." : "予約を更新"}
-          </Button>
-        </div>
-      </CardFooter>
-    </Card>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

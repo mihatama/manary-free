@@ -125,7 +125,7 @@ export async function updateAppointment(
 }
 
 export async function getAvailableSlots(clinicId: number, date: string) {
-  console.log(`[Action:getAvailableSlots] ClinicID: ${clinicId}, Date: ${date}`)
+  console.log(`[Action:getAvailableSlots] START - ClinicID: ${clinicId}, Date: ${date}`)
   const supabase = createClient()
 
   try {
@@ -148,15 +148,17 @@ export async function getAvailableSlots(clinicId: number, date: string) {
       .or(`specific_date.eq.${date},and(day_of_week.eq.${dayOfWeek},specific_date.is.null)`)
 
     if (settingsError) throw new Error(`予約設定の取得に失敗しました: ${settingsError.message}`)
+    console.log(`[Action:getAvailableSlots] Fetched availability_settings for ${date}:`, settings)
 
     const { data: existingReservations, error: reservationsError } = await supabase
       .from("reservations")
-      .select("start_time, end_time")
+      .select("id, reservation_date, start_time, end_time, status, service_type_id")
       .eq("clinic_id", clinicId)
       .eq("reservation_date", date)
       .neq("status", "cancelled")
 
     if (reservationsError) throw new Error(`既存の予約の取得に失敗しました: ${reservationsError.message}`)
+    console.log(`[Action:getAvailableSlots] Fetched existingReservations for ${date}:`, existingReservations)
 
     const availableSlots: {
       date: string
@@ -193,21 +195,26 @@ export async function getAvailableSlots(clinicId: number, date: string) {
           )
 
           if (!isBooked) {
-            availableSlots.push({
+            const newSlot = {
               date: date,
               startTime: slotStartTime,
               endTime: slotEndTime,
               serviceTypeId: serviceTypeId,
-            })
+            }
+            // console.log(`[Action:getAvailableSlots] Generated available slot:`, newSlot);
+            availableSlots.push(newSlot)
           }
           currentMinutes += duration
         }
       }
     }
-
+    console.log(`[Action:getAvailableSlots] END - Returning for ${date}:`, {
+      availableSlots,
+      existingReservations,
+    })
     return { availableSlots, existingReservations: (existingReservations as Reservation[]) || [] }
   } catch (error: any) {
-    console.error("Error in getAvailableSlots:", error.message)
+    console.error(`[Action:getAvailableSlots] CATCH ERROR for ${date}:`, error.message)
     return { error: error.message || "利用可能な予約枠の取得中にエラーが発生しました。" }
   }
 }

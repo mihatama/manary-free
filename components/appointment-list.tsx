@@ -6,7 +6,7 @@ import { ja } from "date-fns/locale"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CalendarIcon, Clock, MapPin, Phone } from 'lucide-react'
+import { CalendarIcon, Clock, MapPin, Phone } from "lucide-react"
 import { AppointmentEditor } from "@/components/appointment-editor"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -23,6 +23,11 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
   const handleEditComplete = async () => {
     setEditingAppointment(null)
     await onUpdate(phoneNumber)
+  }
+
+  const handleEditClick = (appointment: any) => {
+    console.log('[AppointmentList] "予約を変更" clicked. Passing this appointment data to editor:', appointment)
+    setEditingAppointment(appointment)
   }
 
   // 日付を安全にフォーマットするヘルパー関数
@@ -106,7 +111,7 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
                                 <Button
                                   variant="outline"
                                   className="text-[#f8a0a0] border-[#f8a0a0] hover:bg-[#fff5f5] bg-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                                  onClick={() => setEditingAppointment(appointment)}
+                                  onClick={() => handleEditClick(appointment)}
                                   disabled={!isChangeable}
                                 >
                                   予約を変更
