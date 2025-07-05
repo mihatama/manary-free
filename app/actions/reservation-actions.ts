@@ -107,7 +107,7 @@ export async function getAppointmentByToken(token: string): Promise<ReservationW
   }
 }
 
-export async function updateAppointment(
+export async function updateReservation(
   id: number,
   updates: Partial<Database["public"]["Tables"]["reservations"]["Update"]>,
 ) {
@@ -115,7 +115,7 @@ export async function updateAppointment(
   const { error } = await supabase.from("reservations").update(updates).eq("id", id)
 
   if (error) {
-    console.error("Error updating appointment:", error.message)
+    console.error("Error updating reservation:", error.message)
     return { success: false, message: "予約の更新に失敗しました。" }
   }
 
@@ -123,6 +123,7 @@ export async function updateAppointment(
   revalidatePath("/reservation")
   return { success: true, message: "予約が更新されました。" }
 }
+export const updateAppointment = updateReservation
 
 export async function getAvailableSlots(clinicId: number, date: string) {
   console.log(`[Action:getAvailableSlots] ClinicID: ${clinicId}, Date: ${date}`)
@@ -288,7 +289,7 @@ export async function createReservation(formData: FormData) {
 
 export const createAppointment = createReservation
 
-export async function cancelAppointment(id: number) {
+export async function cancelReservation(id: number) {
   const supabase = createClient()
   const { data, error } = await supabase.from("reservations").update({ status: "cancelled" }).eq("id", id).select()
 
@@ -300,9 +301,10 @@ export async function cancelAppointment(id: number) {
   revalidatePath("/dashboard/appointments")
   return { success: true, data }
 }
+export const cancelAppointment = cancelReservation
 
 export async function updateReservationStatus(id: number, status: string) {
-  return updateAppointment(id, { status })
+  return updateReservation(id, { status })
 }
 
 export async function deleteReservation(id: number) {
