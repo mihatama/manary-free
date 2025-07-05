@@ -85,19 +85,20 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
 
         const processedEvents: CalendarEvent[] = []
         for (const [index, slot] of slots.entries()) {
-          try {
-            if (!slot || typeof slot.start_time !== "string" || typeof slot.end_time !== "string") {
-              console.warn(`[CLIENT LOG] STEP 2: Skipping invalid slot object at index ${index}:`, slot)
-              continue
-            }
+          // More robust check here
+          if (!slot || typeof slot.start_time !== "string" || typeof slot.end_time !== "string") {
+            console.warn(`[CLIENT LOG] Skipping invalid slot object at index ${index}:`, slot)
+            continue
+          }
 
+          try {
             const startTime = parseISO(slot.start_time)
             const endTime = parseISO(slot.end_time)
 
+            // Check if dates are valid after parsing
             if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
               console.warn(
-                `[CLIENT LOG] STEP 2: Skipping slot at index ${index} due to invalid date after parsing. Original:`,
-                slot,
+                `[CLIENT LOG] Skipping slot at index ${index} due to invalid date after parsing. Original start: "${slot.start_time}", Original end: "${slot.end_time}"`,
               )
               continue
             }
@@ -109,7 +110,8 @@ export function ReservationCalendar({ serviceType, onSelectSlot, selectedSlot }:
               isAvailable: slot.is_available,
             })
           } catch (e) {
-            console.error(`[CLIENT LOG] STEP 2: Error processing a single slot at index ${index}, skipping.`, {
+            // This catch block will handle errors from parseISO specifically
+            console.error(`[CLIENT LOG] Error parsing date for slot at index ${index}. Skipping.`, {
               slot,
               error: e,
             })
