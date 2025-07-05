@@ -155,6 +155,7 @@ export async function createReservation(formData: FormData) {
   }
 
   revalidatePath("/dashboard/appointments")
+  revalidatePath("/reservation/new-calendar")
   return { success: true, message: "予約が作成されました。", data }
 }
 

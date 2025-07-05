@@ -1,104 +1,155 @@
+import { Suspense } from "react"
 import { getAppointmentByToken } from "@/app/actions/reservation-actions"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { notFound } from "next/navigation"
-import { format } from "date-fns"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { CheckCircle, Calendar, User, MapPin, Stethoscope } from "lucide-react"
+import { format, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
-import { CheckCircle, AlertTriangle } from "lucide-react"
 
-// Helper function to safely format the reservation date and time
-const formatReservationDateTime = (dateStr: string | null, timeStr: string | null): string => {
-  if (!dateStr || !timeStr) {
-    return "日時情報不明"
-  }
-  try {
-    // Combine date and time and explicitly parse as JST (+09:00)
-    // This creates a correct Date object regardless of the server's timezone
-    const dateTimeInJST = new Date(`${dateStr}T${timeStr}+09:00`)
-
-    // Check if the created date is valid
-    if (isNaN(dateTimeInJST.getTime())) {
-      console.error("Invalid date created:", `${dateStr}T${timeStr}`)
-      return "無効な日時情報"
-    }
-
-    return format(dateTimeInJST, "yyyy年MM月dd日 (E) HH:mm", { locale: ja })
-  } catch (error) {
-    console.error("Error formatting date:", error)
-    return "日時のフォーマットに失敗しました"
-  }
+function ConfirmationContent({ token }: { token: string }) {
+  return (
+    <Suspense fallback={<ConfirmationSkeleton />}>
+      <ConfirmationData token={token} />
+    </Suspense>
+  )
 }
 
-export default async function ReservationConfirmationPage({ searchParams }: { searchParams: { token?: string } }) {
-  if (!searchParams.token) {
-    notFound()
-  }
-
-  const appointment = await getAppointmentByToken(searchParams.token)
+async function ConfirmationData({ token }: { token: string }) {
+  const appointment = await getAppointmentByToken(token)
 
   if (!appointment) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Card className="w-full max-w-lg text-center">
-          <CardHeader>
-            <div className="mx-auto bg-red-100 rounded-full p-3 w-fit">
-              <AlertTriangle className="h-8 w-8 text-red-600" />
-            </div>
-            <CardTitle className="mt-4">予約が見つかりません</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">
-              ご指定の予約情報が見つかりませんでした。URLが正しいかご確認いただくか、お手数ですが再度予約手続きをお願いいたします。
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>予約情報が見つかりません</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>指定された予約情報が見つかりませんでした。URLをご確認の上、再度お試しください。</p>
+        </CardContent>
+      </Card>
     )
   }
 
-  // Safely access nested properties
-  const clinicName = Array.isArray(appointment.clinics)
-    ? appointment.clinics[0]?.name
-    : (appointment.clinics?.name ?? "クリニック情報なし")
-  const serviceTypeName = Array.isArray(appointment.service_types)
-    ? appointment.service_types[0]?.name
-    : (appointment.service_types?.name ?? "サービス情報なし")
+  const safeParseDate = (dateStr: string | null, timeStr: string | null): Date | null => {
+    if (!dateStr || !timeStr) return null
+    try {
+      const combinedStr = `${dateStr}T${timeStr}`
+      const date = parseISO(combinedStr)
+      return isNaN(date.getTime()) ? null : date
+    } catch (e) {
+      return null
+    }
+  }
 
-  const formattedDateTime = formatReservationDateTime(appointment.reservation_date, appointment.start_time)
+  const reservationDate = safeParseDate(appointment.reservation_date, appointment.start_time)
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto bg-green-100 rounded-full p-3 w-fit">
-            <CheckCircle className="h-8 w-8 text-green-600" />
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader className="text-center">
+        <div className="flex justify-center items-center mb-4">
+          <CheckCircle className="h-16 w-16 text-green-500" />
+        </div>
+        <CardTitle className="text-2xl font-bold">ご予約が確定しました</CardTitle>
+        <CardDescription>ご予約いただきありがとうございます。詳細は下記をご確認ください。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4 p-6 border rounded-lg">
+          <h3 className="font-semibold text-lg">予約内容</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-start space-x-3">
+              <Calendar className="h-5 w-5 text-gray-500 mt-1" />
+              <div>
+                <p className="text-sm text-gray-500">予約日時</p>
+                <p className="font-medium">
+                  {reservationDate ? format(reservationDate, "yyyy年M月d日 (E) HH:mm", { locale: ja }) : "日時情報なし"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <User className="h-5 w-5 text-gray-500 mt-1" />
+              <div>
+                <p className="text-sm text-gray-500">お名前</p>
+                <p className="font-medium">{appointment.patient_name}</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <MapPin className="h-5 w-5 text-gray-500 mt-1" />
+              <div>
+                <p className="text-sm text-gray-500">助産院</p>
+                <p className="font-medium">{appointment.clinics?.name ?? "情報なし"}</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Stethoscope className="h-5 w-5 text-gray-500 mt-1" />
+              <div>
+                <p className="text-sm text-gray-500">診療内容</p>
+                <p className="font-medium">{appointment.service_types?.name ?? "情報なし"}</p>
+              </div>
+            </div>
           </div>
-          <CardTitle className="mt-4">ご予約ありがとうございます</CardTitle>
-          <CardDescription>以下の内容でご予約を承りました。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="border rounded-lg p-4 space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-500">お名前</span>
-              <span className="font-medium">{appointment.patient_name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">クリニック</span>
-              <span className="font-medium">{clinicName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">診療内容</span>
-              <span className="font-medium">{serviceTypeName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">ご予約日時</span>
-              <span className="font-medium">{formattedDateTime}</span>
-            </div>
+        </div>
+        <Alert>
+          <AlertTitle>今後の流れ</AlertTitle>
+          <AlertDescription>
+            当日は予約時間の5分前までにお越しください。持ち物など、ご不明な点がございましたらお気軽にお問い合わせください。
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ConfirmationSkeleton() {
+  return (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader className="text-center">
+        <div className="flex justify-center items-center mb-4">
+          <div className="h-16 w-16 bg-gray-200 rounded-full animate-pulse" />
+        </div>
+        <div className="h-8 bg-gray-200 rounded w-3/4 mx-auto animate-pulse" />
+        <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto mt-2 animate-pulse" />
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4 p-6 border rounded-lg">
+          <div className="h-6 bg-gray-200 rounded w-1/4 animate-pulse" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-start space-x-3">
+                <div className="h-5 w-5 bg-gray-200 rounded animate-pulse mt-1" />
+                <div className="w-full">
+                  <div className="h-4 bg-gray-200 rounded w-1/3 animate-pulse" />
+                  <div className="h-5 bg-gray-200 rounded w-2/3 mt-1 animate-pulse" />
+                </div>
+              </div>
+            ))}
           </div>
-          <p className="text-xs text-gray-500 text-center">
-            予約の変更やキャンセルをご希望の場合は、クリニックまで直接お問い合わせください。
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="p-4 border rounded-lg">
+          <div className="h-5 bg-gray-200 rounded w-1/5 mb-2 animate-pulse" />
+          <div className="h-4 bg-gray-200 rounded w-full animate-pulse" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function ConfirmationPage({ searchParams }: { searchParams: { token?: string } }) {
+  const token = searchParams.token
+
+  return (
+    <div className="container mx-auto py-12 px-4">
+      {!token ? (
+        <Card className="w-full max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>無効なアクセス</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>予約情報にアクセスするための情報が不足しています。</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <ConfirmationContent token={token} />
+      )}
     </div>
   )
 }
