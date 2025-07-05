@@ -28,6 +28,63 @@ const timeToMinutes = (time: string): number => {
   return hours * 60 + minutes
 }
 
+export async function createReservation(spaceId: string, date: string, startTime: string, endTime: string) {
+  const supabase = createClient()
+
+  try {
+    const { data, error } = await supabase
+      .from("reservations")
+      .insert([
+        {
+          space_id: spaceId,
+          date: date,
+          start_time: startTime,
+          end_time: endTime,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    revalidatePath(`/spaces/${spaceId}`)
+    return { success: true, data: data }
+  } catch (error: any) {
+    console.error("Error creating reservation:", error)
+    let errorMessage = "不明なエラーが発生しました。"
+    if (error instanceof Error) {
+      errorMessage = error.message
+    } else if (typeof error === "string") {
+      errorMessage = error
+    } else if (error.details) {
+      // Handle Supabase postgrest error format
+      errorMessage = error.details
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    return {
+      success: false,
+      error: `予約の作成に失敗しました: ${errorMessage}`,
+    }
+  }
+}
+
+export async function deleteReservationById(id: string, spaceId: string) {
+  const supabase = createClient()
+
+  const { error } = await supabase.from("reservations").delete().eq("id", id)
+
+  if (error) {
+    console.error("Error deleting reservation:", error)
+    return { success: false, error: "予約の削除に失敗しました。" }
+  }
+
+  revalidatePath(`/spaces/${spaceId}`)
+  return { success: true }
+}
+
 export async function getAppointments({
   page = 1,
   limit = 10,
@@ -176,9 +233,7 @@ export async function getAvailableSlots(clinicId: number, date: string) {
       const specificDateSettings = relevantSettings.filter((s) => s.specific_date === date)
       const dayOfWeekSettings = relevantSettings.filter((s) => s.day_of_week === dayOfWeek && !s.specific_date)
 
-      const finalSettings = (specificDateSettings.length > 0 ? specificDateSettings : dayOfWeekSettings).filter(
-        (s) => s.is_available,
-      )
+      const finalSettings = specificDateSettings.length > 0 ? specificDateSettings : dayOfWeekSettings
 
       for (const setting of finalSettings) {
         const startMinutes = timeToMinutes(setting.start_time)
@@ -202,7 +257,6 @@ export async function getAvailableSlots(clinicId: number, date: string) {
               endTime: slotEndTime,
               serviceTypeId: serviceTypeId,
             }
-            // console.log(`[Action:getAvailableSlots] Generated available slot:`, newSlot);
             availableSlots.push(newSlot)
           }
           currentMinutes += duration
@@ -220,11 +274,11 @@ export async function getAvailableSlots(clinicId: number, date: string) {
   }
 }
 
-export async function createReservation(formData: FormData) {
+export async function createAppointment(formData: FormData) {
   const supabase = createClient()
   const cookieStore = cookies()
 
-  console.log("[Action:createReservation] Received FormData:", Object.fromEntries(formData.entries()))
+  console.log("[Action:createAppointment] Received FormData:", Object.fromEntries(formData.entries()))
 
   try {
     const email = formData.get("patient_email") as string
@@ -234,7 +288,7 @@ export async function createReservation(formData: FormData) {
       phone_number: formData.get("patient_phone") as string,
       email: email || null, // Use null if email is empty
     }
-    console.log("[Action:createReservation] Parsed patient data:", patientData)
+    console.log("[Action:createAppointment] Parsed patient data:", patientData)
 
     const reservationData = {
       clinic_id: Number(formData.get("clinic_id")),
@@ -246,10 +300,10 @@ export async function createReservation(formData: FormData) {
       note: null, // Notes field is removed from form
       access_token: uuidv4(),
     }
-    console.log("[Action:createReservation] Parsed reservation data:", reservationData)
+    console.log("[Action:createAppointment] Parsed reservation data:", reservationData)
 
     // Step 1: Find existing patient
-    console.log("[Action:createReservation] Step 1: Finding patient with phone", patientData.phone_number)
+    console.log("[Action:createAppointment] Step 1: Finding patient with phone", patientData.phone_number)
     let { data: patient, error: patientError } = await supabase
       .from("patients")
       .select("id")
@@ -258,40 +312,40 @@ export async function createReservation(formData: FormData) {
 
     if (patientError && patientError.code !== "PGRST116") {
       // PGRST116: no rows found
-      console.error("[Action:createReservation] Error finding patient:", patientError)
+      console.error("[Action:createAppointment] Error finding patient:", patientError)
       throw patientError
     }
-    console.log("[Action:createReservation] Found patient:", patient)
+    console.log("[Action:createAppointment] Found patient:", patient)
 
     // Step 2: Create or update patient
     if (!patient) {
-      console.log("[Action:createReservation] Step 2a: Patient not found, creating new one.")
+      console.log("[Action:createAppointment] Step 2a: Patient not found, creating new one.")
       const { data: newPatient, error: newPatientError } = await supabase
         .from("patients")
         .insert(patientData)
         .select("id")
         .single()
       if (newPatientError) {
-        console.error("[Action:createReservation] Error creating new patient:", newPatientError)
+        console.error("[Action:createAppointment] Error creating new patient:", newPatientError)
         throw newPatientError
       }
       patient = newPatient
-      console.log("[Action:createReservation] Created new patient:", patient)
+      console.log("[Action:createAppointment] Created new patient:", patient)
     } else {
-      console.log("[Action:createReservation] Step 2b: Patient found, updating details for patient ID:", patient.id)
+      console.log("[Action:createAppointment] Step 2b: Patient found, updating details for patient ID:", patient.id)
       const { error: updateError } = await supabase
         .from("patients")
         .update({ name: patientData.name, kana: patientData.kana, email: patientData.email })
         .eq("id", patient.id)
       if (updateError) {
-        console.error("[Action:createReservation] Error updating patient:", updateError)
+        console.error("[Action:createAppointment] Error updating patient:", updateError)
         throw updateError
       }
-      console.log("[Action:createReservation] Successfully updated patient.")
+      console.log("[Action:createAppointment] Successfully updated patient.")
     }
 
     // Step 3: Create reservation
-    console.log("[Action:createReservation] Step 3: Creating reservation for patient ID:", patient.id)
+    console.log("[Action:createAppointment] Step 3: Creating reservation for patient ID:", patient.id)
     const { data: newReservation, error: reservationError } = await supabase
       .from("reservations")
       .insert({ ...reservationData, patient_id: patient.id })
@@ -299,10 +353,10 @@ export async function createReservation(formData: FormData) {
       .single()
 
     if (reservationError) {
-      console.error("[Action:createReservation] Error creating reservation:", reservationError)
+      console.error("[Action:createAppointment] Error creating reservation:", reservationError)
       throw reservationError
     }
-    console.log("[Action:createReservation] Successfully created reservation:", newReservation)
+    console.log("[Action:createAppointment] Successfully created reservation:", newReservation)
 
     revalidatePath("/reservation/new")
     revalidatePath("/dashboard/appointments")
@@ -311,13 +365,17 @@ export async function createReservation(formData: FormData) {
 
     return { success: true, data: newReservation }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました。"
-    console.error("[Action:createReservation] CATCH BLOCK:", errorMessage)
+    const errorMessage =
+      error && typeof error === "object" && "message" in error ? String(error.message) : "不明なエラーが発生しました。"
+
+    console.error("[Action:createAppointment] CATCH BLOCK: An error occurred during reservation creation.", {
+      errorObject: error,
+      errorMessage: errorMessage,
+    })
+
     return { success: false, message: `予約の作成に失敗しました: ${errorMessage}`, data: null }
   }
 }
-
-export const createAppointment = createReservation
 
 export async function cancelAppointment(id: number) {
   const supabase = createClient()
@@ -336,7 +394,7 @@ export async function updateReservationStatus(id: number, status: string) {
   return updateAppointment(id, { status })
 }
 
-export async function deleteReservation(id: number) {
+export async function deleteAppointment(id: number) {
   const supabase = createClient()
   const { error } = await supabase.from("reservations").delete().eq("id", id)
 
@@ -363,7 +421,7 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
     // 1. Fetch service type details
     const { data: serviceType, error: serviceTypeError } = await supabase
       .from("service_types")
-      .select("id, duration")
+      .select("id, name, duration")
       .eq("id", serviceTypeId)
       .single()
 
@@ -371,7 +429,7 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
     if (!serviceType || !serviceType.duration || serviceType.duration <= 0) {
       return { events: [] }
     }
-    const { duration } = serviceType
+    const { duration, name: serviceName } = serviceType
 
     // 2. Fetch all reservations for the month
     const { data: reservations, error: reservationsError } = await supabase
@@ -401,6 +459,7 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
       start: string // ISO string
       end: string // ISO string
       isAvailable: boolean
+      serviceName?: string
     }[] = []
 
     // Add existing reservations to events
@@ -448,6 +507,7 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
               start: `${dayStr}T${slotStartTime}:00`,
               end: `${dayStr}T${slotEndTime}:00`,
               isAvailable: true,
+              serviceName: serviceName || undefined,
             })
           }
           currentMinutes += duration
