@@ -1,155 +1,148 @@
-import { Suspense } from "react"
+import { redirect } from "next/navigation"
 import { getAppointmentByToken } from "@/app/actions/reservation-actions"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { CheckCircle, Calendar, User, MapPin, Stethoscope } from "lucide-react"
-import { format, parseISO } from "date-fns"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import Image from "next/image"
+import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 
-function ConfirmationContent({ token }: { token: string }) {
-  return (
-    <Suspense fallback={<ConfirmationSkeleton />}>
-      <ConfirmationData token={token} />
-    </Suspense>
-  )
-}
+export default async function ConfirmationPage({
+  searchParams,
+}: {
+  searchParams: { token: string }
+}) {
+  const { token } = searchParams
 
-async function ConfirmationData({ token }: { token: string }) {
-  const appointment = await getAppointmentByToken(token)
-
-  if (!appointment) {
-    return (
-      <Card className="w-full max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle>予約情報が見つかりません</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>指定された予約情報が見つかりませんでした。URLをご確認の上、再度お試しください。</p>
-        </CardContent>
-      </Card>
-    )
+  if (!token) {
+    redirect("/reservation")
   }
 
-  const safeParseDate = (dateStr: string | null, timeStr: string | null): Date | null => {
-    if (!dateStr || !timeStr) return null
-    try {
-      const combinedStr = `${dateStr}T${timeStr}`
-      const date = parseISO(combinedStr)
-      return isNaN(date.getTime()) ? null : date
-    } catch (e) {
-      return null
+  try {
+    const appointment = await getAppointmentByToken(token)
+
+    if (!appointment) {
+      redirect("/reservation")
     }
-  }
 
-  const reservationDate = safeParseDate(appointment.reservation_date, appointment.start_time)
+    const appointmentDate = new Date(appointment.appointment_date)
+    const formattedDate = format(appointmentDate, "yyyy年MM月dd日(EEE)", { locale: ja })
+    const startTime = appointment.start_time.substring(0, 5)
+    const endTime = appointment.end_time.substring(0, 5)
 
-  return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader className="text-center">
-        <div className="flex justify-center items-center mb-4">
-          <CheckCircle className="h-16 w-16 text-green-500" />
-        </div>
-        <CardTitle className="text-2xl font-bold">ご予約が確定しました</CardTitle>
-        <CardDescription>ご予約いただきありがとうございます。詳細は下記をご確認ください。</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-4 p-6 border rounded-lg">
-          <h3 className="font-semibold text-lg">予約内容</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex items-start space-x-3">
-              <Calendar className="h-5 w-5 text-gray-500 mt-1" />
-              <div>
-                <p className="text-sm text-gray-500">予約日時</p>
-                <p className="font-medium">
-                  {reservationDate ? format(reservationDate, "yyyy年M月d日 (E) HH:mm", { locale: ja }) : "日時情報なし"}
-                </p>
-              </div>
+    return (
+      <div className="min-h-screen bg-white">
+        <header className="border-b border-gray-100">
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div className="flex items-center">
+              <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
+              <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
             </div>
-            <div className="flex items-start space-x-3">
-              <User className="h-5 w-5 text-gray-500 mt-1" />
-              <div>
-                <p className="text-sm text-gray-500">お名前</p>
-                <p className="font-medium">{appointment.patient_name}</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <MapPin className="h-5 w-5 text-gray-500 mt-1" />
-              <div>
-                <p className="text-sm text-gray-500">助産院</p>
-                <p className="font-medium">{appointment.clinics?.name ?? "情報なし"}</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <Stethoscope className="h-5 w-5 text-gray-500 mt-1" />
-              <div>
-                <p className="text-sm text-gray-500">診療内容</p>
-                <p className="font-medium">{appointment.service_types?.name ?? "情報なし"}</p>
-              </div>
+            <div>
+              <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline mr-4">
+                新規予約
+              </Link>
+              <Link href="/reservation/manage" className="text-sm text-[#f8a0a0] hover:underline">
+                予約の確認・変更
+              </Link>
             </div>
           </div>
-        </div>
-        <Alert>
-          <AlertTitle>今後の流れ</AlertTitle>
-          <AlertDescription>
-            当日は予約時間の5分前までにお越しください。持ち物など、ご不明な点がございましたらお気軽にお問い合わせください。
-          </AlertDescription>
-        </Alert>
-      </CardContent>
-    </Card>
-  )
-}
+        </header>
 
-function ConfirmationSkeleton() {
-  return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader className="text-center">
-        <div className="flex justify-center items-center mb-4">
-          <div className="h-16 w-16 bg-gray-200 rounded-full animate-pulse" />
-        </div>
-        <div className="h-8 bg-gray-200 rounded w-3/4 mx-auto animate-pulse" />
-        <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto mt-2 animate-pulse" />
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-4 p-6 border rounded-lg">
-          <div className="h-6 bg-gray-200 rounded w-1/4 animate-pulse" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-start space-x-3">
-                <div className="h-5 w-5 bg-gray-200 rounded animate-pulse mt-1" />
-                <div className="w-full">
-                  <div className="h-4 bg-gray-200 rounded w-1/3 animate-pulse" />
-                  <div className="h-5 bg-gray-200 rounded w-2/3 mt-1 animate-pulse" />
+        <main className="container mx-auto px-4 py-12">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">予約完了</h1>
+
+            <Card className="w-full shadow-md border-gray-100 mb-8">
+              <CardHeader className="bg-green-50 border-b border-green-100">
+                <CardTitle className="text-xl text-center text-green-800">予約が確定しました</CardTitle>
+                <CardDescription className="text-center text-green-700">
+                  以下の内容で予約を受け付けました
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">助産院</h3>
+                      <p className="text-lg">{appointment.clinics.name}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">診療種別</h3>
+                      <p className="text-lg">{appointment.service_types.name}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">日付</h3>
+                      <p className="text-lg">{formattedDate}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">時間</h3>
+                      <p className="text-lg">
+                        {startTime} - {endTime}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">お名前</h3>
+                      <p className="text-lg">{appointment.patient_name}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">電話番号</h3>
+                      <p className="text-lg">{appointment.patient_phone}</p>
+                    </div>
+                    {appointment.patient_email && (
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">メールアドレス</h3>
+                        <p className="text-lg">{appointment.patient_email}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="mt-6 text-center">
+                      <p className="text-sm text-gray-600 mb-2">予約管理用トークン（4桁の数字）</p>
+                      <div className="flex justify-center items-center space-x-2 mb-4">
+                        {token.split("").map((digit, index) => (
+                          <div
+                            key={index}
+                            className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg border border-blue-300 text-xl font-bold"
+                          >
+                            {digit}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        このトークンは予約の確認・変更・キャンセルに必要です。
+                        <br />
+                        大切に保管してください。
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              </CardContent>
+            </Card>
+
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <Link href="/reservation">
+                <Button variant="outline" className="w-full">
+                  新しい予約を作成
+                </Button>
+              </Link>
+              <Link href={`/reservation/manage?token=${appointment.token}`}>
+                <Button className="w-full bg-[#f8a0a0] hover:bg-[#f78989]">予約を管理する</Button>
+              </Link>
+            </div>
           </div>
-        </div>
-        <div className="p-4 border rounded-lg">
-          <div className="h-5 bg-gray-200 rounded w-1/5 mb-2 animate-pulse" />
-          <div className="h-4 bg-gray-200 rounded w-full animate-pulse" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+        </main>
 
-export default function ConfirmationPage({ searchParams }: { searchParams: { token?: string } }) {
-  const token = searchParams.token
-
-  return (
-    <div className="container mx-auto py-12 px-4">
-      {!token ? (
-        <Card className="w-full max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>無効なアクセス</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>予約情報にアクセスするための情報が不足しています。</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <ConfirmationContent token={token} />
-      )}
-    </div>
-  )
+        <footer className="mt-auto py-6 border-t border-gray-100">
+          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
+            &copy; {new Date().getFullYear()} Manary. All rights reserved.
+          </div>
+        </footer>
+      </div>
+    )
+  } catch (error) {
+    console.error("Error in ConfirmationPage:", error)
+    redirect("/reservation")
+  }
 }

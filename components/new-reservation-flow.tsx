@@ -1,118 +1,250 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { ReservationCalendar, type CalendarEvent } from "./reservation-calendar"
-import { NewReservationForm } from "./new-reservation-form"
-import type { Database } from "@/lib/supabase/database.types"
-import { createReservation } from "@/app/actions/reservation-actions"
+import { useState, useEffect } from "react"
+import { format } from "date-fns"
+import { ja } from "date-fns/locale"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ClinicSelector } from "./clinic-selector"
-import { ServiceTypeSelector } from "./service-type-selector"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { ReservationCalendar, type CalendarEvent } from "@/components/reservation-calendar"
+import { getClinics, getServiceTypes } from "@/app/actions/schedule-actions"
+import { createAppointment } from "@/app/actions/reservation-actions"
+import type { Database } from "@/lib/supabase/database.types"
 
 type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
-export function NewReservationFlow() {
-  const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null)
-  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType | null>(null)
+interface NewReservationFlowProps {
+  phoneNumber: string
+  initialPatientName?: string
+  onBack: () => void
+  onReservationComplete: () => void
+}
+
+export function NewReservationFlow({
+  phoneNumber,
+  initialPatientName = "",
+  onBack,
+  onReservationComplete,
+}: NewReservationFlowProps) {
+  const [clinics, setClinics] = useState<Clinic[]>([])
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
+  const [selectedClinicId, setSelectedClinicId] = useState<string>("")
+  const [selectedServiceTypeId, setSelectedServiceTypeId] = useState<string>("")
   const [selectedSlot, setSelectedSlot] = useState<CalendarEvent | null>(null)
-  const [step, setStep] = useState(1)
-  const [error, setError] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [patientName, setPatientName] = useState(initialPatientName)
+  const [patientEmail, setPatientEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [error, setError] = useState<string | null>(null)
 
-  const handleClinicSelect = (clinic: Clinic) => {
-    setSelectedClinic(clinic)
-    setSelectedServiceType(null)
-    setSelectedSlot(null)
-  }
+  const selectedServiceType = serviceTypes.find((st) => st.id.toString() === selectedServiceTypeId) || null
 
-  const handleServiceTypeSelect = (serviceType: ServiceType) => {
-    setSelectedServiceType(serviceType)
-    setSelectedSlot(null)
-    setStep(1)
-  }
-
-  const handleSlotSelect = (slot: CalendarEvent) => {
-    setSelectedSlot(slot)
-    setStep(2)
-  }
-
-  const handleBack = () => {
-    if (step === 2) {
-      setStep(1)
+  useEffect(() => {
+    async function fetchClinics() {
+      try {
+        const data = await getClinics()
+        setClinics(data)
+        if (data.length > 0) {
+          setSelectedClinicId(data[0].id.toString())
+        }
+      } catch (err) {
+        setError("クリニックの読み込みに失敗しました。")
+      }
     }
-  }
+    fetchClinics()
+  }, [])
 
-  const handleSubmit = async (formData: FormData) => {
-    if (!selectedClinic || !selectedServiceType || !selectedSlot) {
-      setError("予約情報が不完全です。")
+  useEffect(() => {
+    if (!selectedClinicId) {
+      setServiceTypes([])
+      setSelectedServiceTypeId("")
       return
     }
+    async function fetchServiceTypes() {
+      try {
+        const data = await getServiceTypes(Number(selectedClinicId))
+        setServiceTypes(data)
+        if (data.length > 0) {
+          setSelectedServiceTypeId(data[0].id.toString())
+        } else {
+          setSelectedServiceTypeId("")
+        }
+      } catch (err) {
+        setError("診療種別の読み込みに失敗しました。")
+      }
+    }
+    fetchServiceTypes()
+  }, [selectedClinicId])
 
+  const handleSelectSlot = (event: CalendarEvent) => {
+    setSelectedSlot(event)
+    setIsModalOpen(true)
+  }
+
+  const handleConfirmReservation = async () => {
+    if (!selectedClinicId || !selectedServiceTypeId || !selectedSlot || !patientName) {
+      setError("すべての必須項目を入力してください。")
+      return
+    }
     setIsLoading(true)
     setError(null)
 
     try {
-      const result = await createReservation(formData)
-      if (result.success && result.data?.access_token) {
-        router.push(`/reservation/confirmation?token=${result.data.access_token}`)
+      const formData = new FormData()
+      formData.append("clinic_id", selectedClinicId)
+      formData.append("service_type_id", selectedServiceTypeId)
+      formData.append("reservation_date", format(selectedSlot.start as Date, "yyyy-MM-dd"))
+      formData.append("start_time", format(selectedSlot.start as Date, "HH:mm:ss"))
+      formData.append("end_time", format(selectedSlot.end as Date, "HH:mm:ss"))
+      formData.append("patient_name", patientName)
+      formData.append("patient_phone", phoneNumber)
+      formData.append("patient_email", patientEmail)
+      formData.append("status", "confirmed")
+      formData.append("note", "患者による予約")
+
+      const result = await createAppointment(formData)
+
+      if (result.success) {
+        setIsModalOpen(false)
+        onReservationComplete()
       } else {
         setError(result.message || "予約の作成に失敗しました。")
       }
-    } catch (err) {
-      setError("予期せぬエラーが発生しました。")
-      console.error(err)
+    } catch (err: any) {
+      setError(err.message || "予約の作成中にエラーが発生しました。")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-semibold mb-2">ステップ1: 助産院と診療内容を選択</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ClinicSelector onClinicSelect={handleClinicSelect} selectedClinicId={selectedClinic?.id ?? null} />
-          {selectedClinic && (
-            <ServiceTypeSelector
-              clinicId={selectedClinic.id}
-              onServiceTypeSelect={handleServiceTypeSelect}
-              selectedServiceTypeId={selectedServiceType?.id ?? null}
-            />
-          )}
-        </div>
+    <div className="space-y-6">
+      <div className="flex justify-start">
+        <Button variant="outline" onClick={onBack}>
+          予約一覧に戻る
+        </Button>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>ステップ1: クリニックと診療内容を選択</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="clinic-select">クリニック</Label>
+            <Select value={selectedClinicId} onValueChange={setSelectedClinicId}>
+              <SelectTrigger id="clinic-select">
+                <SelectValue placeholder="クリニックを選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {clinics.map((clinic) => (
+                  <SelectItem key={clinic.id} value={clinic.id.toString()}>
+                    {clinic.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="service-type-select">診療内容</Label>
+            <Select value={selectedServiceTypeId} onValueChange={setSelectedServiceTypeId} disabled={!selectedClinicId}>
+              <SelectTrigger id="service-type-select">
+                <SelectValue placeholder="診療内容を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {serviceTypes.map((st) => (
+                  <SelectItem key={st.id} value={st.id.toString()}>
+                    {st.name} ({st.duration}分)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       {selectedServiceType && (
-        <div>
-          <h2 className="text-xl font-semibold mb-2">
-            {step === 1 ? "ステップ2: 日時を選択" : "ステップ3: 予約者情報を入力"}
-          </h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>ステップ2: ご希望の日時を選択</CardTitle>
+            <CardDescription>カレンダーからご希望の予約枠をクリックしてください。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ReservationCalendar
+              serviceType={selectedServiceType}
+              onSelectSlot={handleSelectSlot}
+              selectedSlot={selectedSlot}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>予約内容の確認</DialogTitle>
+            <DialogDescription>お名前を入力して予約を確定してください。</DialogDescription>
+          </DialogHeader>
           {error && (
-            <Alert variant="destructive" className="mb-4">
+            <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          {step === 1 ? (
-            <ReservationCalendar
-              serviceType={selectedServiceType}
-              onSelectSlot={handleSlotSelect}
-              selectedSlot={selectedSlot}
-            />
-          ) : (
-            <NewReservationForm
-              clinic={selectedClinic}
-              serviceType={selectedServiceType}
-              slot={selectedSlot}
-              onSubmit={handleSubmit}
-              onBack={handleBack}
-              isLoading={isLoading}
-            />
-          )}
-        </div>
-      )}
+          <div className="space-y-4 py-4">
+            <Card className="p-4 bg-gray-50">
+              <CardContent className="space-y-2 text-sm">
+                <p>
+                  <strong>日時:</strong>{" "}
+                  {selectedSlot?.start && format(selectedSlot.start, "yyyy年MM月dd日 (E) HH:mm", { locale: ja })}
+                </p>
+                <p>
+                  <strong>診療内容:</strong> {selectedServiceType?.name}
+                </p>
+              </CardContent>
+            </Card>
+            <div className="space-y-2">
+              <Label htmlFor="patient-name">お名前</Label>
+              <Input
+                id="patient-name"
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                placeholder="山田 花子"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="patient-email">メールアドレス (任意)</Label>
+              <Input
+                id="patient-email"
+                type="email"
+                value={patientEmail}
+                onChange={(e) => setPatientEmail(e.target.value)}
+                placeholder="example@example.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              キャンセル
+            </Button>
+            <Button onClick={handleConfirmReservation} disabled={isLoading} className="bg-[#f8a0a0] hover:bg-[#f78989]">
+              {isLoading ? "処理中..." : "予約を確定する"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
