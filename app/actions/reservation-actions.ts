@@ -310,11 +310,12 @@ export async function createReservation(formData: FormData) {
     cookieStore.set("new_reservation_id", newReservation.id.toString(), { path: "/" })
 
     return { success: true, data: newReservation }
-  } catch (error) {
+  } catch (error: any) {
     console.error("[Action:createReservation] CATCH BLOCK - Full error object:", error)
-    const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました。"
-    console.error("[Action:createReservation] CATCH BLOCK:", errorMessage)
-    return { success: false, message: `予約の作成に失敗しました: ${errorMessage}`, data: null }
+    const errorMessage = error.message || "不明なエラーが発生しました。"
+    const detailedMessage = error.details ? `${errorMessage} 詳細: ${error.details}` : errorMessage
+    console.error("[Action:createReservation] CATCH BLOCK:", detailedMessage)
+    return { success: false, message: `予約の作成に失敗しました: ${detailedMessage}`, data: null }
   }
 }
 

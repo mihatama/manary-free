@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,7 @@ interface NewReservationFormProps {
   date: string
   startTime: string
   endTime: string
-  phoneNumber?: string
+  phoneNumber: string
 }
 
 export function NewReservationForm({
@@ -28,9 +28,29 @@ export function NewReservationForm({
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
+  useEffect(() => {
+    console.log("[NewReservationForm] Rendering with props:", {
+      clinicId,
+      serviceTypeId,
+      date,
+      startTime,
+      endTime,
+      phoneNumber,
+    })
+  }, [clinicId, serviceTypeId, date, startTime, endTime, phoneNumber])
+
   const handleSubmit = async (formData: FormData) => {
     setIsSubmitting(true)
     setError(null)
+
+    // Client-side validation
+    if (!clinicId || !serviceTypeId || !date || !startTime || !endTime || !phoneNumber) {
+      const errorMessage = "予約情報が不完全です。前のステップに戻ってやり直してください。"
+      console.error(errorMessage, { clinicId, serviceTypeId, date, startTime, endTime, phoneNumber })
+      setError(errorMessage)
+      setIsSubmitting(false)
+      return
+    }
 
     try {
       // Append data from props to the FormData object
@@ -39,12 +59,11 @@ export function NewReservationForm({
       formData.append("reservation_date", date)
       formData.append("start_time", startTime)
       formData.append("end_time", endTime)
-      if (phoneNumber) {
-        formData.append("patient_phone", phoneNumber)
-      }
+      formData.append("patient_phone", phoneNumber)
 
       console.log("Submitting FormData to createReservation:", Object.fromEntries(formData.entries()))
 
+      // Call the action with the complete FormData object
       const result = await createReservation(formData)
       console.log("Reservation creation result:", result)
 
@@ -52,6 +71,7 @@ export function NewReservationForm({
         throw new Error(result.message || "予約の作成に失敗しました")
       }
 
+      // Redirect to confirmation page using the ID from the returned data
       router.push(`/reservation/confirmation?id=${result.data.id}`)
     } catch (err) {
       console.error("予約フォーム送信エラー:", err)
@@ -78,15 +98,6 @@ export function NewReservationForm({
             </label>
             <Input id="patient_kana" name="patient_kana" required placeholder="ヤマダ ハナコ" />
           </div>
-
-          {!phoneNumber && (
-            <div className="space-y-2">
-              <label htmlFor="patient_phone" className="block text-sm font-medium text-gray-700">
-                電話番号 <span className="text-red-500">*</span>
-              </label>
-              <Input id="patient_phone" name="patient_phone" type="tel" required placeholder="09012345678" />
-            </div>
-          )}
 
           <div className="space-y-2">
             <label htmlFor="patient_email" className="block text-sm font-medium text-gray-700">
