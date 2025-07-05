@@ -74,8 +74,9 @@ const parseTime = (dateStr: string, timeStr: string): Date | null => {
     return null
   }
   try {
-    // Use UTC to avoid timezone issues during parsing
-    return new Date(`${dateStr}T${timeStr}Z`)
+    // IMPORTANT: Do NOT append 'Z'. This will parse the date in the browser's local timezone (JST).
+    // Appending 'Z' would incorrectly interpret the local time as UTC.
+    return new Date(`${dateStr}T${timeStr}`)
   } catch (e) {
     console.error(`[ReservationCalendar] Error parsing date/time: ${dateStr}T${timeStr}`, e)
     return null
@@ -114,12 +115,10 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
           const dayStr = format(days[i], "yyyy-MM-dd")
           if (dayResult.error) {
             console.warn(`[ReservationCalendar] Could not fetch slots for ${dayStr}:`, dayResult.error)
-            // Optionally set a global error if any day fails
             if (!error) setError("一部の日付の予約枠が読み込めませんでした。")
             return
           }
 
-          // Process available slots for the selected service type
           const allAvailableSlots = dayResult.availableSlots || []
           const serviceTypeSlots = allAvailableSlots.filter((slot) => slot.serviceTypeId === serviceType.id)
 
@@ -138,9 +137,7 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
             })
           })
 
-          // Process all existing reservations for the clinic as unavailable slots
           dayResult.existingReservations?.forEach((reservation) => {
-            // Only show reservations for the currently selected service type to avoid clutter
             if (reservation.service_type_id === serviceType.id) {
               const startTime = parseTime(reservation.reservation_date, reservation.start_time)
               const endTime = parseTime(reservation.reservation_date, reservation.end_time)
@@ -159,9 +156,6 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
         })
 
         console.log(`[ReservationCalendar] Total processed events for month: ${processedEvents.length}`)
-        if (processedEvents.length === 0) {
-          console.log("[ReservationCalendar] No events were generated for the current view.")
-        }
         setEvents(processedEvents)
       } catch (err) {
         console.error("[ReservationCalendar] A top-level error occurred:", err)
