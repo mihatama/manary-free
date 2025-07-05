@@ -4,28 +4,18 @@ import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ReservationCalendar } from "@/components/reservation-calendar"
-import { getAvailableSlots, updateAppointment, cancelAppointment } from "@/app/actions/reservation-actions"
-import { parseDate, parseTime, formatDate, formatTimeSimple } from "@/lib/date-utils"
+import { CalendarTimePicker } from "@/components/calendar-time-picker"
+import { updateAppointment, cancelAppointment } from "@/app/actions/reservation-actions"
 import { toast } from "sonner"
-import type { ReservationWithService } from "@/app/actions/reservation-actions"
-import type { ServiceType } from "@/app/actions/schedule-actions"
+import { parseDate, parseTime, formatDate, formatTimeSimple } from "@/lib/date-utils"
 
 interface AppointmentEditorProps {
-  appointment: ReservationWithService | null
-  serviceTypes: ServiceType[]
-  isOpen: boolean
+  appointment: any
   onClose: () => void
-  onAppointmentUpdate: () => void
+  onUpdate: () => void
 }
 
-export function AppointmentEditor({
-  appointment,
-  serviceTypes,
-  isOpen,
-  onClose,
-  onAppointmentUpdate,
-}: AppointmentEditorProps) {
+export function AppointmentEditor({ appointment, onClose, onUpdate }: AppointmentEditorProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined)
   const [isLoading, setIsLoading] = useState(false)
@@ -33,82 +23,117 @@ export function AppointmentEditor({
 
   useEffect(() => {
     console.log("[AppointmentEditor] Initializing with appointment data:", appointment)
-    if (appointment) {
+    if (appointment?.reservation_date && appointment?.start_time) {
       const initialDate = parseDate(appointment.reservation_date)
       if (initialDate) {
         setSelectedDate(initialDate)
-        const initialTime = formatTimeSimple(parseTime(appointment.start_time, initialDate))
-        setSelectedTime(initialTime)
-        console.log("[AppointmentEditor] State initialized:", { initialDate, initialTime })
+        const initialTime = parseTime(appointment.start_time, initialDate)
+        if (initialTime) {
+          const formattedTime = formatTimeSimple(initialTime)
+          setSelectedTime(formattedTime)
+          console.log("[AppointmentEditor] State initialized:", { initialDate, formattedTime })
+        } else {
+          setError("予約時間の読み込みに失敗しました。")
+          console.error("[AppointmentEditor] Failed to parse initial time:", appointment.start_time)
+        }
       } else {
-        console.error("[AppointmentEditor] Failed to parse initial date from appointment.", appointment)
-        setError("予約データの読み込みに失敗しました。日付情報が不正です。")
+        setError("予約日の読み込みに失敗しました。")
+        console.error("[AppointmentEditor] Failed to parse initial date:", appointment.reservation_date)
       }
     } else {
       setError("予約データの読み込みに失敗しました。情報が不完全です。")
-      console.error("[AppointmentEditor] Invalid or incomplete appointment data received.")
+      console.error("[AppointmentEditor] Invalid or incomplete appointment data received.", appointment)
     }
   }, [appointment])
 
-  const currentServiceType = useMemo(() => {
-    if (!appointment || !serviceTypes) return null
-    return serviceTypes.find((st) => st.id === appointment.service_type_id)
-  }, [appointment, serviceTypes])
+  const serviceType = useMemo(() => {
+    if (!appointment?.service_types) {
+      console.error("Service type information is missing from the appointment object.")
+      return null
+    }
+    return appointment.service_types
+  }, [appointment])
 
   const handleUpdate = async () => {
-    if (!appointment || !selectedDate || !selectedTime || !currentServiceType) {
-      toast.error("更新情報が不完全です。")
+    console.log("--- [handleUpdate] Fired ---")
+    console.log("State at update:", {
+      appointment: !!appointment,
+      selectedDate: selectedDate,
+      selectedTime: selectedTime,
+      serviceType: serviceType,
+      duration: serviceType?.duration,
+    })
+
+    if (!appointment || !selectedDate || !selectedTime || !serviceType?.duration) {
+      const validationError = "Update validation failed. Required data is missing."
+      console.error(validationError, {
+        hasAppointment: !!appointment,
+        hasSelectedDate: !!selectedDate,
+        hasSelectedTime: !!selectedTime,
+        hasDuration: !!serviceType?.duration,
+      })
+      toast.error("更新情報が不完全です。", { description: "日付と時刻が選択されているか確認してください。" })
       return
     }
+
     setIsLoading(true)
     setError(null)
 
-    const newStartTime = selectedTime
-    const duration = currentServiceType.duration || 60
-    const [hours, minutes] = newStartTime.split(":").map(Number)
-    const newEndTimeDate = new Date(selectedDate)
-    newEndTimeDate.setHours(hours, minutes + duration)
-    const newEndTime = formatTimeSimple(newEndTimeDate)
+    try {
+      const [hours, minutes] = selectedTime.split(":").map(Number)
+      const newEndTimeDate = new Date(selectedDate)
+      newEndTimeDate.setHours(hours, minutes + serviceType.duration)
 
-    const updates = {
-      reservation_date: formatDate(selectedDate),
-      start_time: `${newStartTime}:00`,
-      end_time: `${newEndTime}:00`,
-    }
+      const updates = {
+        reservation_date: formatDate(selectedDate),
+        start_time: `${selectedTime}:00`,
+        end_time: formatTimeSimple(newEndTimeDate) + ":00",
+      }
 
-    const result = await updateAppointment(appointment.id, updates)
-    setIsLoading(false)
+      const result = await updateAppointment(appointment.id, updates)
 
-    if (result.success) {
-      toast.success("予約が正常に更新されました。")
-      onAppointmentUpdate()
-      onClose()
-    } else {
-      toast.error(`予約の更新に失敗しました: ${result.message}`)
-      setError(result.message || "不明なエラーが発生しました。")
+      if (result.success) {
+        toast.success("予約が正常に変更されました。")
+        onUpdate()
+        onClose()
+      } else {
+        throw new Error(result.message || "予約の変更に失敗しました。")
+      }
+    } catch (e: any) {
+      setError(e.message)
+      toast.error(e.message)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleCancel = async () => {
-    if (!appointment) return
+    if (!appointment || !window.confirm("本当にこの予約をキャンセルしますか？")) {
+      return
+    }
     setIsLoading(true)
-    const result = await cancelAppointment(appointment.id)
-    setIsLoading(false)
-    if (result.success) {
-      toast.success("予約をキャンセルしました。")
-      onAppointmentUpdate()
-      onClose()
-    } else {
-      toast.error(`予約のキャンセルに失敗しました: ${result.message}`)
+    setError(null)
+    try {
+      const result = await cancelAppointment(appointment.id)
+      if (result.success) {
+        toast.success("予約をキャンセルしました。")
+        onUpdate()
+        onClose()
+      } else {
+        throw new Error(result.message || "予約のキャンセルに失敗しました。")
+      }
+    } catch (e: any) {
+      setError(e.message)
+      toast.error(e.message)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  if (!appointment) {
-    return null
-  }
+  if (!appointment) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px] md:max-w-2xl">
         <DialogHeader>
           <DialogTitle>予約の変更</DialogTitle>
@@ -120,30 +145,36 @@ export function AppointmentEditor({
           </Alert>
         )}
         <div className="grid gap-4 py-4">
-          <div>
-            <h3 className="font-semibold">診療種別</h3>
-            <p>{appointment.service_types?.name}</p>
+          <div className="p-4 border rounded-lg bg-gray-50">
+            <h3 className="font-semibold text-lg">{serviceType?.name}</h3>
             <p className="text-sm text-muted-foreground">{appointment.clinics?.name}</p>
           </div>
-          <div>
-            <h3 className="font-semibold">日付と時間</h3>
-            <ReservationCalendar
+          <div className="grid gap-4">
+            <h4 className="font-semibold">日付と時間を選択</h4>
+            <CalendarTimePicker
               clinicId={appointment.clinic_id}
               serviceTypeId={appointment.service_type_id}
-              getAvailableSlots={getAvailableSlots}
+              onSelectDateTime={(date, start, end) => {
+                setSelectedDate(date)
+                setSelectedTime(start)
+              }}
               selectedDate={selectedDate}
-              onDateSelect={setSelectedDate}
-              selectedTime={selectedTime}
-              onTimeSelect={setSelectedTime}
-              duration={currentServiceType?.duration || 60}
+              selectedTime={{ start: selectedTime, end: "" }}
             />
           </div>
+          <div className="mt-4 p-2 bg-slate-100 rounded-md text-xs border border-slate-200">
+            <h4 className="font-bold">Debug Info:</h4>
+            <p>Selected Date: {selectedDate ? formatDate(selectedDate) : "None"}</p>
+            <p>Selected Time: {selectedTime || "None"}</p>
+            <p>Service Duration: {serviceType?.duration ?? "N/A"}</p>
+            <p>Is Button Disabled: {String(isLoading || !selectedTime)}</p>
+          </div>
         </div>
-        <DialogFooter className="justify-between">
+        <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
           <Button variant="destructive" onClick={handleCancel} disabled={isLoading}>
             予約をキャンセル
           </Button>
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
               閉じる
             </Button>

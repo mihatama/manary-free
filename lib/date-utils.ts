@@ -1,74 +1,46 @@
-import { format, parse, isValid, startOfDay } from "date-fns"
+import { format, startOfDay as fnsStartOfDay } from "date-fns"
 
-/**
- * Safely parses a time string (HH:mm or HH:mm:ss) into a Date object for a given day.
- * @param timeStr The time string to parse.
- * @param baseDate The base date to apply the time to.
- * @returns A Date object or null if parsing fails.
- */
-export const parseTime = (timeStr: string | null | undefined, baseDate: Date): Date | null => {
-  if (!timeStr || !isValid(baseDate)) {
-    console.error("[parseTime] Invalid input:", { timeStr, baseDate })
+// Parses a date string like "YYYY-MM-DD" into a Date object.
+export function parseDate(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null
+  try {
+    // Appending T00:00:00 ensures it's parsed in the local timezone, not UTC.
+    const date = new Date(`${dateString}T00:00:00`)
+    if (isNaN(date.getTime())) throw new Error("Invalid date value")
+    return date
+  } catch (e) {
+    console.error(`Failed to parse date string: ${dateString}`, e)
     return null
   }
-
-  // Try parsing HH:mm:ss first, then HH:mm
-  let parsedTime = parse(timeStr, "HH:mm:ss", baseDate)
-  if (!isValid(parsedTime)) {
-    parsedTime = parse(timeStr, "HH:mm", baseDate)
-  }
-
-  if (!isValid(parsedTime)) {
-    console.error("[parseTime] Failed to parse time string:", timeStr)
-    return null
-  }
-
-  return parsedTime
 }
 
-/**
- * Safely parses a date string (YYYY-MM-DD) into a Date object.
- * It ensures the date is treated as local time, not UTC, to avoid timezone-off-by-one errors.
- * @param dateStr The date string to parse.
- * @returns A Date object or null if parsing fails.
- */
-export const parseDate = (dateStr: string | null | undefined): Date | null => {
-  if (!dateStr) {
-    console.error("[parseDate] Invalid input: dateStr is null or undefined")
+// Parses a time string like "HH:mm" or "HH:mm:ss" and applies it to a given date.
+export function parseTime(timeString: string | null | undefined, baseDate: Date | null | undefined): Date | null {
+  if (!timeString || !baseDate) return null
+  try {
+    const [hours, minutes] = timeString.split(":").map(Number)
+    if (isNaN(hours) || isNaN(minutes)) throw new Error("Invalid time format")
+
+    const newDate = new Date(baseDate)
+    newDate.setHours(hours, minutes, 0, 0)
+    return newDate
+  } catch (e) {
+    console.error(`Failed to parse time string: ${timeString}`, e)
     return null
   }
-
-  // The 'T00:00:00' suffix ensures the date is parsed in the local timezone.
-  const date = new Date(`${dateStr}T00:00:00`)
-
-  if (!isValid(date)) {
-    console.error("[parseDate] Failed to parse date string:", dateStr)
-    return null
-  }
-
-  return startOfDay(date) // Normalize to the beginning of the day
 }
 
-/**
- * Formats a Date object into a YYYY-MM-DD string.
- * @param date The Date object to format.
- * @returns A formatted string or an empty string if the date is invalid.
- */
-export const formatDate = (date: Date | null | undefined): string => {
-  if (!date || !isValid(date)) {
-    return ""
-  }
+// Formats a Date object into "YYYY-MM-DD"
+export function formatDate(date: Date | null | undefined): string {
+  if (!date) return ""
   return format(date, "yyyy-MM-dd")
 }
 
-/**
- * Formats a Date object into an HH:mm string.
- * @param date The Date object to format.
- * @returns A formatted string or an empty string if the date is invalid.
- */
-export const formatTimeSimple = (date: Date | null | undefined): string => {
-  if (!date || !isValid(date)) {
-    return ""
-  }
+// Formats a Date object into "HH:mm"
+export function formatTimeSimple(date: Date | null | undefined): string {
+  if (!date) return ""
   return format(date, "HH:mm")
 }
+
+// Wrapper for date-fns startOfDay
+export const startOfDay = fnsStartOfDay

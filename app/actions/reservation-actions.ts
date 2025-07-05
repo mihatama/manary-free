@@ -47,7 +47,7 @@ export async function getAppointments({
   try {
     let query = supabase
       .from("reservations")
-      .select("*, service_types(name, color), patients!inner(name, kana, email, phone_number)", { count: "exact" })
+      .select("*, service_types(name, color, duration), clinics(name, phone, address)", { count: "exact" })
 
     if (search) {
       query = query.ilike("patients.name", `%${search}%`)
@@ -61,9 +61,7 @@ export async function getAppointments({
     }
     const dbSortBy = sortableColumns[sortBy] || "reservation_date"
 
-    query = query
-      .order(dbSortBy, { ascending: sortOrder === "asc", referencedTable: "patients" })
-      .range(offset, offset + limit - 1)
+    query = query.order(dbSortBy, { ascending: sortOrder === "asc" }).range(offset, offset + limit - 1)
 
     const { data, error, count } = await query
 
