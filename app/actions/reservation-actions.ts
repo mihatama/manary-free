@@ -5,6 +5,7 @@ import { unstable_noStore as noStore, revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { v4 as uuidv4 } from "uuid"
 import { cookies } from "next/headers"
+import { startOfMonth, endOfMonth, eachDayOfInterval, format, getDay } from "date-fns"
 
 // Types
 type Reservation = Database["public"]["Tables"]["reservations"]["Row"]
@@ -345,4 +346,119 @@ export async function deleteReservation(id: number) {
 
   revalidatePath("/dashboard/appointments")
   return { success: true, message: "予約が削除されました。" }
+}
+
+export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId: number, month: string) {
+  noStore()
+  console.log(
+    `[Action:getCalendarEventsForMonth] START - ClinicID: ${clinicId}, ServiceTypeID: ${serviceTypeId}, Month: ${month}`,
+  )
+  const supabase = createClient()
+
+  try {
+    const targetMonth = new Date(`${month}-01T00:00:00`)
+    const startDate = startOfMonth(targetMonth)
+    const endDate = endOfMonth(targetMonth)
+
+    // 1. Fetch service type details
+    const { data: serviceType, error: serviceTypeError } = await supabase
+      .from("service_types")
+      .select("id, duration")
+      .eq("id", serviceTypeId)
+      .single()
+
+    if (serviceTypeError) throw new Error(`診療メニューの取得に失敗しました: ${serviceTypeError.message}`)
+    if (!serviceType || !serviceType.duration || serviceType.duration <= 0) {
+      return { events: [] }
+    }
+    const { duration } = serviceType
+
+    // 2. Fetch all reservations for the month
+    const { data: reservations, error: reservationsError } = await supabase
+      .from("reservations")
+      .select("id, reservation_date, start_time, end_time, status, service_type_id")
+      .eq("clinic_id", clinicId)
+      .eq("service_type_id", serviceTypeId)
+      .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
+      .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
+      .neq("status", "cancelled")
+
+    if (reservationsError) throw new Error(`既存の予約の取得に失敗しました: ${reservationsError.message}`)
+
+    // 3. Fetch all relevant availability settings
+    const { data: settings, error: settingsError } = await supabase
+      .from("availability_settings")
+      .select("*")
+      .eq("service_type_id", serviceTypeId)
+      .or(
+        `specific_date.gte.${format(startDate, "yyyy-MM-dd")},specific_date.lte.${format(endDate, "yyyy-MM-dd")},specific_date.is.null`,
+      )
+
+    if (settingsError) throw new Error(`予約設定の取得に失敗しました: ${settingsError.message}`)
+
+    const events: {
+      title: string
+      start: string // ISO string
+      end: string // ISO string
+      isAvailable: boolean
+    }[] = []
+
+    // Add existing reservations to events
+    reservations?.forEach((res) => {
+      if (res.reservation_date && res.start_time && res.end_time) {
+        events.push({
+          title: "予約済",
+          start: `${res.reservation_date}T${res.start_time}`,
+          end: `${res.reservation_date}T${res.end_time}`,
+          isAvailable: false,
+        })
+      }
+    })
+
+    // Create a lookup for booked slots
+    const bookedSlots = new Set(reservations?.map((r) => `${r.reservation_date}T${r.start_time}`))
+
+    // Process each day of the month
+    const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate })
+    const weeklySettings = settings?.filter((s) => !s.specific_date && s.is_available) || []
+    const specificDateSettings = settings?.filter((s) => s.specific_date && s.is_available) || []
+
+    for (const day of daysInMonth) {
+      const dayStr = format(day, "yyyy-MM-dd")
+      const dayOfWeek = getDay(day)
+
+      const specificSettingsForDay = specificDateSettings.filter((s) => s.specific_date === dayStr)
+      const weeklySettingsForDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
+
+      const finalSettings = specificSettingsForDay.length > 0 ? specificSettingsForDay : weeklySettingsForDay
+
+      for (const setting of finalSettings) {
+        const startMinutes = timeToMinutes(setting.start_time)
+        const endMinutes = timeToMinutes(setting.end_time)
+        let currentMinutes = startMinutes
+
+        while (currentMinutes + duration <= endMinutes) {
+          const slotStartTime = formatTime(currentMinutes)
+          const slotEndTime = formatTime(currentMinutes + duration)
+          const slotStartDateTime = `${dayStr}T${slotStartTime}:00`
+
+          if (!bookedSlots.has(slotStartDateTime.substring(0, 19))) {
+            events.push({
+              title: slotStartTime,
+              start: `${dayStr}T${slotStartTime}:00`,
+              end: `${dayStr}T${slotEndTime}:00`,
+              isAvailable: true,
+            })
+          }
+          currentMinutes += duration
+        }
+      }
+    }
+
+    console.log(`[Action:getCalendarEventsForMonth] END - Returning ${events.length} events.`)
+    return { events }
+  } catch (error: any) {
+    console.error(`[Action:getCalendarEventsForMonth] CATCH ERROR:`, error.message)
+    return { error: error.message || "カレンダーのデータ取得中にエラーが発生しました。" }
+  }
 }

@@ -2,26 +2,16 @@
 
 import { useState, useEffect } from "react"
 import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent } from "react-big-calendar"
-import {
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  addMonths,
-  subMonths,
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-} from "date-fns"
+import { format, parse, startOfWeek, getDay, addMonths, subMonths } from "date-fns"
 import { ja } from "date-fns/locale"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { getAvailableSlots } from "@/app/actions/reservation-actions"
 import type { Database } from "@/lib/supabase/database.types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import ErrorBoundary from "./error-boundary"
 import "react-big-calendar/lib/css/react-big-calendar.css"
+import { getCalendarEventsForMonth } from "@/app/actions/reservation-actions"
 
 const locales = {
   ja: ja,
@@ -63,6 +53,19 @@ function getContrastingTextColor(hexColor: string): string {
   const b = Number.parseInt(fullHex.substring(4, 6), 16)
   const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
   return luma > 0.5 ? "#212529" : "#FFFFFF"
+}
+
+// Helper to parse time robustly, with detailed logging
+const parseISO = (isoString: string | null): Date | null => {
+  if (!isoString) {
+    return null
+  }
+  const date = new Date(isoString)
+  if (isNaN(date.getTime())) {
+    console.error(`[ReservationCalendar:parseISO] FAILED: Invalid Date for string: '${isoString}'`)
+    return null
+  }
+  return date
 }
 
 // Helper to parse time robustly, with detailed logging
@@ -114,84 +117,50 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
       return
     }
 
-    async function fetchAndProcessSlots() {
+    async function fetchMonthEvents() {
       setIsLoading(true)
       setError(null)
+      const monthStr = format(currentDate, "yyyy-MM")
       console.log(
-        `[ReservationCalendar:useEffect] Fetching slots for clinic ${clinicId}, service type ${
-          serviceType.id
-        }, month ${format(currentDate, "yyyy-MM")}`,
+        `[ReservationCalendar:useEffect] Fetching events for clinic ${clinicId}, service type ${serviceType.id}, month ${monthStr}`,
       )
       try {
-        const startDate = startOfMonth(currentDate)
-        const endDate = endOfMonth(currentDate)
-        const days = eachDayOfInterval({ start: startDate, end: endDate })
+        const result = await getCalendarEventsForMonth(clinicId, serviceType.id, monthStr)
 
-        const dailySlotsPromises = days.map((day) => getAvailableSlots(clinicId, format(day, "yyyy-MM-dd")))
-        const dailyResults = await Promise.all(dailySlotsPromises)
-        console.log(`[ReservationCalendar:useEffect] Raw dailyResults from server action:`, dailyResults)
+        if (result.error) {
+          throw new Error(result.error)
+        }
 
-        const processedEvents: CalendarEvent[] = []
+        const processedEvents: CalendarEvent[] = (result.events || [])
+          .map((event) => {
+            const startDate = parseISO(event.start)
+            const endDate = parseISO(event.end)
 
-        dailyResults.forEach((dayResult, i) => {
-          const dayStr = format(days[i], "yyyy-MM-dd")
-          if (dayResult.error) {
-            console.warn(`[ReservationCalendar] Could not fetch slots for ${dayStr}:`, dayResult.error)
-            if (!error) setError("一部の日付の予約枠が読み込めませんでした。")
-            return
-          }
-
-          const allAvailableSlots = dayResult.availableSlots || []
-          const serviceTypeSlots = allAvailableSlots.filter((slot) => slot.serviceTypeId === serviceType.id)
-
-          serviceTypeSlots.forEach((slot) => {
-            const startTime = parseTime(slot.date, slot.startTime)
-            const endTime = parseTime(slot.date, slot.endTime)
-            if (!startTime || !endTime) {
-              console.error("[ReservationCalendar] Skipping invalid available slot due to parseTime failure:", slot)
-              return
+            if (!startDate || !endDate) {
+              console.error("[ReservationCalendar] Skipping invalid event due to date parsing failure:", event)
+              return null
             }
-            processedEvents.push({
-              title: format(startTime, "HH:mm"),
-              start: startTime,
-              end: endTime,
-              isAvailable: true,
-            })
-          })
 
-          dayResult.existingReservations?.forEach((reservation: any) => {
-            console.log(`[ReservationCalendar:useEffect] Processing existing reservation:`, reservation)
-            if (reservation.service_type_id === serviceType.id) {
-              const startTime = parseTime(reservation.reservation_date, reservation.start_time)
-              const endTime = parseTime(reservation.reservation_date, reservation.end_time)
-              if (!startTime || !endTime) {
-                console.error(
-                  "[ReservationCalendar] Skipping invalid reservation due to parseTime failure:",
-                  reservation,
-                )
-                return
-              }
-              processedEvents.push({
-                title: "予約済",
-                start: startTime,
-                end: endTime,
-                isAvailable: false,
-              })
+            return {
+              title: event.isAvailable ? format(startDate, "HH:mm") : "予約済",
+              start: startDate,
+              end: endDate,
+              isAvailable: event.isAvailable,
             }
           })
-        })
+          .filter((e): e is CalendarEvent => e !== null) // Filter out nulls
 
         console.log(`[ReservationCalendar:useEffect] Total processed events for month: ${processedEvents.length}`)
         setEvents(processedEvents)
-      } catch (err) {
+      } catch (err: any) {
         console.error("[ReservationCalendar] A top-level error occurred:", err)
-        setError("予約枠の読み込み中にエラーが発生しました。")
+        setError(err.message || "予約枠の読み込み中にエラーが発生しました。")
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchAndProcessSlots()
+    fetchMonthEvents()
   }, [clinicId, serviceType, currentDate])
 
   const eventStyleGetter = (event: CalendarEvent) => {
