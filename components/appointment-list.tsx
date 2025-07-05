@@ -24,6 +24,24 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
     await onUpdate(phoneNumber)
   }
 
+  // 日付を安全にフォーマットするヘルパー関数
+  const safeFormatDate = (dateString: string | null | undefined) => {
+    if (!dateString) {
+      return "日付情報なし"
+    }
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        console.error("Invalid date value received in AppointmentList:", dateString)
+        return "無効な日付"
+      }
+      return format(date, "yyyy年MM月dd日(EEE)", { locale: ja })
+    } catch (error) {
+      console.error("Error formatting date in AppointmentList:", dateString, error)
+      return "日付表示エラー"
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card className="w-full shadow-md border-gray-100">
@@ -35,13 +53,13 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
           <div className="space-y-4">
             {appointments.map((appointment) => (
               <Card key={appointment.id} className="overflow-hidden">
-                <div className="h-2" style={{ backgroundColor: appointment.service_types.color || "#f8a0a0" }}></div>
+                <div className="h-2" style={{ backgroundColor: appointment.service_types?.color || "#f8a0a0" }}></div>
                 <CardContent className="p-4">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold">{appointment.service_types.name}</h3>
+                      <h3 className="text-lg font-semibold">{appointment.service_types?.name}</h3>
                       <p className="text-gray-500 text-sm">
-                        {appointment.service_types.duration}分 • {appointment.clinics.name}
+                        {appointment.service_types?.duration}分 • {appointment.clinics?.name}
                       </p>
                     </div>
                     <Badge
@@ -56,23 +74,22 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                     <div className="flex items-center">
                       <CalendarIcon className="h-4 w-4 mr-2 text-gray-500" />
-                      <span>
-                        {format(new Date(appointment.appointment_date), "yyyy年MM月dd日(EEE)", { locale: ja })}
-                      </span>
+                      {/* 修正点: 正しいプロパティ名と安全なフォーマット関数を使用 */}
+                      <span>{safeFormatDate(appointment.reservation_date)}</span>
                     </div>
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-2 text-gray-500" />
                       <span>
-                        {appointment.start_time.substring(0, 5)} - {appointment.end_time.substring(0, 5)}
+                        {appointment.start_time?.substring(0, 5)} - {appointment.end_time?.substring(0, 5)}
                       </span>
                     </div>
                     <div className="flex items-center">
                       <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                      <span>{appointment.clinics.address || "住所情報なし"}</span>
+                      <span>{appointment.clinics?.address || "住所情報なし"}</span>
                     </div>
                     <div className="flex items-center">
                       <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                      <span>{appointment.clinics.phone || "電話番号情報なし"}</span>
+                      <span>{appointment.clinics?.phone || "電話番号情報なし"}</span>
                     </div>
                   </div>
 
@@ -80,7 +97,7 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
                     <div className="flex justify-end">
                       <Button
                         variant="outline"
-                        className="text-[#f8a0a0] border-[#f8a0a0] hover:bg-[#fff5f5]"
+                        className="text-[#f8a0a0] border-[#f8a0a0] hover:bg-[#fff5f5] bg-transparent"
                         onClick={() => setEditingAppointment(appointment)}
                       >
                         予約を変更
