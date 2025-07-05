@@ -246,8 +246,12 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             return null
           }
           try {
+            let time = r.start_time
+            if (/^\d{2}:\d{2}$/.test(time)) {
+              time = `${time}:00`
+            }
             // IMPORTANT: Construct date string with JST offset to create correct Date object
-            const dateStr = `${r.reservation_date}T${r.start_time}+09:00`
+            const dateStr = `${r.reservation_date}T${time}+09:00`
             const date = new Date(dateStr)
             if (isNaN(date.getTime())) {
               console.error(
@@ -299,15 +303,24 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             continue
           }
 
+          let startTime = setting.start_time
+          if (/^\d{2}:\d{2}$/.test(startTime)) {
+            startTime = `${startTime}:00`
+          }
+          let endTime = setting.end_time
+          if (/^\d{2}:\d{2}$/.test(endTime)) {
+            endTime = `${endTime}:00`
+          }
+
           // Construct date strings with JST timezone offset (+09:00) to ensure correct time interpretation
-          const startDateTimeStr = `${dateStr}T${setting.start_time}+09:00`
+          const startDateTimeStr = `${dateStr}T${startTime}+09:00`
           const slotStartDateTime = new Date(startDateTimeStr)
 
-          const endDateTimeStr = `${dateStr}T${setting.end_time}+09:00`
+          const endDateTimeStr = `${dateStr}T${endTime}+09:00`
           const settingEndDateTime = new Date(endDateTimeStr)
 
           // Handle overnight availability (e.g., 22:00 to 02:00)
-          if (setting.end_time <= setting.start_time) {
+          if (endTime <= startTime) {
             settingEndDateTime.setDate(settingEndDateTime.getDate() + 1)
           }
 
