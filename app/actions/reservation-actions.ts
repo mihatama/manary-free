@@ -205,7 +205,12 @@ export async function getAvailableSlots(clinicId: number, date: string) {
       }
     }
 
-    type ExistingReservation = Database["public"]["Tables"]["reservations"]["Row"]
+    type ExistingReservation = {
+      reservation_date: string | null
+      start_time: string | null
+      end_time: string | null
+      service_type_id: number | null
+    }
 
     return { availableSlots, existingReservations: (existingReservations as ExistingReservation[]) || [] }
   } catch (error: any) {
