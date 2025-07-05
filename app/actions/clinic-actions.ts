@@ -53,7 +53,7 @@ export async function createClinic(formData: FormData) {
     const clinic = {
       name: formData.get("name") as string,
       address: formData.get("address") as string,
-      phone: formData.get("phone") as string,
+      phone_number: formData.get("phone") as string,
     }
 
     const supabase = createClient()
@@ -91,7 +91,7 @@ export async function updateClinic(formData: FormData) {
     const clinic = {
       name: formData.get("name") as string,
       address: formData.get("address") as string,
-      phone: formData.get("phone") as string,
+      phone_number: formData.get("phone") as string,
     }
 
     const supabase = createClient()

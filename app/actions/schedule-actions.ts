@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { validateCSRFToken } from "@/lib/csrf"
@@ -19,25 +19,20 @@ async function validateCSRF(formData: FormData) {
 
 // 全ての助産院を取得
 export async function getClinics() {
-  const supabase = createClient()
-  try {
-    const { data, error } = await supabase.from("clinics").select("*").order("name")
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.from("clinics").select("*").order("name")
 
-    if (error) {
-      console.error("Database query error")
-      throw new Error("データの取得に失敗しました")
-    }
-
-    return data
-  } catch (error) {
-    console.error("Error in getClinics")
-    throw new Error("データの取得に失敗しました")
+  if (error) {
+    console.error("Error fetching clinics:", error)
+    throw new Error(`助産院データの取得に失敗しました: ${error.message}`)
   }
+
+  return data
 }
 
 // 特定の助産院の診療種別を取得
 export async function getServiceTypes(clinicId?: number) {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   try {
     let query = supabase.from("service_types").select("*").order("name")
 
@@ -62,7 +57,7 @@ export async function getServiceTypes(clinicId?: number) {
 
 // 特定の診療種別の予約可能時間を取得
 export async function getAvailabilitySettings(serviceTypeId: number) {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   try {
     const { data, error } = await supabase
       .from("availability_settings")
@@ -91,7 +86,7 @@ export async function getAvailabilitySettings(serviceTypeId: number) {
 export async function getAvailableTimeSlots(serviceTypeId: number, date: string) {
   try {
     // 診療種別の情報を取得
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const { data: serviceType, error: serviceTypeError } = await supabase
       .from("service_types")
       .select("*")
@@ -214,7 +209,7 @@ export async function createServiceType(formData: FormData) {
       color: formData.get("color") as string,
     }
 
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("service_types")
       .insert([
@@ -252,7 +247,7 @@ export async function updateServiceType(formData: FormData) {
       color: formData.get("color") as string,
     }
 
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from("service_types")
       .update({
@@ -283,7 +278,7 @@ export async function deleteServiceType(formData: FormData) {
 
     const id = Number(formData.get("id"))
 
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const { error } = await supabase.from("service_types").delete().eq("id", id)
 
     if (error) {
@@ -331,7 +326,7 @@ export async function upsertAvailabilitySetting(formData: FormData) {
     // デバッグ用
     console.log("保存する設定:", setting)
 
-    const supabase = createClient()
+    const supabase = createAdminClient()
 
     // 既存の設定を確認
     let query = supabase
@@ -413,7 +408,7 @@ export async function deleteAvailabilitySetting(formData: FormData) {
 
     const id = Number(formData.get("id"))
 
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const { error } = await supabase.from("availability_settings").delete().eq("id", id)
 
     if (error) {
@@ -448,7 +443,7 @@ export async function createWeeklyAvailability(formData: FormData) {
       throw new Error("開始時間は終了時間より前である必要があります")
     }
 
-    const supabase = createClient()
+    const supabase = createAdminClient()
 
     // Fetch service type duration
     const { data: serviceType, error: serviceTypeError } = await supabase
@@ -576,7 +571,7 @@ export async function createSpecificDateAvailability(formData: FormData) {
       throw new Error("開始時間は終了時間より前である必要があります")
     }
 
-    const supabase = createClient()
+    const supabase = createAdminClient()
 
     // Fetch service type duration
     const { data: serviceType, error: serviceTypeError } = await supabase
@@ -679,5 +674,45 @@ export async function createSpecificDateAvailability(formData: FormData) {
   } catch (error: any) {
     console.error("Error in createSpecificDateAvailability:", error)
     throw new Error(error.message || "特定日の予約可能時間の作成に失敗しました")
+  }
+}
+
+// 特定の助産院の全ての予約可能時間を取得 (サービス種別情報も含む)
+export async function getAvailabilitySettingsForClinic(clinicId: number) {
+  const supabase = createAdminClient()
+  try {
+    // 1. clinicに属するservice_typeのIDを取得
+    const { data: serviceTypes, error: serviceTypesError } = await supabase
+      .from("service_types")
+      .select("id")
+      .eq("clinic_id", clinicId)
+
+    if (serviceTypesError) {
+      console.error("Error fetching service types for clinic:", serviceTypesError)
+      throw new Error("診療種別の取得に失敗しました")
+    }
+
+    if (!serviceTypes || serviceTypes.length === 0) {
+      return [] // このクリニックにはサービス種別がない
+    }
+
+    const serviceTypeIds = serviceTypes.map((st) => st.id)
+
+    // 2. service_type_idに紐づくavailability_settingsを全て取得し、service_typesの情報も結合する
+    const { data, error } = await supabase
+      .from("availability_settings")
+      .select("*, service_types(name, color)")
+      .in("service_type_id", serviceTypeIds)
+      .order("day_of_week")
+
+    if (error) {
+      console.error("Database query error in getAvailabilitySettingsForClinic:", error)
+      throw new Error("予約可能時間データの取得に失敗しました")
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error in getAvailabilitySettingsForClinic", error)
+    throw new Error("予約可能時間データの取得に失敗しました")
   }
 }

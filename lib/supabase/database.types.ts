@@ -7,9 +7,10 @@ export type Database = {
         Row: {
           created_at: string
           day_of_week: number | null
+          end_date: string | null
           end_time: string
           id: number
-          is_available: boolean
+          is_available: boolean | null
           service_type_id: number
           specific_date: string | null
           start_time: string
@@ -18,9 +19,10 @@ export type Database = {
         Insert: {
           created_at?: string
           day_of_week?: number | null
+          end_date?: string | null
           end_time: string
           id?: number
-          is_available?: boolean
+          is_available?: boolean | null
           service_type_id: number
           specific_date?: string | null
           start_time: string
@@ -29,9 +31,10 @@ export type Database = {
         Update: {
           created_at?: string
           day_of_week?: number | null
+          end_date?: string | null
           end_time?: string
           id?: number
-          is_available?: boolean
+          is_available?: boolean | null
           service_type_id?: number
           specific_date?: string | null
           start_time?: string
@@ -204,6 +207,38 @@ export type Database = {
           },
         ]
       }
+      questionnaires: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: number
+          reservation_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: number
+          reservation_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: number
+          reservation_id?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionnaires_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservations: {
         Row: {
           access_token: string | null
@@ -216,7 +251,7 @@ export type Database = {
           reservation_date: string
           service_type_id: number
           start_time: string
-          status: string
+          status: string | null
           updated_at: string
         }
         Insert: {
@@ -230,7 +265,7 @@ export type Database = {
           reservation_date: string
           service_type_id: number
           start_time: string
-          status?: string
+          status?: string | null
           updated_at?: string
         }
         Update: {
@@ -244,7 +279,7 @@ export type Database = {
           reservation_date?: string
           service_type_id?: number
           start_time?: string
-          status?: string
+          status?: string | null
           updated_at?: string
         }
         Relationships: [

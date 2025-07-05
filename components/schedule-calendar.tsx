@@ -5,10 +5,15 @@ import { Calendar, dateFnsLocalizer, type Event as BigCalendarEvent } from "reac
 import { format, parse, startOfWeek, getDay, addDays, startOfDay } from "date-fns"
 import { ja } from "date-fns/locale"
 import "react-big-calendar/lib/css/react-big-calendar.css"
-import { getAvailabilitySettings } from "@/app/actions/schedule-actions"
+import { getAvailabilitySettingsForClinic } from "@/app/actions/schedule-actions"
 import type { Database } from "@/lib/supabase/database.types"
 
-type AvailabilitySetting = Database["public"]["Tables"]["availability_settings"]["Row"]
+type AvailabilitySettingWithService = Database["public"]["Tables"]["availability_settings"]["Row"] & {
+  service_types: {
+    name: string
+    color: string
+  } | null
+}
 
 const locales = {
   ja: ja,
@@ -25,10 +30,11 @@ const localizer = dateFnsLocalizer({
 interface ScheduleCalendarEvent extends BigCalendarEvent {
   isAvailable: boolean
   isSpecificDate: boolean
+  color: string | null
 }
 
 interface ScheduleCalendarProps {
-  serviceTypeId: number | null
+  clinicId: number | null
 }
 
 // Helper to parse time robustly, accepting HH:mm and HH:mm:ss
@@ -43,13 +49,13 @@ const parseTimeToDate = (timeStr: string, date: Date): Date | null => {
   return newDate
 }
 
-export function ScheduleCalendar({ serviceTypeId }: ScheduleCalendarProps) {
-  const [settings, setSettings] = useState<AvailabilitySetting[]>([])
+export function ScheduleCalendar({ clinicId }: ScheduleCalendarProps) {
+  const [settings, setSettings] = useState<AvailabilitySettingWithService[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!serviceTypeId) {
+    if (!clinicId) {
       setSettings([])
       return
     }
@@ -58,7 +64,7 @@ export function ScheduleCalendar({ serviceTypeId }: ScheduleCalendarProps) {
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getAvailabilitySettings(serviceTypeId)
+        const data = await getAvailabilitySettingsForClinic(clinicId)
         setSettings(data)
       } catch (err) {
         setError("予約設定の読み込みに失敗しました。")
@@ -69,13 +75,16 @@ export function ScheduleCalendar({ serviceTypeId }: ScheduleCalendarProps) {
     }
 
     fetchSettings()
-  }, [serviceTypeId])
+  }, [clinicId])
 
   const events = useMemo(() => {
     const calendarEvents: ScheduleCalendarEvent[] = []
     const today = startOfDay(new Date())
 
     settings.forEach((setting) => {
+      const serviceName = setting.service_types?.name || "未分類"
+      const serviceColor = setting.service_types?.color || "#808080" // Default to gray
+
       // Handle specific date settings
       if (setting.specific_date) {
         const date = startOfDay(new Date(setting.specific_date))
@@ -84,11 +93,12 @@ export function ScheduleCalendar({ serviceTypeId }: ScheduleCalendarProps) {
 
         if (start && end) {
           calendarEvents.push({
-            title: `${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
+            title: `${serviceName}: ${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
             start,
             end,
             isAvailable: setting.is_available,
             isSpecificDate: true,
+            color: serviceColor,
             resource: setting,
           })
         } else {
@@ -114,11 +124,12 @@ export function ScheduleCalendar({ serviceTypeId }: ScheduleCalendarProps) {
 
           if (start && end) {
             calendarEvents.push({
-              title: `${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
+              title: `${serviceName}: ${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
               start,
               end,
               isAvailable: setting.is_available,
               isSpecificDate: false,
+              color: serviceColor,
               resource: setting,
             })
           } else {
@@ -131,10 +142,7 @@ export function ScheduleCalendar({ serviceTypeId }: ScheduleCalendarProps) {
   }, [settings])
 
   const eventStyleGetter = (event: ScheduleCalendarEvent) => {
-    let backgroundColor = event.isAvailable ? "#28a745" : "#dc3545" // green for available, red for unavailable
-    if (event.isSpecificDate) {
-      backgroundColor = event.isAvailable ? "#17a2b8" : "#ffc107" // cyan for specific available, yellow for specific unavailable
-    }
+    const backgroundColor = event.color || (event.isAvailable ? "#28a745" : "#dc3545")
 
     const style = {
       backgroundColor,
@@ -152,7 +160,7 @@ export function ScheduleCalendar({ serviceTypeId }: ScheduleCalendarProps) {
 
   if (isLoading) return <p>カレンダーを読み込み中...</p>
   if (error) return <p className="text-red-500">{error}</p>
-  if (!serviceTypeId) return <p>診療メニューを選択してください。</p>
+  if (!clinicId) return <p>助産院を選択してください。</p>
 
   return (
     <div style={{ height: "700px" }}>

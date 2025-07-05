@@ -23,6 +23,7 @@ export function ScheduleSettingsClient() {
   const refreshClinics = async () => {
     try {
       setIsLoadingClinics(true)
+      setClinicsError(null) // Reset error state
       const data = await getClinics()
       setClinics(data)
       // If the selected clinic was deleted, reset selection
@@ -31,7 +32,11 @@ export function ScheduleSettingsClient() {
         setSelectedServiceType(null)
       }
     } catch (err) {
-      setClinicsError("助産院の読み込みに失敗しました")
+      if (err instanceof Error) {
+        setClinicsError(err.message)
+      } else {
+        setClinicsError("助産院の読み込み中に不明なエラーが発生しました。")
+      }
       console.error(err)
     } finally {
       setIsLoadingClinics(false)
