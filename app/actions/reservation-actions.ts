@@ -151,7 +151,7 @@ export async function getAvailableSlots(clinicId: number, date: string) {
 
     const { data: existingReservations, error: reservationsError } = await supabase
       .from("reservations")
-      .select("start_time, end_time")
+      .select("reservation_date, start_time, end_time, service_type_id")
       .eq("clinic_id", clinicId)
       .eq("reservation_date", date)
       .neq("status", "cancelled")
@@ -205,7 +205,7 @@ export async function getAvailableSlots(clinicId: number, date: string) {
       }
     }
 
-    return { availableSlots, existingReservations: (existingReservations as Reservation[]) || [] }
+    return { availableSlots, existingReservations: (existingReservations as any[]) || [] }
   } catch (error: any) {
     console.error("Error in getAvailableSlots:", error.message)
     return { error: error.message || "利用可能な予約枠の取得中にエラーが発生しました。" }
