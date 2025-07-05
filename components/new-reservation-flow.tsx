@@ -140,7 +140,7 @@ export function NewReservationFlow() {
                         <p className="font-medium">{st.name}</p>
                         <p className="text-sm text-gray-500">{st.description}</p>
                         <p className="text-sm font-semibold mt-1">
-                          {st.duration}分 / {st.price?.toLocaleString()}円
+                          {st.duration}分 / {st.price != null ? `${st.price.toLocaleString()}円` : "価格未定"}
                         </p>
                       </div>
                     </Label>
