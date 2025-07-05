@@ -6,6 +6,7 @@ import type { Database } from "@/lib/supabase/database.types"
 import { validateCSRFToken } from "@/lib/csrf"
 
 type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
+type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
 // CSRF検証を行うヘルパー関数
 async function validateCSRF(formData: FormData) {
@@ -13,6 +14,34 @@ async function validateCSRF(formData: FormData) {
   if (!validateCSRFToken(csrfToken)) {
     throw new Error("セキュリティトークンが無効です。ページを再読み込みしてください。")
   }
+}
+
+// 全ての助産院を取得
+export async function getClinics(): Promise<Clinic[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("clinics").select("*").order("name", { ascending: true })
+
+  if (error) {
+    console.error("Error fetching clinics:", error)
+    throw new Error("助産院の取得に失敗しました。")
+  }
+  return data
+}
+
+// 特定の助産院の診療種別を取得
+export async function getServiceTypesForClinic(clinicId: number): Promise<ServiceType[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("service_types")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .order("name", { ascending: true })
+
+  if (error) {
+    console.error("Error fetching service types:", error)
+    throw new Error("診療種別の取得に失敗しました。")
+  }
+  return data
 }
 
 // 助産院を作成
