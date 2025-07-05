@@ -197,12 +197,11 @@ export function NewReservationFlow() {
               </AlertDescription>
             </Alert>
             <NewReservationForm
-              clinic={selectedClinic}
-              serviceType={selectedServiceType}
-              slot={{
-                date: format(selectedSlot.start!, "yyyy-MM-dd"),
-                time: format(selectedSlot.start!, "HH:mm"),
-              }}
+              clinicId={selectedClinic.id}
+              serviceTypeId={selectedServiceType.id}
+              date={format(selectedSlot.start!, "yyyy-MM-dd")}
+              startTime={format(selectedSlot.start!, "HH:mm")}
+              endTime={format(selectedSlot.end!, "HH:mm")}
             />
           </CardContent>
         </Card>

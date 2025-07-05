@@ -311,6 +311,7 @@ export async function createReservation(formData: FormData) {
 
     return { success: true, data: newReservation }
   } catch (error) {
+    console.error("[Action:createReservation] CATCH BLOCK - Full error object:", error)
     const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました。"
     console.error("[Action:createReservation] CATCH BLOCK:", errorMessage)
     return { success: false, message: `予約の作成に失敗しました: ${errorMessage}`, data: null }
