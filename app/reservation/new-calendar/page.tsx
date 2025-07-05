@@ -1,40 +1,28 @@
-import { Suspense } from "react"
-import { ReservationCalendarView } from "@/components/reservation-calendar-view"
-import Image from "next/image"
-import Link from "next/link"
+"use client"
+
+import { PhoneAuthReservationManager } from "@/components/phone-auth-reservation-manager"
+import { NewReservationFlow } from "@/components/new-reservation-flow"
+import { useRouter } from "next/navigation"
 
 export default function NewCalendarPage() {
+  const router = useRouter()
+
+  const handleReservationComplete = (token: string) => {
+    router.push(`/reservation/confirmation?token=${token}`)
+  }
+
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
-            <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
-          </div>
-          <div>
-            <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
-              予約の確認・変更
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-center mb-8 text-[#f8a0a0]">新規予約</h1>
-
-        <div className="max-w-5xl mx-auto">
-          <Suspense fallback={<div className="text-center py-8">読み込み中...</div>}>
-            <ReservationCalendarView />
-          </Suspense>
-        </div>
-      </main>
-
-      <footer className="mt-auto py-6 border-t border-gray-100">
-        <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          &copy; {new Date().getFullYear()} Manary. All rights reserved.
-        </div>
-      </footer>
+    <div className="container mx-auto p-4">
+      <PhoneAuthReservationManager>
+        {({ phoneNumber, patientName, onBack }) => (
+          <NewReservationFlow
+            phoneNumber={phoneNumber}
+            initialPatientName={patientName}
+            onBack={onBack}
+            onReservationComplete={handleReservationComplete}
+          />
+        )}
+      </PhoneAuthReservationManager>
     </div>
   )
 }

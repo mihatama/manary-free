@@ -98,39 +98,28 @@ export async function getAppointments({
   }
 }
 
-export async function getAppointmentByToken(token: string): Promise<ReservationWithService | null> {
+export async function getAppointmentByToken(token: string) {
   noStore()
   const supabase = createClient()
   try {
-    const { data: reservation, error } = await supabase
+    const { data: appointment, error } = await supabase
       .from("reservations")
-      .select("*")
+      .select(
+        `
+        *,
+        clinics (name),
+        service_types (name)
+      `,
+      )
       .eq("access_token", token)
       .single()
 
-    if (error || !reservation) {
+    if (error || !appointment) {
       console.error("Error fetching reservation by token:", error?.message)
       return null
     }
 
-    let serviceTypeData: Pick<ServiceType, "name" | "color"> | null = null
-    if (reservation.service_type_id) {
-      const { data: st, error: stError } = await supabase
-        .from("service_types")
-        .select("name, color")
-        .eq("id", reservation.service_type_id)
-        .single()
-      if (stError) {
-        console.error("Error fetching service type for reservation:", stError.message)
-      } else {
-        serviceTypeData = st
-      }
-    }
-
-    return {
-      ...reservation,
-      service_types: serviceTypeData,
-    }
+    return appointment
   } catch (error) {
     console.error(
       "An unexpected error occurred in getAppointmentByToken:",
@@ -228,10 +217,9 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
     if (availabilityError) throw new Error("予約可能時間の設定の取得に失敗しました。")
     if (!availabilitySettings) return []
 
-    // Fetch existing reservations with their IDs for better logging
     const { data: existingReservations, error: reservationError } = await supabase
       .from("reservations")
-      .select("id, reservation_date, start_time") // Added 'id'
+      .select("id, reservation_date, start_time")
       .eq("service_type_id", serviceTypeId)
       .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
       .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
@@ -247,7 +235,6 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             return null
           }
           try {
-            // FIX: Interpret time from DB as JST by adding timezone offset
             const dateStr = `${r.reservation_date}T${r.start_time}+09:00`
             const date = new Date(dateStr)
             if (isNaN(date.getTime())) {
@@ -275,9 +262,10 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
       const dateStr = format(date, "yyyy-MM-dd")
       const dayOfWeek = date.getDay()
 
-      const settingsForDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
-      const specificSettings = specificDateSettings.filter((s) => s.specific_date === dateStr)
-      const settingsToUse = specificSettings.length > 0 ? specificSettings : settingsForDay
+      let settingsToUse = specificDateSettings.filter((s) => s.specific_date === dateStr)
+      if (settingsToUse.length === 0) {
+        settingsToUse = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
+      }
 
       for (const setting of settingsToUse) {
         try {
@@ -295,7 +283,6 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
             continue
           }
 
-          // FIX: Interpret time from DB as JST by adding timezone offset
           const startDateTimeStr = `${dateStr}T${setting.start_time}+09:00`
           const slotStartDateTime = new Date(startDateTimeStr)
 
@@ -308,7 +295,7 @@ export async function getAvailableSlots(serviceTypeId: number, month: string) {
 
           if (isNaN(slotStartDateTime.getTime()) || isNaN(settingEndDateTime.getTime())) {
             console.error(
-              `[SERVER LOG] CRITICAL: Skipping setting ID ${setting.id}. Failed to create valid Date object. Invalid string was: Start: "${startDateTimeStr}", End: "${endDateTimeStr}"`,
+              `[SERVER LOG] CRITICAL: Skipping setting ID ${setting.id}. Failed to create valid Date object.`,
             )
             continue
           }

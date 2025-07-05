@@ -1,148 +1,104 @@
-import { redirect } from "next/navigation"
 import { getAppointmentByToken } from "@/app/actions/reservation-actions"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import Image from "next/image"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
+import { CheckCircle, AlertTriangle } from "lucide-react"
 
-export default async function ConfirmationPage({
-  searchParams,
-}: {
-  searchParams: { token: string }
-}) {
-  const { token } = searchParams
-
-  if (!token) {
-    redirect("/reservation")
+// Helper function to safely format the reservation date and time
+const formatReservationDateTime = (dateStr: string | null, timeStr: string | null): string => {
+  if (!dateStr || !timeStr) {
+    return "日時情報不明"
   }
-
   try {
-    const appointment = await getAppointmentByToken(token)
+    // Combine date and time and explicitly parse as JST (+09:00)
+    // This creates a correct Date object regardless of the server's timezone
+    const dateTimeInJST = new Date(`${dateStr}T${timeStr}+09:00`)
 
-    if (!appointment) {
-      redirect("/reservation")
+    // Check if the created date is valid
+    if (isNaN(dateTimeInJST.getTime())) {
+      console.error("Invalid date created:", `${dateStr}T${timeStr}`)
+      return "無効な日時情報"
     }
 
-    const appointmentDate = new Date(appointment.appointment_date)
-    const formattedDate = format(appointmentDate, "yyyy年MM月dd日(EEE)", { locale: ja })
-    const startTime = appointment.start_time.substring(0, 5)
-    const endTime = appointment.end_time.substring(0, 5)
+    return format(dateTimeInJST, "yyyy年MM月dd日 (E) HH:mm", { locale: ja })
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return "日時のフォーマットに失敗しました"
+  }
+}
 
+export default async function ReservationConfirmationPage({ searchParams }: { searchParams: { token?: string } }) {
+  if (!searchParams.token) {
+    notFound()
+  }
+
+  const appointment = await getAppointmentByToken(searchParams.token)
+
+  if (!appointment) {
     return (
-      <div className="min-h-screen bg-white">
-        <header className="border-b border-gray-100">
-          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-            <div className="flex items-center">
-              <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
-              <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <Card className="w-full max-w-lg text-center">
+          <CardHeader>
+            <div className="mx-auto bg-red-100 rounded-full p-3 w-fit">
+              <AlertTriangle className="h-8 w-8 text-red-600" />
             </div>
-            <div>
-              <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline mr-4">
-                新規予約
-              </Link>
-              <Link href="/reservation/manage" className="text-sm text-[#f8a0a0] hover:underline">
-                予約の確認・変更
-              </Link>
-            </div>
-          </div>
-        </header>
-
-        <main className="container mx-auto px-4 py-12">
-          <div className="max-w-2xl mx-auto">
-            <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">予約完了</h1>
-
-            <Card className="w-full shadow-md border-gray-100 mb-8">
-              <CardHeader className="bg-green-50 border-b border-green-100">
-                <CardTitle className="text-xl text-center text-green-800">予約が確定しました</CardTitle>
-                <CardDescription className="text-center text-green-700">
-                  以下の内容で予約を受け付けました
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">助産院</h3>
-                      <p className="text-lg">{appointment.clinics.name}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">診療種別</h3>
-                      <p className="text-lg">{appointment.service_types.name}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">日付</h3>
-                      <p className="text-lg">{formattedDate}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">時間</h3>
-                      <p className="text-lg">
-                        {startTime} - {endTime}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">お名前</h3>
-                      <p className="text-lg">{appointment.patient_name}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">電話番号</h3>
-                      <p className="text-lg">{appointment.patient_phone}</p>
-                    </div>
-                    {appointment.patient_email && (
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500">メールアドレス</h3>
-                        <p className="text-lg">{appointment.patient_email}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <div className="mt-6 text-center">
-                      <p className="text-sm text-gray-600 mb-2">予約管理用トークン（4桁の数字）</p>
-                      <div className="flex justify-center items-center space-x-2 mb-4">
-                        {token.split("").map((digit, index) => (
-                          <div
-                            key={index}
-                            className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg border border-blue-300 text-xl font-bold"
-                          >
-                            {digit}
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        このトークンは予約の確認・変更・キャンセルに必要です。
-                        <br />
-                        大切に保管してください。
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link href="/reservation">
-                <Button variant="outline" className="w-full">
-                  新しい予約を作成
-                </Button>
-              </Link>
-              <Link href={`/reservation/manage?token=${appointment.token}`}>
-                <Button className="w-full bg-[#f8a0a0] hover:bg-[#f78989]">予約を管理する</Button>
-              </Link>
-            </div>
-          </div>
-        </main>
-
-        <footer className="mt-auto py-6 border-t border-gray-100">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            &copy; {new Date().getFullYear()} Manary. All rights reserved.
-          </div>
-        </footer>
+            <CardTitle className="mt-4">予約が見つかりません</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600">
+              ご指定の予約情報が見つかりませんでした。URLが正しいかご確認いただくか、お手数ですが再度予約手続きをお願いいたします。
+            </p>
+          </CardContent>
+        </Card>
       </div>
     )
-  } catch (error) {
-    console.error("Error in ConfirmationPage:", error)
-    redirect("/reservation")
   }
+
+  // Safely access nested properties
+  const clinicName = Array.isArray(appointment.clinics)
+    ? appointment.clinics[0]?.name
+    : (appointment.clinics?.name ?? "クリニック情報なし")
+  const serviceTypeName = Array.isArray(appointment.service_types)
+    ? appointment.service_types[0]?.name
+    : (appointment.service_types?.name ?? "サービス情報なし")
+
+  const formattedDateTime = formatReservationDateTime(appointment.reservation_date, appointment.start_time)
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <Card className="w-full max-w-lg">
+        <CardHeader className="text-center">
+          <div className="mx-auto bg-green-100 rounded-full p-3 w-fit">
+            <CheckCircle className="h-8 w-8 text-green-600" />
+          </div>
+          <CardTitle className="mt-4">ご予約ありがとうございます</CardTitle>
+          <CardDescription>以下の内容でご予約を承りました。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="border rounded-lg p-4 space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-500">お名前</span>
+              <span className="font-medium">{appointment.patient_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">クリニック</span>
+              <span className="font-medium">{clinicName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">診療内容</span>
+              <span className="font-medium">{serviceTypeName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">ご予約日時</span>
+              <span className="font-medium">{formattedDateTime}</span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 text-center">
+            予約の変更やキャンセルをご希望の場合は、クリニックまで直接お問い合わせください。
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }

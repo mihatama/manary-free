@@ -17,7 +17,8 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { ReservationCalendar, type CalendarEvent } from "@/components/reservation-calendar"
+import { ReservationCalendar } from "@/components/reservation-calendar"
+import type { CalendarEvent } from "@/components/reservation-calendar"
 import { getClinics, getServiceTypes } from "@/app/actions/schedule-actions"
 import { createAppointment } from "@/app/actions/reservation-actions"
 import type { Database } from "@/lib/supabase/database.types"
@@ -29,7 +30,7 @@ interface NewReservationFlowProps {
   phoneNumber: string
   initialPatientName?: string
   onBack: () => void
-  onReservationComplete: () => void
+  onReservationComplete: (token: string) => void
 }
 
 export function NewReservationFlow({
@@ -116,9 +117,9 @@ export function NewReservationFlow({
 
       const result = await createAppointment(formData)
 
-      if (result.success) {
+      if (result.success && result.data?.access_token) {
         setIsModalOpen(false)
-        onReservationComplete()
+        onReservationComplete(result.data.access_token)
       } else {
         setError(result.message || "予約の作成に失敗しました。")
       }
