@@ -17,6 +17,7 @@ import {
 import { updateAppointment, cancelAppointment } from "@/app/actions/reservation-actions"
 import { useCSRF } from "@/hooks/use-csrf"
 import { CalendarTimePicker } from "@/components/calendar-time-picker"
+import { parseDateString } from "@/lib/date-utils"
 
 interface AppointmentEditorProps {
   appointment: any
@@ -37,13 +38,34 @@ export function AppointmentEditor({ appointment, onClose, onComplete }: Appointm
 
   // 初期値を設定
   useEffect(() => {
-    if (appointment) {
-      const appointmentDate = new Date(appointment.appointment_date)
-      setSelectedDate(appointmentDate)
+    console.log(
+      "%c[AppointmentEditor] Initializing with appointment data:",
+      "color: blue; font-weight: bold;",
+      appointment,
+    )
+    if (appointment && appointment.appointment_date && appointment.start_time && appointment.end_time) {
+      const appointmentDate = parseDateString(appointment.appointment_date)
+      console.log("[AppointmentEditor] Parsed date from string:", appointmentDate)
 
-      const startTime = appointment.start_time.substring(0, 5)
-      const endTime = appointment.end_time.substring(0, 5)
-      setSelectedTimeSlot({ start: startTime, end: endTime })
+      if (appointmentDate) {
+        setSelectedDate(appointmentDate)
+        const startTime = appointment.start_time.substring(0, 5)
+        const endTime = appointment.end_time.substring(0, 5)
+        setSelectedTimeSlot({ start: startTime, end: endTime })
+        console.log("%c[AppointmentEditor] Initial state set successfully.", "color: green;")
+      } else {
+        console.error(
+          "%c[AppointmentEditor] Failed to parse appointment date. Cannot set initial state.",
+          "color: red; font-weight: bold;",
+        )
+        setError("予約データの読み込みに失敗しました。日付の形式が正しくありません。")
+      }
+    } else {
+      console.error(
+        "%c[AppointmentEditor] Invalid or incomplete appointment data received.",
+        "color: red; font-weight: bold;",
+      )
+      setError("予約データの読み込みに失敗しました。情報が不完全です。")
     }
   }, [appointment])
 
@@ -176,7 +198,7 @@ export function AppointmentEditor({ appointment, onClose, onComplete }: Appointm
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <Button
             variant="outline"
-            className="text-red-500 border-red-200 hover:bg-red-50"
+            className="text-red-500 border-red-200 hover:bg-red-50 bg-transparent"
             onClick={() => setIsDialogOpen(true)}
           >
             予約をキャンセル

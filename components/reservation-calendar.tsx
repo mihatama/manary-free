@@ -21,6 +21,7 @@ import { getAvailableSlots } from "@/app/actions/reservation-actions"
 import type { Database } from "@/lib/supabase/database.types"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import ErrorBoundary from "./error-boundary"
+import { parseTime } from "@/lib/date-utils"
 import "react-big-calendar/lib/css/react-big-calendar.css"
 
 const locales = {
@@ -65,61 +66,6 @@ function getContrastingTextColor(hexColor: string): string {
   return luma > 0.5 ? "#212529" : "#FFFFFF"
 }
 
-/**
- * A robust helper to create a Date object from a base date and a time string.
- * It includes multiple checks and detailed logging to prevent and debug the "Invalid time value" error.
- */
-const parseTime = (baseDate: Date, timeStr: string | null): Date | null => {
-  console.log(`[parseTime] Attempting to parse:`, { baseDate, timeStr })
-
-  // 1. Check for invalid inputs
-  if (!baseDate || isNaN(baseDate.getTime())) {
-    console.error(`[parseTime] Validation failed: Invalid baseDate.`, { baseDate, timeStr })
-    return null
-  }
-  if (typeof timeStr !== "string" || timeStr.length < 5) {
-    console.error(`[parseTime] Validation failed: Invalid timeStr.`, { baseDate, timeStr })
-    return null
-  }
-
-  // 2. Check time string format
-  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(timeStr)) {
-    console.error(`[parseTime] Validation failed: timeStr format is incorrect.`, { baseDate, timeStr })
-    return null
-  }
-
-  try {
-    // 3. Parse time components and validate their range
-    const [hours, minutes, seconds] = timeStr.split(":").map(Number)
-    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-      console.error(`[parseTime] Validation failed: Invalid time components.`, { hours, minutes, timeStr })
-      return null
-    }
-
-    // 4. Construct new Date object reliably
-    const newDate = new Date(
-      baseDate.getFullYear(),
-      baseDate.getMonth(),
-      baseDate.getDate(),
-      hours,
-      minutes,
-      seconds || 0,
-    )
-
-    // 5. Final check on the created date
-    if (isNaN(newDate.getTime())) {
-      console.error(`[parseTime] Validation failed: Final date is invalid.`, { baseDate, timeStr, newDate })
-      return null
-    }
-
-    console.log(`[parseTime] Successfully parsed.`, { result: newDate })
-    return newDate
-  } catch (e) {
-    console.error(`[parseTime] Exception caught during parsing.`, { baseDate, timeStr, error: e })
-    return null
-  }
-}
-
 export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selectedSlot }: ReservationCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -135,10 +81,6 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
     async function fetchAndProcessSlots() {
       setIsLoading(true)
       setError(null)
-      console.log(
-        `%c[ReservationCalendar] Starting fetch for month: ${format(currentDate, "yyyy-MM")}`,
-        "color: blue; font-weight: bold;",
-      )
       try {
         const startDate = startOfMonth(currentDate)
         const endDate = endOfMonth(currentDate)
@@ -156,62 +98,59 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
         const processedEvents: CalendarEvent[] = []
 
         dailyResults.forEach((dayResult, i) => {
-          const day = days[i]
-          if (!day || isNaN(day.getTime())) {
-            console.error("[ReservationCalendar] Skipping day processing due to invalid base date:", day)
-            return
-          }
-          const dayStr = format(day, "yyyy-MM-dd")
-          console.log(`%c[ReservationCalendar] Processing data for ${dayStr}`, "color: green;")
-
-          if (dayResult.error) {
-            console.warn(`[ReservationCalendar] API Error for ${dayStr}:`, dayResult.error)
-            if (!error) setError("一部の日付の予約枠が読み込めませんでした。")
-            return
-          }
-          // Process available slots
-          ;(dayResult.availableSlots || []).forEach((slot) => {
-            console.log("[ReservationCalendar] Processing available slot:", slot)
-            const startTime = parseTime(day, slot.startTime)
-            const endTime = parseTime(day, slot.endTime)
-            if (startTime && endTime) {
-              processedEvents.push({
-                title: format(startTime, "HH:mm"),
-                start: startTime,
-                end: endTime,
-                isAvailable: true,
-              })
-            } else {
-              console.error(
-                `%c[ReservationCalendar] Skipping invalid available slot due to parsing failure.`,
-                "color: red; font-weight: bold;",
-                { slot, day },
-              )
+          try {
+            const day = days[i]
+            if (!day || isNaN(day.getTime())) {
+              console.error("[ReservationCalendar] Skipping iteration due to invalid base date:", day)
+              return
             }
-          })
+            const dayStr = format(day, "yyyy-MM-dd")
 
-          // Process existing reservations
-          ;(dayResult.existingReservations || []).forEach((reservation) => {
-            console.log("[ReservationCalendar] Processing existing reservation:", reservation)
-            if (reservation.service_type_id !== serviceType.id) return
-
-            const startTime = parseTime(day, reservation.start_time)
-            const endTime = parseTime(day, reservation.end_time)
-            if (startTime && endTime) {
-              processedEvents.push({
-                title: "予約済",
-                start: startTime,
-                end: endTime,
-                isAvailable: false,
-              })
-            } else {
-              console.error(
-                `%c[ReservationCalendar] Skipping invalid reservation due to parsing failure.`,
-                "color: red; font-weight: bold;",
-                { reservation, day },
-              )
+            if (dayResult.error) {
+              console.warn(`[ReservationCalendar] Could not fetch slots for ${dayStr}:`, dayResult.error)
+              if (!error) setError("一部の日付の予約枠が読み込めませんでした。")
+              return
             }
-          })
+            ;(dayResult.availableSlots || []).forEach((slot) => {
+              const startTime = parseTime(day, slot.startTime)
+              const endTime = parseTime(day, slot.endTime)
+              if (startTime && endTime) {
+                processedEvents.push({
+                  title: format(startTime, "HH:mm"),
+                  start: startTime,
+                  end: endTime,
+                  isAvailable: true,
+                })
+              } else {
+                console.warn("[ReservationCalendar] Skipping invalid available slot due to parsing failure:", {
+                  slot,
+                  day,
+                })
+              }
+            })
+            ;(dayResult.existingReservations || []).forEach((reservation) => {
+              if (reservation.service_type_id !== serviceType.id) return
+
+              const startTime = parseTime(day, reservation.start_time)
+              const endTime = parseTime(day, reservation.end_time)
+              if (startTime && endTime) {
+                processedEvents.push({
+                  title: "予約済",
+                  start: startTime,
+                  end: endTime,
+                  isAvailable: false,
+                })
+              } else {
+                console.warn("[ReservationCalendar] Skipping invalid reservation due to parsing failure:", {
+                  reservation,
+                  day,
+                })
+              }
+            })
+          } catch (e) {
+            console.error(`[ReservationCalendar] Error processing day index ${i}:`, e)
+            if (!error) setError("予約枠の処理中にエラーが発生しました。")
+          }
         })
 
         setEvents(processedEvents)
