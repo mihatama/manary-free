@@ -1,8 +1,15 @@
--- Drop the entire public schema and recreate it to ensure a clean slate
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO postgres;
-GRANT ALL ON SCHEMA public TO public;
+-- Drop leftover tables from previous versions if they exist, using CASCADE to handle dependencies
+DROP TABLE IF EXISTS "bookings" CASCADE;
+DROP TABLE IF EXISTS "appointments" CASCADE;
+
+-- Drop existing tables in reverse order of dependency to avoid foreign key constraints errors
+DROP TABLE IF EXISTS "reservations" CASCADE;
+DROP TABLE IF EXISTS "availability_settings" CASCADE;
+DROP TABLE IF EXISTS "breast_care_charts" CASCADE;
+DROP TABLE IF EXISTS "postpartum_care_charts" CASCADE;
+DROP TABLE IF EXISTS "patients" CASCADE;
+DROP TABLE IF EXISTS "service_types" CASCADE;
+DROP TABLE IF EXISTS "clinics" CASCADE;
 
 -- Create clinics table
 CREATE TABLE "clinics" (
