@@ -1,105 +1,118 @@
--- clinics table
-CREATE TABLE IF NOT EXISTS public.clinics (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Drop existing tables in reverse order of dependency to avoid foreign key constraints errors
+DROP TABLE IF EXISTS "reservations";
+DROP TABLE IF EXISTS "availability_settings";
+DROP TABLE IF EXISTS "breast_care_charts";
+DROP TABLE IF EXISTS "postpartum_care_charts";
+DROP TABLE IF EXISTS "patients";
+DROP TABLE IF EXISTS "service_types";
+DROP TABLE IF EXISTS "clinics";
+
+-- Create clinics table
+CREATE TABLE "clinics" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "address" VARCHAR(255),
+  "phone_number" VARCHAR(20),
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
 
--- service_types table
-CREATE TABLE IF NOT EXISTS public.service_types (
-    id SERIAL PRIMARY KEY,
-    clinic_id INTEGER REFERENCES public.clinics(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    duration INTEGER NOT NULL, -- in minutes
-    color TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Create service_types table
+CREATE TABLE "service_types" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "description" TEXT,
+  "duration_minutes" INT NOT NULL,
+  "price" INT NOT NULL,
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
 
--- patients table
-CREATE TABLE IF NOT EXISTS public.patients (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    kana TEXT NOT NULL,
-    phone_number TEXT UNIQUE NOT NULL,
-    email TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Create patients table
+CREATE TABLE "patients" (
+  "id" SERIAL PRIMARY KEY,
+  "name" VARCHAR(255) NOT NULL,
+  "kana" VARCHAR(255) NOT NULL,
+  "phone_number" VARCHAR(20) UNIQUE NOT NULL,
+  "email" VARCHAR(255) UNIQUE,
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
 
--- reservations table
-CREATE TABLE IF NOT EXISTS public.reservations (
-    id SERIAL PRIMARY KEY,
-    patient_id INTEGER REFERENCES public.patients(id) ON DELETE CASCADE,
-    clinic_id INTEGER REFERENCES public.clinics(id) ON DELETE CASCADE,
-    service_type_id INTEGER REFERENCES public.service_types(id) ON DELETE CASCADE,
-    reservation_date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    status TEXT NOT NULL DEFAULT 'confirmed',
-    note TEXT,
-    access_token UUID DEFAULT gen_random_uuid() NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+-- Create reservations table
+CREATE TABLE "reservations" (
+  "id" SERIAL PRIMARY KEY,
+  "patient_id" INT NOT NULL REFERENCES "patients"("id") ON DELETE CASCADE,
+  "clinic_id" INT NOT NULL REFERENCES "clinics"("id") ON DELETE CASCADE,
+  "service_type_id" INT NOT NULL REFERENCES "service_types"("id") ON DELETE CASCADE,
+  "reservation_date" DATE NOT NULL,
+  "start_time" TIME NOT NULL,
+  "end_time" TIME NOT NULL,
+  "status" VARCHAR(50) DEFAULT 'confirmed',
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
 
--- availability_settings table
-CREATE TABLE IF NOT EXISTS public.availability_settings (
-    id SERIAL PRIMARY KEY,
-    service_type_id INTEGER REFERENCES public.service_types(id) ON DELETE CASCADE,
-    day_of_week INTEGER, -- 0 for Sunday, 1 for Monday, etc.
-    specific_date DATE,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    is_available BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT check_day_or_date CHECK (day_of_week IS NOT NULL OR specific_date IS NOT NULL)
+-- Create availability_settings table
+CREATE TABLE "availability_settings" (
+  "id" SERIAL PRIMARY KEY,
+  "clinic_id" INT NOT NULL REFERENCES "clinics"("id") ON DELETE CASCADE,
+  "day_of_week" INT NOT NULL, -- 0 for Sunday, 1 for Monday, etc.
+  "start_time" TIME NOT NULL,
+  "end_time" TIME NOT NULL,
+  "is_available" BOOLEAN DEFAULT TRUE,
+  "created_at" TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add some initial data for testing
--- This is important because the app expects some data to exist.
--- For example, clinics and service types.
+-- Create breast_care_charts table
+CREATE TABLE "breast_care_charts" (
+    "id" SERIAL PRIMARY KEY,
+    "patient_id" INT NOT NULL REFERENCES "patients"("id") ON DELETE CASCADE,
+    "visit_date" DATE NOT NULL,
+    "practitioner_name" VARCHAR(255),
+    "concerns" TEXT,
+    "left_breast_condition" JSONB,
+    "right_breast_condition" JSONB,
+    "care_details" TEXT,
+    "recommendations" TEXT,
+    "created_at" TIMESTAMPTZ DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ DEFAULT NOW()
+);
 
--- Check if clinics exist before inserting
-DO $$
-BEGIN
-   IF NOT EXISTS (SELECT 1 FROM public.clinics) THEN
-      INSERT INTO public.clinics (id, name) VALUES
-      (1, '助産院1'),
-      (2, '助産院2'),
-      (3, '助産院3')
-      ON CONFLICT (id) DO NOTHING;
-   END IF;
-END $$;
+-- Create postpartum_care_charts table
+CREATE TABLE "postpartum_care_charts" (
+    "id" SERIAL PRIMARY KEY,
+    "patient_id" INT NOT NULL REFERENCES "patients"("id") ON DELETE CASCADE,
+    "visit_date" DATE NOT NULL,
+    "practitioner_name" VARCHAR(255),
+    "weeks_postpartum" INT,
+    "physical_condition" TEXT,
+    "mental_condition" TEXT,
+    "care_provided" TEXT,
+    "guidance" TEXT,
+    "created_at" TIMESTAMPTZ DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ DEFAULT NOW()
+);
 
--- Check if service_types exist before inserting
-DO $$
-BEGIN
-   IF NOT EXISTS (SELECT 1 FROM public.service_types) THEN
-      INSERT INTO public.service_types (id, clinic_id, name, duration, color) VALUES
-      (10, 1, '産後ケア', 60, '#FFB6C1'),
-      (11, 1, '母乳相談', 30, '#ADD8E6'),
-      (12, 2, '産後ケア', 60, '#FFB6C1'),
-      (13, 3, '産後ケア', 60, '#FFB6C1')
-      ON CONFLICT (id) DO NOTHING;
-   END IF;
-END $$;
 
--- Check if availability_settings exist before inserting
-DO $$
-BEGIN
-   IF NOT EXISTS (SELECT 1 FROM public.availability_settings) THEN
-      -- General availability for service type 10 (Clinic 1, 産後ケア)
-      INSERT INTO public.availability_settings (service_type_id, day_of_week, start_time, end_time, is_available) VALUES
-      (10, 1, '09:00', '17:00', true), -- Monday
-      (10, 2, '09:00', '17:00', true), -- Tuesday
-      (10, 3, '09:00', '17:00', true), -- Wednesday
-      (10, 4, '09:00', '17:00', true), -- Thursday
-      (10, 5, '09:00', '17:00', true); -- Friday
+-- Insert initial data
+INSERT INTO "clinics" ("name", "address", "phone_number") VALUES
+('助産院1', '東京都渋谷区', '03-1111-1111'),
+('助産院2', '東京都新宿区', '03-2222-2222'),
+('助産院3', '東京都港区', '03-3333-3333');
 
-      -- General availability for service type 13 (Clinic 3, 産後ケア)
-      INSERT INTO public.availability_settings (service_type_id, day_of_week, start_time, end_time, is_available) VALUES
-      (13, 1, '10:00', '18:00', true), -- Monday
-      (13, 2, '10:00', '18:00', true), -- Tuesday
-      (13, 3, '10:00', '18:00', true), -- Wednesday
-      (13, 4, '10:00', '18:00', true), -- Thursday
-      (13, 5, '10:00', '18:00', true); -- Friday
-   END IF;
-END $$;
+INSERT INTO "service_types" ("name", "description", "duration_minutes", "price") VALUES
+('初回相談', '初めての方の相談メニュー', 60, 5000),
+('産後ケア', '産後の体と心のケア', 90, 8000),
+('母乳相談', '母乳育児に関する相談', 60, 6000),
+('沐浴指導', '赤ちゃんの沐浴指導', 45, 4000),
+('育児相談', '育児全般に関する相談', 60, 5000);
+
+-- Add some availability for clinic 1 (Monday to Friday, 9am to 5pm)
+INSERT INTO "availability_settings" ("clinic_id", "day_of_week", "start_time", "end_time", "is_available") VALUES
+(1, 1, '09:00:00', '17:00:00', TRUE),
+(1, 2, '09:00:00', '17:00:00', TRUE),
+(1, 3, '09:00:00', '17:00:00', TRUE),
+(1, 4, '09:00:00', '17:00:00', TRUE),
+(1, 5, '09:00:00', '17:00:00', TRUE);
