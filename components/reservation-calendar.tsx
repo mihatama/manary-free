@@ -66,7 +66,7 @@ function getContrastingTextColor(hexColor: string): string {
 }
 
 // Helper to parse time robustly, accepting HH:mm and HH:mm:ss
-const parseTime = (dateStr: string, timeStr: string): Date | null => {
+const parseTime = (dateStr: string, timeStr: string | null): Date | null => {
   if (!dateStr || !timeStr) return null
   // Regex to validate HH:mm or HH:mm:ss
   if (!/^\d{2}:\d{2}(:\d{2})?$/.test(timeStr)) {
@@ -139,10 +139,15 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
 
           dayResult.existingReservations?.forEach((reservation) => {
             if (reservation.service_type_id === serviceType.id) {
-              const startTime = parseTime(reservation.reservation_date, reservation.start_time)
-              const endTime = parseTime(reservation.reservation_date, reservation.end_time)
+              // FIX: Use `dayStr` which is guaranteed to be valid for this loop iteration,
+              // instead of `reservation.reservation_date` which might be problematic.
+              const startTime = parseTime(dayStr, reservation.start_time)
+              const endTime = parseTime(dayStr, reservation.end_time)
               if (!startTime || !endTime || isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-                console.error("[ReservationCalendar] Skipping invalid reservation:", reservation)
+                console.error("[ReservationCalendar] Skipping invalid reservation:", {
+                  ...reservation,
+                  dateUsed: dayStr,
+                })
                 return
               }
               processedEvents.push({

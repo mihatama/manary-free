@@ -205,7 +205,14 @@ export async function getAvailableSlots(clinicId: number, date: string) {
       }
     }
 
-    return { availableSlots, existingReservations: (existingReservations as any[]) || [] }
+    type ExistingReservation = {
+      reservation_date: string | null
+      start_time: string | null
+      end_time: string | null
+      service_type_id: number | null
+    }
+
+    return { availableSlots, existingReservations: (existingReservations as ExistingReservation[]) || [] }
   } catch (error: any) {
     console.error("Error in getAvailableSlots:", error.message)
     return { error: error.message || "利用可能な予約枠の取得中にエラーが発生しました。" }
