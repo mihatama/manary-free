@@ -122,3 +122,22 @@ export async function sendSMS(phoneNumber: string, message: string): Promise<boo
     return false
   }
 }
+
+// Add the missing function
+export async function sendConfirmationSms(
+  phoneNumber: string,
+  patientName: string,
+  reservationDate: string,
+  startTime: string,
+  token: string,
+): Promise<boolean> {
+  const formattedDate = new Date(reservationDate).toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  })
+  const message = `${patientName}様\nご予約ありがとうございます。\n\n日時: ${formattedDate} ${startTime}\n\n予約の確認・問診票の記入はこちらから:\n${process.env.NEXT_PUBLIC_BASE_URL}/reservation/questionnaire?token=${token}`
+
+  return sendSMS(phoneNumber, message)
+}

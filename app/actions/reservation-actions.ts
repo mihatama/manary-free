@@ -85,6 +85,10 @@ export async function getAppointments({
 
 export async function getAppointmentByToken(token: string): Promise<ReservationWithService | null> {
   noStore()
+  if (!token || token === "undefined") {
+    console.warn("getAppointmentByToken called with invalid token.")
+    return null
+  }
   const supabase = createClient()
   try {
     const { data: reservation, error } = await supabase
@@ -211,7 +215,7 @@ export async function getAvailableSlots(clinicId: number, date: string) {
     }
     console.log(`[Action:getAvailableSlots] END - Returning for ${date}:`, {
       availableSlots,
-      existingReservations,
+      existingReservations: (existingReservations as Reservation[]) || [],
     })
     return { availableSlots, existingReservations: (existingReservations as Reservation[]) || [] }
   } catch (error: any) {

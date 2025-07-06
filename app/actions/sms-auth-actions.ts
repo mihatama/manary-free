@@ -1,75 +1,39 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { validateCSRFToken } from "@/lib/csrf"
-import { sendVerificationCode as sendTwilioVerificationCode, verifyCode as verifyTwilioCode } from "@/lib/twilio"
+import { unstable_noStore as noStore } from "next/cache"
 
-// 認証コードを送信
-export async function sendVerificationCodeAction(formData: FormData) {
-  try {
-    // CSRF検証 - 公開ページからのアクセスの場合は検証をスキップ
-    const csrfToken = formData.get("csrf_token") as string
-    // CSRFトークンが提供されている場合のみ検証
-    if (csrfToken && !validateCSRFToken(csrfToken)) {
-      throw new Error("セキュリティトークンが無効です")
-    }
+export async function getAppointmentsByPhoneNumber(phoneNumber: string) {
+  noStore()
+  const supabase = createClient()
 
-    const phoneNumber = formData.get("phone_number") as string
+  // Normalize phone number to E.164 format for query if it's not already
+  const formattedPhoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+81${phoneNumber.substring(1)}`
 
-    if (!phoneNumber) {
-      throw new Error("電話番号が入力されていません")
-    }
+  const { data, error } = await supabase
+    .from("reservations")
+    .select(
+      `
+    id,
+    reservation_date,
+    start_time,
+    end_time,
+    status,
+    token,
+    questionnaire_id,
+    clinics (name, address, phone_number),
+    service_types (name, duration, color)
+  `,
+    )
+    .eq("patient_phone", formattedPhoneNumber)
+    .order("reservation_date", { ascending: false })
 
-    // 電話番号のフォーマットを検証
-    const phoneRegex = /^0\d{1,4}-?\d{1,4}-?\d{4}$/
-    if (!phoneRegex.test(phoneNumber)) {
-      throw new Error("有効な日本の電話番号を入力してください")
-    }
-
-    // 認証コードを送信
-    const success = await sendTwilioVerificationCode(phoneNumber)
-
-    if (!success) {
-      throw new Error("認証コードの送信に失敗しました")
-    }
-
-    return { success: true, message: "認証コードを送信しました" }
-  } catch (error: any) {
-    console.error("認証コード送信エラー:", error)
-    return { success: false, error: error.message || "認証コードの送信に失敗しました" }
+  if (error) {
+    console.error("Error fetching appointments by phone number:", error.message)
+    return { success: false, message: "予約の取得に失敗しました。", data: [] }
   }
-}
 
-// 認証コードを検証
-export async function verifyCodeAction(formData: FormData) {
-  try {
-    // CSRF検証 - 公開ページからのアクセスの場合は検証をスキップ
-    const csrfToken = formData.get("csrf_token") as string
-    // CSRFトークンが提供されている場合のみ検証
-    if (csrfToken && !validateCSRFToken(csrfToken)) {
-      throw new Error("セキュリティトークンが無効です")
-    }
-
-    const phoneNumber = formData.get("phone_number") as string
-    const code = formData.get("verification_code") as string
-
-    if (!phoneNumber || !code) {
-      throw new Error("電話番号または認証コードが入力されていません")
-    }
-
-    // 認証コードを検証
-    const isVerified = await verifyTwilioCode(phoneNumber, code)
-
-    if (!isVerified) {
-      throw new Error("認証コードが無効です")
-    }
-
-    // 認証成功
-    return { success: true, verified: true }
-  } catch (error: any) {
-    console.error("認証コード検証エラー:", error)
-    return { success: false, error: error.message || "認証に失敗しました" }
-  }
+  return { success: true, data: data || [] }
 }
 
 // 電話番号で予約を取得 (Simplified Logic)
@@ -83,19 +47,21 @@ export async function getAppointmentsByPhone(
       .from("reservations")
       .select(
         `
-        *,
-        service_types (
-          id,
-          name,
-          duration,
-          color
-        ),
-        clinics (
-          name,
-          address,
-          phone_number
-        )
-      `,
+          *,
+          access_token,
+          questionnaire_id,
+          service_types (
+            id,
+            name,
+            duration,
+            color
+          ),
+          clinics (
+            name,
+            address,
+            phone_number
+          )
+        `,
       )
       .eq("patient_phone", phoneNumber) // Use the new column for direct lookup
       .neq("status", "cancelled")
@@ -111,24 +77,5 @@ export async function getAppointmentsByPhone(
   } catch (error: any) {
     console.error("Unhandled error in getAppointmentsByPhone:", error)
     return { success: false, error: "予約情報の取得中に予期せぬエラーが発生しました。" }
-  }
-}
-
-// エイリアス関数を追加
-export async function sendVerificationCode(phoneNumber: string) {
-  try {
-    return await sendTwilioVerificationCode(phoneNumber)
-  } catch (error) {
-    console.error("認証コード送信エラー:", error)
-    return false
-  }
-}
-
-export async function verifyCode(phoneNumber: string, code: string) {
-  try {
-    return await verifyTwilioCode(phoneNumber, code)
-  } catch (error) {
-    console.error("認証コード検証エラー:", error)
-    return false
   }
 }

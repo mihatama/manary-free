@@ -214,3 +214,44 @@ export async function submitAndLinkQuestionnaire(formData: FormData) {
   revalidatePath(`/reservation/questionnaire/success?reservation_id=${reservation_id}`)
   return { success: true, message: "問診票が正常に提出されました。", data }
 }
+
+export async function getLatestQuestionnaireByPhone(phone: string): Promise<{ [key: string]: any } | null> {
+  noStore()
+  if (!phone) return null
+
+  const supabase = createClient()
+
+  // First, find all reservations for the given phone number.
+  const { data: reservations, error: reservationsError } = await supabase
+    .from("reservations")
+    .select("id")
+    .eq("patient_phone", phone)
+
+  if (reservationsError || !reservations || reservations.length === 0) {
+    if (reservationsError) {
+      console.error("Error fetching reservations by phone:", reservationsError.message)
+    }
+    return null
+  }
+
+  const reservationIds = reservations.map((r) => r.id)
+
+  // Then, find the latest questionnaire associated with these reservations.
+  const { data: latestQuestionnaire, error: questionnaireError } = await supabase
+    .from("questionnaires")
+    .select("data")
+    .in("reservation_id", reservationIds)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single()
+
+  if (questionnaireError) {
+    if (questionnaireError.code !== "PGRST116") {
+      // 'PGRST116' means no rows found
+      console.error("Error fetching latest questionnaire:", questionnaireError.message)
+    }
+    return null
+  }
+
+  return latestQuestionnaire?.data as { [key: string]: any } | null
+}

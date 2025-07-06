@@ -3,6 +3,7 @@ import { getAppointmentByToken } from "@/app/actions/reservation-actions"
 import { DetailedQuestionnaireForm } from "@/components/detailed-questionnaire-form"
 import { redirect } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getLatestQuestionnaireByPhone } from "@/app/actions/questionnaire-actions"
 
 function QuestionnairePageContent({ token }: { token: string }) {
   return (
@@ -33,11 +34,18 @@ async function QuestionnaireLoader({ token }: { token: string }) {
     )
   }
 
+  const previousData = appointment.patient_phone ? await getLatestQuestionnaireByPhone(appointment.patient_phone) : null
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <h1 className="text-2xl font-bold mb-4 text-center text-[#f8a0a0]">問診票</h1>
       <p className="mb-6 text-center text-gray-600">※ わかる範囲で結構ですので、ご記入ください。</p>
-      <DetailedQuestionnaireForm appointment={appointment} />
+      {previousData && (
+        <p className="mb-6 text-center text-gray-500 text-sm bg-blue-50 p-3 rounded-md">
+          以前ご入力いただいた内容を読み込みました。内容をご確認・修正の上、送信してください。
+        </p>
+      )}
+      <DetailedQuestionnaireForm appointment={appointment} previousData={previousData} />
     </div>
   )
 }
