@@ -363,6 +363,7 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
     const endDate = endOfMonth(targetMonth)
 
     // 1. Fetch service type details
+    console.log(`[Action:getCalendarEventsForMonth] Fetching service type ${serviceTypeId}`)
     const { data: serviceType, error: serviceTypeError } = await supabase
       .from("service_types")
       .select("id, duration")
@@ -371,11 +372,16 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
 
     if (serviceTypeError) throw new Error(`診療メニューの取得に失敗しました: ${serviceTypeError.message}`)
     if (!serviceType || !serviceType.duration || serviceType.duration <= 0) {
+      console.warn(
+        `[Action:getCalendarEventsForMonth] Service type ${serviceTypeId} not found or has invalid duration.`,
+      )
       return { events: [] }
     }
     const { duration } = serviceType
+    console.log(`[Action:getCalendarEventsForMonth] Service duration: ${duration} minutes.`)
 
     // 2. Fetch all reservations for the month
+    console.log(`[Action:getCalendarEventsForMonth] Fetching reservations for month ${month}`)
     const { data: reservations, error: reservationsError } = await supabase
       .from("reservations")
       .select("id, reservation_date, start_time, end_time, status, service_type_id")
@@ -386,8 +392,10 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
       .neq("status", "cancelled")
 
     if (reservationsError) throw new Error(`既存の予約の取得に失敗しました: ${reservationsError.message}`)
+    console.log(`[Action:getCalendarEventsForMonth] Found ${reservations?.length || 0} existing reservations.`)
 
     // 3. Fetch all relevant availability settings
+    console.log(`[Action:getCalendarEventsForMonth] Fetching availability settings for service type ${serviceTypeId}`)
     const { data: settings, error: settingsError } = await supabase
       .from("availability_settings")
       .select("*")
@@ -400,6 +408,7 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
       )
 
     if (settingsError) throw new Error(`予約設定の取得に失敗しました: ${settingsError.message}`)
+    console.log(`[Action:getCalendarEventsForMonth] Found ${settings?.length || 0} availability settings.`)
 
     const events: {
       title: string
@@ -431,6 +440,9 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
     const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate })
     const weeklySettings = settings?.filter((s) => !s.specific_date && s.is_available) || []
     const specificDateSettings = settings?.filter((s) => s.specific_date && s.is_available) || []
+    console.log(
+      `[Action:getCalendarEventsForMonth] Processing ${daysInMonth.length} days. Weekly settings: ${weeklySettings.length}, Specific date settings: ${specificDateSettings.length}`,
+    )
 
     for (const day of daysInMonth) {
       const dayStr = format(day, "yyyy-MM-dd")
@@ -468,7 +480,9 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
       }
     }
 
-    console.log(`[Action:getCalendarEventsForMonth] END - Returning ${events.length} events.`)
+    console.log(
+      `[Action:getCalendarEventsForMonth] END - Returning ${events.length} total events (available + booked).`,
+    )
     return { events }
   } catch (error: any) {
     console.error(`[Action:getCalendarEventsForMonth] CATCH ERROR:`, error.message)
