@@ -1,13 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { format, isBefore, startOfDay } from "date-fns"
+import { format } from "date-fns"
 import { ja } from "date-fns/locale"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { CalendarIcon, Clock, MapPin, Phone } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,172 +15,202 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { cancelAppointment } from "@/app/actions/reservation-actions"
-import { useToast } from "@/hooks/use-toast"
+import { AppointmentEditor } from "./appointment-editor"
+import { Loader2, Calendar, Edit, Trash2, CheckCircle, XCircle, Building } from "lucide-react"
+
+type Appointment = {
+  id: number
+  reservation_date: string
+  start_time: string
+  end_time: string
+  status: string
+  service_types: {
+    name: string
+    duration: number
+    price: number
+  } | null
+  clinics: {
+    name: string
+  } | null
+  // Add other properties from appointment object if needed
+  [key: string]: any
+}
 
 interface AppointmentListProps {
-  appointments: any[]
+  appointments: Appointment[]
   phoneNumber: string
-  onUpdate: (phoneNumber: string) => Promise<void>
+  onUpdate: (phone: string) => void
+}
+
+// Helper function to safely format date strings
+const safeFormatDate = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return "日付不明"
+  try {
+    // Dates from Supabase are 'YYYY-MM-DD'. Appending 'T00:00:00' ensures they are parsed in the local timezone.
+    const date = new Date(`${dateStr}T00:00:00`)
+    if (isNaN(date.getTime())) {
+      console.error(`Invalid date string received: "${dateStr}"`)
+      return "無効な日付"
+    }
+    return format(date, "yyyy年M月d日(E)", { locale: ja })
+  } catch (e) {
+    console.error(`Error formatting date string "${dateStr}":`, e)
+    return "日付表示エラー"
+  }
+}
+
+// Helper function to safely format time strings
+const safeFormatTime = (timeStr: string | null | undefined): string => {
+  if (!timeStr || typeof timeStr !== "string" || timeStr.length < 5) {
+    return "時刻不明"
+  }
+  return timeStr.substring(0, 5)
 }
 
 export function AppointmentList({ appointments, phoneNumber, onUpdate }: AppointmentListProps) {
-  const [appointmentToCancel, setAppointmentToCancel] = useState<any | null>(null)
-  const { toast } = useToast()
+  const [isCancelling, setIsCancelling] = useState<number | null>(null)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null)
 
-  const handleCancelClick = (appointment: any) => {
-    setAppointmentToCancel(appointment)
-  }
-
-  const handleConfirmCancel = async () => {
-    if (!appointmentToCancel) return
-
-    const result = await cancelAppointment(appointmentToCancel.id)
-
-    if (result.success) {
-      toast({
-        title: "予約がキャンセルされました",
-      })
-      await onUpdate(phoneNumber)
+  const handleCancel = async (id: number) => {
+    setIsCancelling(id)
+    setCancelError(null)
+    const result = await cancelAppointment(id)
+    if (!result.success) {
+      setCancelError(result.message || "予約のキャンセルに失敗しました。")
     } else {
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: result.message || "予約のキャンセルに失敗しました。",
-      })
+      onUpdate(phoneNumber)
     }
-    setAppointmentToCancel(null)
+    setIsCancelling(null)
   }
 
-  // 日付を安全にフォーマットするヘルパー関数
-  const safeFormatDate = (dateString: string | null | undefined) => {
-    if (!dateString) {
-      return "日付情報なし"
-    }
-    try {
-      const date = new Date(dateString)
-      if (isNaN(date.getTime())) {
-        console.error("Invalid date value received in AppointmentList:", dateString)
-        return "無効な日付"
-      }
-      return format(date, "yyyy年MM月dd日(EEE)", { locale: ja })
-    } catch (error) {
-      console.error("Error formatting date in AppointmentList:", dateString, error)
-      return "日付表示エラー"
+  const handleEditComplete = () => {
+    setEditingAppointment(null)
+    onUpdate(phoneNumber)
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "confirmed":
+        return (
+          <span className="flex items-center text-sm font-semibold text-green-600">
+            <CheckCircle className="mr-1 h-4 w-4" />
+            予約確定
+          </span>
+        )
+      case "cancelled":
+        return (
+          <span className="flex items-center text-sm font-semibold text-red-600">
+            <XCircle className="mr-1 h-4 w-4" />
+            キャンセル済
+          </span>
+        )
+      default:
+        return <span className="text-sm font-semibold text-gray-500">{status}</span>
     }
   }
 
   return (
-    <>
-      <div className="space-y-6">
-        <Card className="w-full shadow-md border-gray-100">
-          <CardHeader>
-            <CardTitle className="text-xl text-center text-gray-800">予約一覧</CardTitle>
-            <CardDescription className="text-center">電話番号 {phoneNumber} に関連する予約一覧です</CardDescription>
-          </CardHeader>
-          <CardContent>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>ご予約一覧</CardTitle>
+          <CardDescription>お客様の今後のご予約と過去のご予約です。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {appointments.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">予約情報がありません。</p>
+          ) : (
             <div className="space-y-4">
-              {appointments.map((appointment) => {
-                const reservationDate = appointment.reservation_date ? new Date(appointment.reservation_date) : null
-                const isCancellable = reservationDate ? isBefore(startOfDay(new Date()), reservationDate) : false
-
-                return (
-                  <Card key={appointment.id} className="overflow-hidden">
-                    <div
-                      className="h-2"
-                      style={{ backgroundColor: appointment.service_types?.color || "#f8a0a0" }}
-                    ></div>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">{appointment.service_types?.name}</h3>
-                          <p className="text-gray-500 text-sm">
-                            {appointment.service_types?.duration}分 • {appointment.clinics?.name}
-                          </p>
-                        </div>
-                        <Badge
-                          className={
-                            appointment.status === "confirmed"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }
-                        >
-                          {appointment.status === "confirmed" ? "予約確定" : "キャンセル済み"}
-                        </Badge>
+              {appointments.map((appointment) => (
+                <Card key={appointment.id} className="overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  <div
+                    className={`p-4 border-l-4 ${
+                      appointment.status === "cancelled" ? "border-red-400 bg-red-50" : "border-pink-400 bg-white"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="font-bold text-lg text-gray-800">
+                        {appointment.service_types?.name || "サービス不明"}
                       </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                        <div className="flex items-center">
-                          <CalendarIcon className="h-4 w-4 mr-2 text-gray-500" />
-                          <span>{safeFormatDate(appointment.reservation_date)}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                          <span>
-                            {appointment.start_time?.substring(0, 5)} - {appointment.end_time?.substring(0, 5)}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                          <span>{appointment.clinics?.address || "住所情報なし"}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                          <span>{appointment.clinics?.phone || "電話番号情報なし"}</span>
-                        </div>
-                      </div>
-
-                      {appointment.status === "confirmed" && (
-                        <div className="flex justify-end">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="inline-block">
-                                  <Button
-                                    variant="outline"
-                                    className="text-red-500 border-red-200 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
-                                    onClick={() => handleCancelClick(appointment)}
-                                    disabled={!isCancellable}
-                                  >
-                                    予約をキャンセル
-                                  </Button>
-                                </div>
-                              </TooltipTrigger>
-                              {!isCancellable && (
-                                <TooltipContent>
-                                  <p>オンラインでのキャンセルは前日までです。</p>
-                                </TooltipContent>
+                      {getStatusBadge(appointment.status)}
+                    </div>
+                    <div className="mt-2 space-y-1 text-gray-600">
+                      <p className="flex items-center">
+                        <Calendar className="mr-2 h-4 w-4 text-gray-500" />
+                        <strong>日時:</strong>
+                        <span className="ml-2">
+                          {safeFormatDate(appointment.reservation_date)} {safeFormatTime(appointment.start_time)}
+                        </span>
+                      </p>
+                      <p className="flex items-center">
+                        <Building className="mr-2 h-4 w-4 text-gray-500" />
+                        <strong>クリニック:</strong>
+                        <span className="ml-2">{appointment.clinics?.name || "クリニック不明"}</span>
+                      </p>
+                    </div>
+                    {appointment.status !== "cancelled" && new Date(appointment.reservation_date) >= new Date() && (
+                      <div className="mt-4 flex justify-end space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => setEditingAppointment(appointment)}>
+                          <Edit className="mr-1 h-4 w-4" />
+                          変更
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" disabled={isCancelling === appointment.id}>
+                              {isCancelling === appointment.id ? (
+                                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="mr-1 h-4 w-4" />
                               )}
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                              キャンセル
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>予約をキャンセルしますか？</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                この操作は元に戻せません。本当にこの予約をキャンセルしてもよろしいですか？
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>いいえ</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleCancel(appointment.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                はい、キャンセルします
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <AlertDialog open={!!appointmentToCancel} onOpenChange={(open) => !open && setAppointmentToCancel(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>予約をキャンセルしますか？</AlertDialogTitle>
-            <AlertDialogDescription>
-              この操作は元に戻せません。キャンセル後、再度予約が必要な場合は、新しく予約を取り直してください。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>戻る</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmCancel} className="bg-red-500 hover:bg-red-600">
-              はい、キャンセルする
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      {cancelError && (
+        <Alert variant="destructive">
+          <AlertTitle>エラー</AlertTitle>
+          <AlertDescription>{cancelError}</AlertDescription>
+        </Alert>
+      )}
+
+      {editingAppointment && (
+        <AppointmentEditor
+          appointment={editingAppointment}
+          onClose={() => setEditingAppointment(null)}
+          onComplete={handleEditComplete}
+        />
+      )}
+    </div>
   )
 }
