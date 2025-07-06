@@ -28,53 +28,18 @@ const timeToMinutes = (time: string): number => {
   return hours * 60 + minutes
 }
 
-export async function getReservationDatesForMonth(month: string) {
-  noStore()
-  const supabase = createClient()
-
-  try {
-    const targetMonth = new Date(`${month}-01T00:00:00Z`)
-    const startDate = startOfMonth(targetMonth)
-    const endDate = endOfMonth(targetMonth)
-
-    const { data, error } = await supabase
-      .from("reservations")
-      .select("reservation_date")
-      .gte("reservation_date", format(startDate, "yyyy-MM-dd"))
-      .lte("reservation_date", format(endDate, "yyyy-MM-dd"))
-      .neq("status", "cancelled")
-
-    if (error) {
-      console.error("Error fetching reservation dates:", error.message)
-      throw new Error("予約日の取得に失敗しました。")
-    }
-
-    // Get unique dates
-    const uniqueDates = [...new Set(data.map((r) => r.reservation_date))]
-    return { dates: uniqueDates }
-  } catch (error) {
-    console.error(
-      "An unexpected error occurred in getReservationDatesForMonth:",
-      error instanceof Error ? error.message : "Unknown error",
-    )
-    return { error: "予約日の取得中にエラーが発生しました。" }
-  }
-}
-
 export async function getAppointments({
   page = 1,
   limit = 10,
   sortBy = "reservation_date",
   sortOrder = "desc",
   search = "",
-  date,
 }: {
   page?: number
   limit?: number
   sortBy?: string
   sortOrder?: "asc" | "desc"
   search?: string
-  date?: string
 }) {
   noStore()
   const supabase = createClient()
@@ -87,10 +52,6 @@ export async function getAppointments({
 
     if (search) {
       query = query.ilike("patients.name", `%${search}%`)
-    }
-
-    if (date) {
-      query = query.eq("reservation_date", date)
     }
 
     const sortableColumns: { [key: string]: string } = {

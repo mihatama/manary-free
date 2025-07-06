@@ -1,28 +1,15 @@
 "use server"
 
-import { z } from "zod"
-import { createServerClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
+import { z } from "zod"
 
-// Helper function to format phone number to E.164
-function formatPhoneNumber(phone: string): string {
-  if (!phone) return ""
-  // Remove non-digit characters
-  let digits = phone.replace(/\D/g, "")
-  // If it starts with 0, replace with +81
-  if (digits.startsWith("0")) {
-    digits = "81" + digits.substring(1)
-  }
-  // If it doesn't start with +, add it
-  if (!digits.startsWith("+")) {
-    digits = "+" + digits
-  }
-  return digits
-}
+// This action requires Supabase Admin privileges.
+// Ensure SUPABASE_SERVICE_ROLE_KEY is set in your environment variables.
+const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function getUsers() {
-  const supabase = createServerClient()
-  const { data, error } = await supabase.auth.admin.listUsers({
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers({
     page: 1,
     perPage: 100,
   })
@@ -35,21 +22,15 @@ export async function getUsers() {
   return data.users
 }
 
-const userSchema = z.object({
+const CreateUserSchema = z.object({
   email: z.string().email({ message: "有効なメールアドレスを入力してください。" }),
-  password: z.string().min(6, { message: "パスワードは6文字以上で入力してください。" }),
-  phone: z.string().optional(),
-  isAdmin: z.boolean(),
+  password: z.string().min(8, { message: "パスワードは8文字以上である必要があります。" }),
 })
 
 export async function createUser(prevState: any, formData: FormData) {
-  const supabase = createServerClient()
-
-  const validatedFields = userSchema.safeParse({
+  const validatedFields = CreateUserSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
-    phone: formData.get("phone"),
-    isAdmin: formData.get("isAdmin") === "on",
   })
 
   if (!validatedFields.success) {
@@ -60,95 +41,38 @@ export async function createUser(prevState: any, formData: FormData) {
     }
   }
 
-  const { email, password, phone, isAdmin } = validatedFields.data
+  const { email, password } = validatedFields.data
+  const isAdmin = formData.get("isAdmin") === "on"
 
-  const formattedPhone = phone ? formatPhoneNumber(phone) : undefined
+  const userMetadata = isAdmin ? { role: "admin" } : {}
 
-  const { data: user, error } = await supabase.auth.admin.createUser({
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    phone: formattedPhone,
-    email_confirm: true, // Automatically confirm user
-    user_metadata: {
-      role: isAdmin ? "admin" : null,
-      raw_phone: phone || null, // Store original phone number
-    },
+    email_confirm: true,
+    user_metadata: userMetadata,
   })
 
   if (error) {
-    console.error("Error creating user:", error)
-    return { message: `ユーザーの作成に失敗しました: ${error.message}`, success: false }
-  }
-
-  revalidatePath("/dashboard/users")
-  return { message: "新しい利用者を正常に作成しました。", success: true }
-}
-
-const updateUserSchema = z.object({
-  userId: z.string(),
-  email: z.string().email({ message: "有効なメールアドレスを入力してください。" }),
-  phone: z.string().optional(),
-  password: z.string().optional(),
-  isAdmin: z.boolean(),
-})
-
-export async function updateUser(prevState: any, formData: FormData) {
-  const supabase = createServerClient()
-
-  const validatedFields = updateUserSchema.safeParse({
-    userId: formData.get("userId"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
-    password: formData.get("password"),
-    isAdmin: formData.get("isAdmin") === "on",
-  })
-
-  if (!validatedFields.success) {
     return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: "入力内容に誤りがあります。",
+      errors: null,
+      message: `ユーザーの作成に失敗しました: ${error.message}`,
       success: false,
     }
   }
 
-  const { userId, email, phone, password, isAdmin } = validatedFields.data
-
-  const updateData: { email?: string; phone?: string; password?: string; user_metadata?: any } = {
-    email,
-    user_metadata: {
-      role: isAdmin ? "admin" : null,
-      raw_phone: phone || null, // Store original phone number
-    },
-  }
-
-  if (phone) {
-    const formattedPhone = formatPhoneNumber(phone)
-    updateData.phone = formattedPhone
-  } else {
-    updateData.phone = "" // Clear the phone number if empty
-  }
-
-  if (password) {
-    if (password.length < 6) {
-      return {
-        errors: { password: ["パスワードは6文字以上で入力してください。"] },
-        message: "パスワードが短すぎます。",
-        success: false,
-      }
-    }
-    updateData.password = password
-  }
-
-  const { error } = await supabase.auth.admin.updateUserById(userId, updateData)
-
-  if (error) {
-    console.error("Error updating user:", error)
+  if (!data.user) {
     return {
-      message: `ユーザー情報の更新に失敗しました: ${error.message}`,
+      errors: null,
+      message: "ユーザーの作成に失敗しました: 予期せぬエラーが発生しました。",
       success: false,
     }
   }
 
   revalidatePath("/dashboard/users")
-  return { message: "ユーザー情報を正常に更新しました。", success: true }
+  return {
+    errors: null,
+    message: `ユーザー ${data.user.email} を作成しました。${isAdmin ? " (管理者)" : ""}`,
+    success: true,
+  }
 }
