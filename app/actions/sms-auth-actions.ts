@@ -92,7 +92,7 @@ export async function getAppointmentsByPhone(
         clinics (
           name,
           address,
-          phone
+          phone_number
         )
       `,
       )
