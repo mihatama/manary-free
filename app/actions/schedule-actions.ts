@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import type { Database } from "@/lib/supabase/database.types"
 import { validateCSRFToken } from "@/lib/csrf"
+import { startOfMonth, endOfMonth, eachDayOfInterval, getDay, format } from "date-fns"
+import { unstable_noStore as noStore } from "next/cache"
 
 type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
@@ -592,5 +594,94 @@ export async function getAvailabilitySettingsForClinic(clinicId: number) {
   } catch (error) {
     console.error("Error in getAvailabilitySettingsForClinic", error)
     throw new Error("予約可能時間データの取得に失敗しました")
+  }
+}
+
+// Helper to parse time robustly, accepting HH:mm and HH:mm:ss
+const parseTimeToDate = (timeStr: string, date: Date): Date | null => {
+  if (!timeStr || !/^\d{2}:\d{2}(:\d{2})?$/.test(timeStr)) {
+    return null
+  }
+  const parts = timeStr.split(":").map(Number)
+  const newDate = new Date(date)
+  newDate.setHours(parts[0], parts[1], parts[2] || 0, 0)
+  return newDate
+}
+
+export async function getScheduleEventsForMonth(clinicId: number, month: string) {
+  noStore()
+  try {
+    const targetMonth = new Date(`${month}-01T00:00:00`)
+    const startDate = startOfMonth(targetMonth)
+    const endDate = endOfMonth(targetMonth)
+
+    // Fetch all availability settings for the clinic, with service type info
+    const settings = await getAvailabilitySettingsForClinic(clinicId)
+
+    const calendarEvents: {
+      title: string
+      start: string // ISO string
+      end: string // ISO string
+      isAvailable: boolean
+      isSpecificDate: boolean
+      color: string | null
+      resource: any // The original setting object
+    }[] = []
+
+    const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate })
+    const weeklySettings = settings.filter((s) => s.day_of_week !== null && !s.specific_date)
+    const specificDateSettings = settings.filter((s) => s.specific_date)
+
+    for (const day of daysInMonth) {
+      const dayStr = format(day, "yyyy-MM-dd")
+      const dayOfWeek = getDay(day)
+
+      // Process specific date settings for this day
+      const specificSettingsForDay = specificDateSettings.filter((s) => s.specific_date === dayStr)
+      for (const setting of specificSettingsForDay) {
+        const start = parseTimeToDate(setting.start_time, day)
+        const end = parseTimeToDate(setting.end_time, day)
+        if (start && end) {
+          calendarEvents.push({
+            title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
+            start: start.toISOString(),
+            end: end.toISOString(),
+            isAvailable: setting.is_available,
+            isSpecificDate: true,
+            color: setting.service_types?.color || "#808080",
+            resource: setting,
+          })
+        }
+      }
+
+      // Process weekly settings for this day, only if no specific setting overrides it
+      if (specificSettingsForDay.length === 0) {
+        const weeklySettingsForDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
+        for (const setting of weeklySettingsForDay) {
+          // If there's an end_date, don't show past it
+          if (setting.end_date && day > new Date(setting.end_date)) {
+            continue
+          }
+          const start = parseTimeToDate(setting.start_time, day)
+          const end = parseTimeToDate(setting.end_time, day)
+          if (start && end) {
+            calendarEvents.push({
+              title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
+              start: start.toISOString(),
+              end: end.toISOString(),
+              isAvailable: setting.is_available,
+              isSpecificDate: false,
+              color: setting.service_types?.color || "#808080",
+              resource: setting,
+            })
+          }
+        }
+      }
+    }
+
+    return { events: calendarEvents }
+  } catch (error: any) {
+    console.error(`[Action:getScheduleEventsForMonth] CATCH ERROR:`, error.message)
+    return { error: error.message || "カレンダーのデータ取得中にエラーが発生しました。" }
   }
 }
