@@ -82,19 +82,19 @@ export async function getAppointmentsByPhone(
       .from("reservations")
       .select(
         `
-          *,
-          service_types (
-            id,
-            name,
-            duration,
-            color
-          ),
-          clinics (
-            name,
-            address,
-            phone
-          )
-        `,
+        *,
+        service_types (
+          id,
+          name,
+          duration,
+          color
+        ),
+        clinics (
+          name,
+          address,
+          phone
+        )
+      `,
       )
       .eq("patient_phone", phoneNumber)
       .neq("status", "cancelled")
@@ -102,8 +102,9 @@ export async function getAppointmentsByPhone(
       .order("start_time", { ascending: true })
 
     if (error) {
-      console.error("予約取得エラー:", error)
-      return { success: false, error: "予約情報の取得に失敗しました。" }
+      console.error("Supabase予約取得エラー:", error) // Log the full error object
+      // Return the specific error message instead of a generic one
+      return { success: false, error: `データベースエラー: ${error.message}` }
     }
 
     return { success: true, data: data }
