@@ -188,31 +188,86 @@ export async function submitAndLinkQuestionnaire(formData: FormData) {
   const supabase = createClient()
   const rawData = Object.fromEntries(formData.entries())
 
-  const reservation_id_raw = rawData.reservation_id
-  if (!reservation_id_raw) {
+  const appointment_id_raw = rawData.appointment_id
+  if (!appointment_id_raw) {
     return { success: false, message: "予約IDが見つかりません。" }
   }
-  const reservation_id = Number(reservation_id_raw)
+  const appointment_id = Number(appointment_id_raw)
 
-  // We don't want to store the reservation_id inside the data blob
+  // We don't want to store these in the data blob
   const dataForBlob = { ...rawData }
-  delete (dataForBlob as any).reservation_id
+  delete (dataForBlob as any).appointment_id
+  delete (dataForBlob as any).appointment_token
+  delete (dataForBlob as any).csrf_token
+  delete (dataForBlob as any).phone_number // This is on the appointment, not needed in blob
 
-  const questionnairePayload: QuestionnaireInsert = {
-    reservation_id: reservation_id,
-    data: dataForBlob,
+  // Fetch the appointment to check for an existing questionnaire
+  const { data: appointment, error: appointmentError } = await supabase
+    .from("appointments")
+    .select("questionnaire_id")
+    .eq("id", appointment_id)
+    .single()
+
+  if (appointmentError) {
+    console.error("Error fetching appointment:", appointmentError.message)
+    return { success: false, message: "予約情報の取得に失敗しました。" }
   }
 
-  const { data, error } = await supabase.from("questionnaires").insert(questionnairePayload).select().single()
+  let questionnaire
+  let message = "問診票が正常に送信されました。"
 
-  if (error) {
-    console.error("Error submitting and linking questionnaire:", error.message)
-    return { success: false, message: "問診票の提出に失敗しました。" }
+  if (appointment.questionnaire_id) {
+    // Update existing questionnaire
+    const { data: updatedQuestionnaire, error } = await supabase
+      .from("questionnaires")
+      .update({ data: dataForBlob, updated_at: new Date().toISOString() })
+      .eq("id", appointment.questionnaire_id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating questionnaire:", error.message)
+      return { success: false, message: "問診票の更新に失敗しました。" }
+    }
+    questionnaire = updatedQuestionnaire
+    message = "問診票が正常に更新されました。"
+  } else {
+    // Insert new questionnaire
+    const questionnairePayload: any = {
+      appointment_id: appointment_id,
+      data: dataForBlob,
+    }
+    const { data: newQuestionnaire, error: insertError } = await supabase
+      .from("questionnaires")
+      .insert(questionnairePayload)
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error("Error inserting questionnaire:", insertError.message)
+      return { success: false, message: "問診票の作成に失敗しました。" }
+    }
+    questionnaire = newQuestionnaire
+
+    // Link questionnaire to appointment
+    const { error: updateAppointmentError } = await supabase
+      .from("appointments")
+      .update({ questionnaire_id: questionnaire.id })
+      .eq("id", appointment_id)
+
+    if (updateAppointmentError) {
+      console.error("Error updating appointment with questionnaire_id:", updateAppointmentError.message)
+      // Not fatal, but should be logged.
+    }
   }
 
   revalidatePath("/dashboard/questionnaires")
-  revalidatePath(`/reservation/questionnaire/success?reservation_id=${reservation_id}`)
-  return { success: true, message: "問診票が正常に提出されました。", data }
+  if (rawData.appointment_token) {
+    revalidatePath(`/reservation/questionnaire?token=${rawData.appointment_token}`)
+  }
+  revalidatePath(`/reservation/questionnaire/success`)
+
+  return { success: true, message, data: questionnaire }
 }
 
 export async function getLatestQuestionnaireByPhone(phone: string): Promise<{ [key: string]: any } | null> {

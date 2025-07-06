@@ -3,7 +3,7 @@ import { getAppointmentByToken } from "@/app/actions/reservation-actions"
 import { DetailedQuestionnaireForm } from "@/components/detailed-questionnaire-form"
 import { redirect } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getLatestQuestionnaireByPhone } from "@/app/actions/questionnaire-actions"
+import { getLatestQuestionnaireByPhone, getQuestionnaireById } from "@/app/actions/questionnaire-actions"
 
 function QuestionnairePageContent({ token }: { token: string }) {
   return (
@@ -25,22 +25,34 @@ async function QuestionnaireLoader({ token }: { token: string }) {
     )
   }
 
-  if (appointment.questionnaire_id) {
-    return (
-      <div className="container mx-auto p-4 md:p-8 text-center">
-        <h1 className="text-2xl font-bold mb-4 text-green-600">送信済み</h1>
-        <p>問診票はすでに提出済みです。ご協力ありがとうございました。</p>
-      </div>
-    )
-  }
+  let previousData: { [key: string]: any } | null = null
+  let isSubmitted = false
 
-  const previousData = appointment.patient_phone ? await getLatestQuestionnaireByPhone(appointment.patient_phone) : null
+  if (appointment.questionnaire_id) {
+    isSubmitted = true
+    const existingQuestionnaire = await getQuestionnaireById(appointment.questionnaire_id)
+    if (
+      existingQuestionnaire &&
+      typeof existingQuestionnaire.data === "object" &&
+      existingQuestionnaire.data !== null
+    ) {
+      previousData = existingQuestionnaire.data as { [key: string]: any }
+    }
+  } else if (appointment.patient_phone) {
+    previousData = await getLatestQuestionnaireByPhone(appointment.patient_phone)
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-8">
       <h1 className="text-2xl font-bold mb-4 text-center text-[#f8a0a0]">問診票</h1>
-      <p className="mb-6 text-center text-gray-600">※ わかる範囲で結構ですので、ご記入ください。</p>
-      {previousData && (
+      {isSubmitted ? (
+        <p className="mb-6 text-center text-gray-500 text-sm bg-green-50 p-3 rounded-md">
+          問診票は提出済みです。内容をご確認・修正の上、再度送信してください。
+        </p>
+      ) : (
+        <p className="mb-6 text-center text-gray-600">※ わかる範囲で結構ですので、ご記入ください。</p>
+      )}
+      {previousData && !isSubmitted && (
         <p className="mb-6 text-center text-gray-500 text-sm bg-blue-50 p-3 rounded-md">
           以前ご入力いただいた内容を読み込みました。内容をご確認・修正の上、送信してください。
         </p>

@@ -62,7 +62,7 @@ export function DetailedQuestionnaireForm({ appointment, previousData }: Detaile
     setIsSubmitting(true)
     setError(null)
 
-    formData.append("reservation_id", String(appointment.id))
+    formData.append("appointment_id", String(appointment.id))
     formData.append("appointment_token", appointment.token)
     formData.append("phone_number", appointment.patient_phone)
 
@@ -780,7 +780,7 @@ export function DetailedQuestionnaireForm({ appointment, previousData }: Detaile
 
       <div className="text-center">
         <p className="text-sm text-gray-500 mb-4">
-          ご記入していただいた情報は、「助産院・こよみ」のケア及びサービスでのみ活用させていただきます。ご協力ありがとうございました。
+          ご記入していただいた情報は、ケア及びサービスでのみ活用させていただきます。ご協力ありがとうございました。
         </p>
         <Button type="submit" disabled={isSubmitting} className="w-full max-w-md bg-[#f8a0a0] hover:bg-[#f78b8b]">
           {isSubmitting ? "送信中..." : "問診票を送信する"}
