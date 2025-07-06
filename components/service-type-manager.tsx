@@ -1,9 +1,9 @@
 "use client"
 
-import { DialogTrigger } from "@/components/ui/dialog"
+import type React from "react"
 
-import { useState, useEffect } from "react"
-import { Plus, Edit, Trash2 } from "lucide-react"
+import { useState } from "react"
+import { Plus, Edit, Trash2, Clock, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,109 +15,49 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  getServiceTypes,
-  createServiceType,
-  updateServiceType,
-  deleteServiceType,
-} from "@/app/actions/schedule-actions"
+import { createServiceType, updateServiceType, deleteServiceType } from "@/app/actions/schedule-actions"
 import type { Database } from "@/lib/supabase/database.types"
 import { useCSRF } from "@/hooks/use-csrf"
 
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
+type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 
 interface ServiceTypeManagerProps {
-  clinicId: number
-  onSelectServiceType: (serviceType: ServiceType | null) => void
+  clinic: Clinic
+  serviceTypes: ServiceType[]
+  isLoading: boolean
+  error: string | null
+  onUpdate: () => void
   selectedServiceTypeId: number | null
+  onSelectServiceType: (serviceType: ServiceType | null) => void
 }
 
-export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServiceTypeId }: ServiceTypeManagerProps) {
-  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export function ServiceTypeManager({
+  clinic,
+  serviceTypes,
+  isLoading,
+  error,
+  onUpdate,
+  selectedServiceTypeId,
+  onSelectServiceType,
+}: ServiceTypeManagerProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingServiceType, setEditingServiceType] = useState<ServiceType | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
-  // フォーム状態
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [duration, setDuration] = useState("60")
-  const [color, setColor] = useState("#f8a0a0")
-
-  const { csrfToken, isLoading: isLoadingCSRF, error: csrfError } = useCSRF()
-
-  // 診療所IDが変更されたときに診療種別を読み込む
-  useEffect(() => {
-    if (!clinicId) {
-      setServiceTypes([])
-      setIsLoading(false)
-      return
-    }
-
-    let isMounted = true
-    async function loadServiceTypes() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const data = await getServiceTypes(clinicId)
-        if (isMounted) {
-          setServiceTypes(data)
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError("診療種別の読み込みに失敗しました")
-          console.error(err)
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadServiceTypes()
-
-    return () => {
-      isMounted = false
-    }
-  }, [clinicId])
-
-  // 読み込み完了後、またはリストが変更された後に選択状態を管理する
-  useEffect(() => {
-    if (isLoading) return
-
-    if (serviceTypes.length > 0) {
-      const selectionExists = serviceTypes.some((st) => st.id === selectedServiceTypeId)
-      if (!selectionExists) {
-        onSelectServiceType(serviceTypes[0])
-      }
-    } else {
-      onSelectServiceType(null)
-    }
-  }, [serviceTypes, isLoading, onSelectServiceType, selectedServiceTypeId])
+  const { csrfToken, isLoading: isLoadingCSRF } = useCSRF()
 
   const resetForm = () => {
-    setName("")
-    setDescription("")
-    setDuration("60")
-    setColor("#f8a0a0")
     setEditingServiceType(null)
+    setFormError(null)
   }
 
   const handleOpenDialog = (serviceType?: ServiceType) => {
-    if (serviceType) {
-      setEditingServiceType(serviceType)
-      setName(serviceType.name)
-      setDescription(serviceType.description || "")
-      setDuration(serviceType.duration.toString())
-      setColor(serviceType.color)
-    } else {
-      resetForm()
-    }
+    setEditingServiceType(serviceType || null)
     setIsDialogOpen(true)
   }
 
@@ -126,93 +66,64 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
     resetForm()
   }
 
-  const handleSubmit = async () => {
-    if (!name.trim()) {
-      // Prevent submission if name is empty
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!csrfToken) {
+      setFormError("セキュリティトークンがありません。ページをリロードしてください。")
       return
     }
 
     setIsSubmitting(true)
-    setError(null)
+    setFormError(null)
+
+    const formData = new FormData(event.currentTarget)
+    formData.append("csrf_token", csrfToken)
+    formData.append("clinic_id", clinic.id.toString())
+    if (editingServiceType) {
+      formData.append("id", editingServiceType.id.toString())
+    }
+
     try {
-      if (!csrfToken) {
-        setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
-        return
-      }
-
-      const formData = new FormData()
-      formData.append("csrf_token", csrfToken)
-
-      if (editingServiceType) {
-        // 更新
-        formData.append("id", editingServiceType.id.toString())
-        formData.append("name", name)
-        formData.append("description", description)
-        formData.append("duration", duration)
-        formData.append("color", color)
-
-        const updated = await updateServiceType(formData)
-        setServiceTypes((prev) => prev.map((st) => (st.id === updated.id ? updated : st)))
-
-        if (selectedServiceTypeId === updated.id) {
-          onSelectServiceType(updated)
-        }
-      } else {
-        // 新規作成
-        formData.append("clinic_id", clinicId.toString())
-        formData.append("name", name)
-        formData.append("description", description)
-        formData.append("duration", duration)
-        formData.append("color", color)
-
-        const created = await createServiceType(formData)
-        setServiceTypes((prev) => [...prev, created])
-      }
+      const action = editingServiceType ? updateServiceType : createServiceType
+      await action(formData)
+      onUpdate() // Notify parent to refresh data
       handleCloseDialog()
     } catch (err) {
-      console.error("Service type operation error", err)
-      setError("データの保存に失敗しました。もう一度お試しください。")
+      setFormError(err instanceof Error ? err.message : "保存中にエラーが発生しました。")
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleDelete = async (id: number) => {
-    // Store original state for potential rollback
-    const originalServiceTypes = [...serviceTypes]
+    if (!window.confirm("この診療種別を削除しますか？関連する予約可能時間設定も全て削除されます。")) {
+      return
+    }
+    if (!csrfToken) {
+      alert("セキュリティトークンがありません。ページをリロードしてください。")
+      return
+    }
 
-    // Optimistically update the UI
-    setServiceTypes((prev) => prev.filter((st) => st.id !== id))
+    const formData = new FormData()
+    formData.append("id", id.toString())
+    formData.append("csrf_token", csrfToken)
 
     try {
-      if (!csrfToken) {
-        setError("セキュリティトークンが利用できません。ページを再読み込みしてください。")
-        setServiceTypes(originalServiceTypes) // Rollback
-        return
-      }
-
-      const formData = new FormData()
-      formData.append("csrf_token", csrfToken)
-      formData.append("id", id.toString())
-
       await deleteServiceType(formData)
-      // On success, the optimistic update is now confirmed.
+      onUpdate() // Notify parent to refresh data
     } catch (err) {
-      console.error("Service type deletion error:", err)
-      setError("データの削除に失敗しました。もう一度お試しください。")
-      // Rollback on error
-      setServiceTypes(originalServiceTypes)
+      alert(err instanceof Error ? err.message : "削除中にエラーが発生しました。")
     }
   }
 
-  if (isLoading && !serviceTypes.length) {
+  if (isLoading) {
     return <div className="text-sm text-gray-500">読み込み中...</div>
   }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">診療種別</h3>
+        <h3 className="text-lg font-medium">{clinic.name} の診療種別</h3>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
@@ -225,70 +136,94 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingServiceType ? "診療種別を編集" : "新しい診療種別"}</DialogTitle>
-              <DialogDescription>診療種別の詳細情報を入力してください。</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">名前</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="例: 初診相談"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">説明</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="例: 初めての方向けの相談"
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit}>
+              <DialogHeader>
+                <DialogTitle>{editingServiceType ? "診療種別を編集" : "新しい診療種別"}</DialogTitle>
+                <DialogDescription>診療種別の詳細情報を入力してください。</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="duration">所要時間（分）</Label>
+                  <Label htmlFor="name">名前</Label>
                   <Input
-                    id="duration"
-                    type="number"
-                    min="5"
-                    step="5"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
+                    id="name"
+                    name="name"
+                    defaultValue={editingServiceType?.name}
+                    placeholder="例: 初診相談"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="color">表示色</Label>
-                  <div className="flex items-center space-x-2">
+                  <Label htmlFor="description">説明</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    defaultValue={editingServiceType?.description || ""}
+                    placeholder="例: 初めての方向けの相談"
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="duration">所要時間（分）</Label>
+                    <Input
+                      id="duration"
+                      name="duration"
+                      type="number"
+                      min="5"
+                      step="5"
+                      defaultValue={editingServiceType?.duration || 60}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="interval_minutes">インターバル（分）</Label>
+                    <Input
+                      id="interval_minutes"
+                      name="interval_minutes"
+                      type="number"
+                      min="0"
+                      step="5"
+                      defaultValue={editingServiceType?.interval_minutes || 0}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">価格（円）</Label>
+                    <Input
+                      id="price"
+                      name="price"
+                      type="number"
+                      min="0"
+                      defaultValue={editingServiceType?.price || 10000}
+                      placeholder="例: 10000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="color">表示色</Label>
                     <Input
                       id="color"
+                      name="color"
                       type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                      className="w-12 h-10 p-1"
+                      defaultValue={editingServiceType?.color || "#f8a0a0"}
+                      className="w-full h-10 p-1"
                     />
-                    <Input type="text" value={color} onChange={(e) => setColor(e.target.value)} className="flex-1" />
                   </div>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={handleCloseDialog}>
-                キャンセル
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting || isLoadingCSRF || !name.trim()}
-                className="bg-manary-pink hover:bg-[#f78989] text-foreground"
-              >
-                {isSubmitting ? "保存中..." : "保存"}
-              </Button>
-            </DialogFooter>
+              {formError && <p className="text-sm text-red-500">{formError}</p>}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                  キャンセル
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || isLoadingCSRF}
+                  className="bg-manary-pink hover:bg-[#f78989] text-foreground"
+                >
+                  {isSubmitting ? "保存中..." : "保存"}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -307,7 +242,7 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: serviceType.color }} />
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: serviceType.color || "#ccc" }} />
                   <CardTitle className="text-base">{serviceType.name}</CardTitle>
                 </div>
                 <div className="flex space-x-1">
@@ -336,11 +271,21 @@ export function ServiceTypeManager({ clinicId, onSelectServiceType, selectedServ
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pb-2">
+            <CardContent className="pb-2 min-h-[40px]">
               <CardDescription className="line-clamp-2">{serviceType.description || "説明なし"}</CardDescription>
             </CardContent>
-            <CardFooter className="pt-0">
-              <p className="text-sm text-gray-500">所要時間: {serviceType.duration}分</p>
+            <CardFooter className="pt-2 flex justify-between items-center text-sm text-gray-600">
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                <span>
+                  {serviceType.duration}分{" "}
+                  {serviceType.interval_minutes > 0 ? `(+${serviceType.interval_minutes}分)` : ""}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Tag className="h-4 w-4" />
+                <span className="font-semibold">{(serviceType.price ?? 0).toLocaleString()}円</span>
+              </div>
             </CardFooter>
           </Card>
         ))}

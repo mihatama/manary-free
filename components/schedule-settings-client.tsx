@@ -1,56 +1,99 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ClinicManager } from "@/components/clinic-manager"
 import { ServiceTypeManager } from "@/components/service-type-manager"
 import { AvailabilityScheduler } from "@/components/availability-scheduler"
 import { ScheduleCalendar } from "@/components/schedule-calendar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Database } from "@/lib/supabase/database.types"
-import { getClinics } from "@/app/actions/schedule-actions"
+import { getClinics, getServiceTypes } from "@/app/actions/schedule-actions"
 
 type Clinic = Database["public"]["Tables"]["clinics"]["Row"]
 type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
 export function ScheduleSettingsClient() {
+  // Clinics state
   const [clinics, setClinics] = useState<Clinic[]>([])
   const [isLoadingClinics, setIsLoadingClinics] = useState(true)
   const [clinicsError, setClinicsError] = useState<string | null>(null)
-
   const [selectedClinicId, setSelectedClinicId] = useState<number | null>(null)
-  const [selectedServiceType, setSelectedServiceType] = useState<ServiceType | null>(null)
+
+  // Service Types state
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
+  const [isLoadingServiceTypes, setIsLoadingServiceTypes] = useState(false)
+  const [serviceTypesError, setServiceTypesError] = useState<string | null>(null)
+  const [selectedServiceTypeId, setSelectedServiceTypeId] = useState<number | null>(null)
+
+  // Derived state
+  const selectedClinic = useMemo(
+    () => clinics.find((c) => c.id === selectedClinicId) || null,
+    [clinics, selectedClinicId],
+  )
+  const selectedServiceType = useMemo(
+    () => serviceTypes.find((st) => st.id === selectedServiceTypeId) || null,
+    [serviceTypes, selectedServiceTypeId],
+  )
+
+  // Fetch clinics on mount
+  useEffect(() => {
+    refreshClinics()
+  }, [])
+
+  // Fetch service types when clinic changes
+  useEffect(() => {
+    if (selectedClinicId) {
+      refreshServiceTypes(selectedClinicId)
+    } else {
+      setServiceTypes([])
+      setSelectedServiceTypeId(null)
+    }
+  }, [selectedClinicId])
+
+  // Auto-select first service type if none is selected
+  useEffect(() => {
+    if (!isLoadingServiceTypes && serviceTypes.length > 0 && !selectedServiceTypeId) {
+      setSelectedServiceTypeId(serviceTypes[0].id)
+    }
+  }, [serviceTypes, isLoadingServiceTypes, selectedServiceTypeId])
 
   const refreshClinics = async () => {
+    setIsLoadingClinics(true)
+    setClinicsError(null)
     try {
-      setIsLoadingClinics(true)
-      setClinicsError(null) // Reset error state
       const data = await getClinics()
       setClinics(data)
-      // If the selected clinic was deleted, reset selection
       if (selectedClinicId && !data.some((c) => c.id === selectedClinicId)) {
         setSelectedClinicId(null)
-        setSelectedServiceType(null)
       }
     } catch (err) {
-      if (err instanceof Error) {
-        setClinicsError(err.message)
-      } else {
-        setClinicsError("助産院の読み込み中に不明なエラーが発生しました。")
-      }
-      console.error(err)
+      setClinicsError(err instanceof Error ? err.message : "助産院の読み込み中に不明なエラーが発生しました。")
     } finally {
       setIsLoadingClinics(false)
     }
   }
 
-  useEffect(() => {
-    refreshClinics()
-  }, [])
+  const refreshServiceTypes = async (clinicId: number) => {
+    setIsLoadingServiceTypes(true)
+    setServiceTypesError(null)
+    try {
+      const data = await getServiceTypes(clinicId)
+      setServiceTypes(data)
+      if (selectedServiceTypeId && !data.some((st) => st.id === selectedServiceTypeId)) {
+        setSelectedServiceTypeId(null)
+      }
+    } catch (err) {
+      setServiceTypesError(err instanceof Error ? err.message : "診療種別の読み込み中に不明なエラーが発生しました。")
+    } finally {
+      setIsLoadingServiceTypes(false)
+    }
+  }
 
   const handleSelectClinic = (clinicId: number | null) => {
     if (clinicId !== selectedClinicId) {
       setSelectedClinicId(clinicId)
-      setSelectedServiceType(null)
+      // Reset service type selection, will be auto-selected by useEffect
+      setSelectedServiceTypeId(null)
     }
   }
 
@@ -75,7 +118,7 @@ export function ScheduleSettingsClient() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <Tabs defaultValue="service-types">
+          <Tabs defaultValue="service-types" className="w-full">
             <TabsList className="mb-6">
               <TabsTrigger value="service-types">診療種別</TabsTrigger>
               <TabsTrigger value="availability">予約可能時間</TabsTrigger>
@@ -83,11 +126,15 @@ export function ScheduleSettingsClient() {
             </TabsList>
 
             <TabsContent value="service-types">
-              {selectedClinicId ? (
+              {selectedClinic ? (
                 <ServiceTypeManager
-                  clinicId={selectedClinicId}
-                  selectedServiceTypeId={selectedServiceType?.id || null}
-                  onSelectServiceType={setSelectedServiceType}
+                  clinic={selectedClinic}
+                  serviceTypes={serviceTypes}
+                  isLoading={isLoadingServiceTypes}
+                  error={serviceTypesError}
+                  onUpdate={() => refreshServiceTypes(selectedClinic.id)}
+                  selectedServiceTypeId={selectedServiceTypeId}
+                  onSelectServiceType={(st) => setSelectedServiceTypeId(st ? st.id : null)}
                 />
               ) : (
                 <div className="text-center py-8 border rounded-lg bg-gray-50">

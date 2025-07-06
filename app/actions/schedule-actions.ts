@@ -70,11 +70,6 @@ export async function getAvailabilitySettings(serviceTypeId: number) {
       throw new Error("データの取得に失敗しました")
     }
 
-    // --- DEBUG LOGGING: Inspect raw data from DB ---
-    console.log(`[Server Action] Fetched availability settings for service_type_id: ${serviceTypeId}`)
-    console.log(JSON.stringify(data, null, 2))
-    // --- END DEBUG LOGGING ---
-
     return data
   } catch (error) {
     console.error("Error in getAvailabilitySettings", error)
@@ -197,7 +192,6 @@ function formatTime(minutes: number): string {
 
 // 診療種別を作成
 export async function createServiceType(formData: FormData) {
-  // CSRF検証
   try {
     await validateCSRF(formData)
 
@@ -206,7 +200,9 @@ export async function createServiceType(formData: FormData) {
       name: formData.get("name") as string,
       description: formData.get("description") as string,
       duration: Number(formData.get("duration")),
+      price: Number(formData.get("price")),
       color: formData.get("color") as string,
+      interval_minutes: Number(formData.get("interval_minutes")),
     }
 
     const supabase = createAdminClient()
@@ -219,24 +215,24 @@ export async function createServiceType(formData: FormData) {
         },
       ])
       .select()
+      .single()
 
     if (error) {
-      console.error("Database operation error")
+      console.error("Database operation error", error)
       throw new Error("データの保存に失敗しました")
     }
 
     revalidatePath("/dashboard/schedule-settings")
-    return data[0]
-  } catch (error) {
-    console.error("Error in createServiceType")
-    throw new Error("データの保存に失敗しました")
+    return data
+  } catch (error: any) {
+    console.error("Error in createServiceType", error)
+    throw new Error(error.message || "データの保存に失敗しました")
   }
 }
 
 // 診療種別を更新
 export async function updateServiceType(formData: FormData) {
   try {
-    // CSRF検証
     await validateCSRF(formData)
 
     const id = Number(formData.get("id"))
@@ -244,7 +240,9 @@ export async function updateServiceType(formData: FormData) {
       name: formData.get("name") as string,
       description: formData.get("description") as string,
       duration: Number(formData.get("duration")),
+      price: Number(formData.get("price")),
       color: formData.get("color") as string,
+      interval_minutes: Number(formData.get("interval_minutes")),
     }
 
     const supabase = createAdminClient()
@@ -256,24 +254,24 @@ export async function updateServiceType(formData: FormData) {
       })
       .eq("id", id)
       .select()
+      .single()
 
     if (error) {
-      console.error("Database operation error")
+      console.error("Database operation error", error)
       throw new Error("データの更新に失敗しました")
     }
 
     revalidatePath("/dashboard/schedule-settings")
-    return data[0]
-  } catch (error) {
-    console.error("Error in updateServiceType")
-    throw new Error("データの更新に失敗しました")
+    return data
+  } catch (error: any) {
+    console.error("Error in updateServiceType", error)
+    throw new Error(error.message || "データの更新に失敗しました")
   }
 }
 
 // 診療種別を削除
 export async function deleteServiceType(formData: FormData) {
   try {
-    // CSRF検証
     await validateCSRF(formData)
 
     const id = Number(formData.get("id"))
@@ -282,128 +280,21 @@ export async function deleteServiceType(formData: FormData) {
     const { error } = await supabase.from("service_types").delete().eq("id", id)
 
     if (error) {
-      console.error("Database operation error")
+      console.error("Database operation error", error)
       throw new Error("データの削除に失敗しました")
     }
 
     revalidatePath("/dashboard/schedule-settings")
     return { success: true }
-  } catch (error) {
-    console.error("Error in deleteServiceType")
-    throw new Error("データの削除に失敗しました")
-  }
-}
-
-// 予約可能時間を作成または更新
-export async function upsertAvailabilitySetting(formData: FormData) {
-  try {
-    // CSRF検証
-    await validateCSRF(formData)
-
-    const endDateValue = (formData.get("end_date") as string) || null
-    const setting = {
-      service_type_id: Number(formData.get("service_type_id")),
-      day_of_week: Number(formData.get("day_of_week")),
-      start_time: formData.get("start_time") as string,
-      end_time: formData.get("end_time") as string,
-      is_available: formData.get("is_available") === "true",
-      specific_date: (formData.get("specific_date") as string) || null,
-    }
-
-    // Add end_date only if the column exists in the database
-    try {
-      // Check if we have an end date value
-      if (endDateValue) {
-        console.log("End date provided:", endDateValue)
-        // @ts-ignore - We'll add this field even if TypeScript doesn't know about it yet
-        setting.end_date = endDateValue
-      }
-    } catch (error) {
-      console.error("Error setting end_date:", error)
-      // Continue without the end_date field
-    }
-
-    // デバッグ用
-    console.log("保存する設定:", setting)
-
-    const supabase = createAdminClient()
-
-    // 既存の設定を確認
-    let query = supabase
-      .from("availability_settings")
-      .select("id")
-      .eq("service_type_id", setting.service_type_id)
-      .eq("start_time", setting.start_time)
-      .eq("end_time", setting.end_time)
-
-    // 特定の日付が指定されている場合
-    if (setting.specific_date) {
-      console.log("特定日の設定を検索:", setting.specific_date) // デバッグ用
-      query = query.eq("specific_date", setting.specific_date)
-    } else {
-      // 曜日ベースの場合
-      console.log("曜日ベースの設定を検索:", setting.day_of_week) // デバッグ用
-      query = query.eq("day_of_week", setting.day_of_week).is("specific_date", null)
-    }
-
-    const { data: existingData, error: queryError } = await query
-
-    if (queryError) {
-      console.error("既存設定の検索エラー:", queryError) // デバッグ用
-    } else {
-      console.log("既存設定の検索結果:", existingData) // デバッグ用
-    }
-
-    if (existingData && existingData.length > 0) {
-      // 既存の設定を更新
-      const { data, error } = await supabase
-        .from("availability_settings")
-        .update({
-          ...setting,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingData[0].id)
-        .select()
-
-      if (error) {
-        console.error("Database operation error:", error)
-        console.error("Attempted to save setting:", setting)
-        throw new Error("データの更新に失敗しました: " + error.message)
-      }
-
-      revalidatePath("/dashboard/schedule-settings")
-      return data[0]
-    } else {
-      // 新しい設定を作成
-      const { data, error } = await supabase
-        .from("availability_settings")
-        .insert([
-          {
-            ...setting,
-            updated_at: new Date().toISOString(),
-          },
-        ])
-        .select()
-
-      if (error) {
-        console.error("Database operation error:", error)
-        console.error("Attempted to save setting:", setting)
-        throw new Error("データの保存に失敗しました: " + error.message)
-      }
-
-      revalidatePath("/dashboard/schedule-settings")
-      return data[0]
-    }
-  } catch (error) {
-    console.error("Error in upsertAvailabilitySetting")
-    throw new Error("データの保存に失敗しました")
+  } catch (error: any) {
+    console.error("Error in deleteServiceType", error)
+    throw new Error(error.message || "データの削除に失敗しました")
   }
 }
 
 // 予約可能時間を削除
 export async function deleteAvailabilitySetting(formData: FormData) {
   try {
-    // CSRF検証
     await validateCSRF(formData)
 
     const id = Number(formData.get("id"))
@@ -412,15 +303,15 @@ export async function deleteAvailabilitySetting(formData: FormData) {
     const { error } = await supabase.from("availability_settings").delete().eq("id", id)
 
     if (error) {
-      console.error("Database operation error")
+      console.error("Database operation error", error)
       throw new Error("データの削除に失敗しました")
     }
 
     revalidatePath("/dashboard/schedule-settings")
     return { success: true }
-  } catch (error) {
-    console.error("Error in deleteAvailabilitySetting")
-    throw new Error("データの削除に失敗しました")
+  } catch (error: any) {
+    console.error("Error in deleteAvailabilitySetting", error)
+    throw new Error(error.message || "データの削除に失敗しました")
   }
 }
 
@@ -438,17 +329,15 @@ export async function createWeeklyAvailability(formData: FormData) {
     const break_start_time = (formData.get("break_start_time") as string) || null
     const break_end_time = (formData.get("break_end_time") as string) || null
 
-    // --- Server-side validation ---
     if (start_time >= end_time) {
       throw new Error("開始時間は終了時間より前である必要があります")
     }
 
     const supabase = createAdminClient()
 
-    // Fetch service type duration
     const { data: serviceType, error: serviceTypeError } = await supabase
       .from("service_types")
-      .select("duration")
+      .select("duration, interval_minutes")
       .eq("id", service_type_id)
       .single()
 
@@ -456,11 +345,11 @@ export async function createWeeklyAvailability(formData: FormData) {
       throw new Error("診療種別の取得に失敗しました")
     }
     const duration = serviceType.duration
+    const interval = serviceType.interval_minutes ?? 0
     if (!duration || duration <= 0) {
       throw new Error("診療種別の所要時間が0分以下に設定されているため、予約枠を作成できません。")
     }
 
-    // Define work periods
     const workPeriods: { start: string; end: string }[] = []
     if (break_start_time && break_end_time) {
       if (break_start_time >= break_end_time) {
@@ -475,7 +364,6 @@ export async function createWeeklyAvailability(formData: FormData) {
       workPeriods.push({ start: start_time, end: end_time })
     }
 
-    // Generate slots based on duration
     const slotsToCreate: { start_time: string; end_time: string }[] = []
     const timeToMinutes = (time: string): number => {
       const [hours, minutes] = time.split(":").map(Number)
@@ -490,7 +378,7 @@ export async function createWeeklyAvailability(formData: FormData) {
         const slotStartTime = formatTime(currentMinutes)
         const slotEndTime = formatTime(currentMinutes + duration)
         slotsToCreate.push({ start_time: slotStartTime, end_time: slotEndTime })
-        currentMinutes += duration
+        currentMinutes += duration + interval
       }
     }
 
@@ -498,7 +386,6 @@ export async function createWeeklyAvailability(formData: FormData) {
       throw new Error("作成できる予約枠がありません。勤務時間と所要時間を確認してください。")
     }
 
-    // --- Overlap check ---
     const { data: existingSettings, error: fetchError } = await supabase
       .from("availability_settings")
       .select("start_time, end_time")
@@ -523,7 +410,6 @@ export async function createWeeklyAvailability(formData: FormData) {
       }
     }
 
-    // --- Insert new settings ---
     const newSettingsPayload = slotsToCreate.map((slot) => ({
       service_type_id,
       day_of_week,
@@ -542,10 +428,9 @@ export async function createWeeklyAvailability(formData: FormData) {
     }
 
     revalidatePath("/dashboard/schedule-settings")
-    return data // returns an array of new settings
+    return data
   } catch (error: any) {
     console.error("Error in createWeeklyAvailability:", error)
-    // Re-throw with a user-friendly message
     throw new Error(error.message || "予約可能時間の作成に失敗しました")
   }
 }
@@ -566,17 +451,15 @@ export async function createSpecificDateAvailability(formData: FormData) {
       throw new Error("日付が指定されていません")
     }
 
-    // --- Server-side validation ---
     if (start_time >= end_time) {
       throw new Error("開始時間は終了時間より前である必要があります")
     }
 
     const supabase = createAdminClient()
 
-    // Fetch service type duration
     const { data: serviceType, error: serviceTypeError } = await supabase
       .from("service_types")
-      .select("duration")
+      .select("duration, interval_minutes")
       .eq("id", service_type_id)
       .single()
 
@@ -584,11 +467,11 @@ export async function createSpecificDateAvailability(formData: FormData) {
       throw new Error("診療種別の取得に失敗しました")
     }
     const duration = serviceType.duration
+    const interval = serviceType.interval_minutes ?? 0
     if (!duration || duration <= 0) {
       throw new Error("診療種別の所要時間が0分以下に設定されているため、予約枠を作成できません。")
     }
 
-    // Define work periods
     const workPeriods: { start: string; end: string }[] = []
     if (break_start_time && break_end_time) {
       if (break_start_time >= break_end_time) {
@@ -603,7 +486,6 @@ export async function createSpecificDateAvailability(formData: FormData) {
       workPeriods.push({ start: start_time, end: end_time })
     }
 
-    // Generate slots based on duration
     const slotsToCreate: { start_time: string; end_time: string }[] = []
     const timeToMinutes = (time: string): number => {
       const [hours, minutes] = time.split(":").map(Number)
@@ -618,7 +500,7 @@ export async function createSpecificDateAvailability(formData: FormData) {
         const slotStartTime = formatTime(currentMinutes)
         const slotEndTime = formatTime(currentMinutes + duration)
         slotsToCreate.push({ start_time: slotStartTime, end_time: slotEndTime })
-        currentMinutes += duration
+        currentMinutes += duration + interval
       }
     }
 
@@ -626,7 +508,6 @@ export async function createSpecificDateAvailability(formData: FormData) {
       throw new Error("作成できる予約枠がありません。勤務時間と所要時間を確認してください。")
     }
 
-    // --- Overlap check ---
     const { data: existingSettings, error: fetchError } = await supabase
       .from("availability_settings")
       .select("start_time, end_time")
@@ -650,7 +531,6 @@ export async function createSpecificDateAvailability(formData: FormData) {
       }
     }
 
-    // --- Insert new settings ---
     const day_of_week = new Date(specific_date).getDay()
     const newSettingsPayload = slotsToCreate.map((slot) => ({
       service_type_id,
@@ -670,7 +550,7 @@ export async function createSpecificDateAvailability(formData: FormData) {
     }
 
     revalidatePath("/dashboard/schedule-settings")
-    return data // returns an array of new settings
+    return data
   } catch (error: any) {
     console.error("Error in createSpecificDateAvailability:", error)
     throw new Error(error.message || "特定日の予約可能時間の作成に失敗しました")
@@ -681,7 +561,6 @@ export async function createSpecificDateAvailability(formData: FormData) {
 export async function getAvailabilitySettingsForClinic(clinicId: number) {
   const supabase = createAdminClient()
   try {
-    // 1. clinicに属するservice_typeのIDを取得
     const { data: serviceTypes, error: serviceTypesError } = await supabase
       .from("service_types")
       .select("id")
@@ -693,12 +572,11 @@ export async function getAvailabilitySettingsForClinic(clinicId: number) {
     }
 
     if (!serviceTypes || serviceTypes.length === 0) {
-      return [] // このクリニックにはサービス種別がない
+      return []
     }
 
     const serviceTypeIds = serviceTypes.map((st) => st.id)
 
-    // 2. service_type_idに紐づくavailability_settingsを全て取得し、service_typesの情報も結合する
     const { data, error } = await supabase
       .from("availability_settings")
       .select("*, service_types(name, color)")
