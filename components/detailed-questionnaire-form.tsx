@@ -56,7 +56,7 @@ export function DetailedQuestionnaireForm({ appointment, previousData }: Detaile
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const [lastName, firstName] = appointment.patient_name.split(/ |　/)
+  const [lastName = "", firstName = ""] = (appointment.patient_name || "").split(/ |　/)
 
   const handleSubmit = async (formData: FormData) => {
     setIsSubmitting(true)
