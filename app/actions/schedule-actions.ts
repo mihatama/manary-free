@@ -560,10 +560,11 @@ export async function createSpecificDateAvailability(formData: FormData) {
 }
 
 // 特定の助産院の全ての予約可能時間を取得 (サービス種別情報も含む)
-export async function getAvailabilitySettingsForClinic(clinicId: number) {
+export async function getAvailabilitySettingsForClinic(clinicId: number, serviceTypeIds?: number[]) {
   const supabase = createAdminClient()
   try {
-    const { data: serviceTypes, error: serviceTypesError } = await supabase
+    // 1. clinicに属するservice_typeのIDを取得
+    const { data: allClinicServiceTypes, error: serviceTypesError } = await supabase
       .from("service_types")
       .select("id")
       .eq("clinic_id", clinicId)
@@ -573,16 +574,27 @@ export async function getAvailabilitySettingsForClinic(clinicId: number) {
       throw new Error("診療種別の取得に失敗しました")
     }
 
-    if (!serviceTypes || serviceTypes.length === 0) {
+    if (!allClinicServiceTypes || allClinicServiceTypes.length === 0) {
       return []
     }
 
-    const serviceTypeIds = serviceTypes.map((st) => st.id)
+    let finalServiceTypeIds = allClinicServiceTypes.map((st) => st.id)
 
+    // If a filter is provided, use only those IDs that also belong to the clinic
+    if (serviceTypeIds && serviceTypeIds.length > 0) {
+      const clinicServiceTypeIdsSet = new Set(finalServiceTypeIds)
+      finalServiceTypeIds = serviceTypeIds.filter((id) => clinicServiceTypeIdsSet.has(id))
+    }
+
+    if (finalServiceTypeIds.length === 0) {
+      return []
+    }
+
+    // 2. service_type_idに紐づくavailability_settingsを全て取得し、service_typesの情報も結合する
     const { data, error } = await supabase
       .from("availability_settings")
       .select("*, service_types(name, color)")
-      .in("service_type_id", serviceTypeIds)
+      .in("service_type_id", finalServiceTypeIds)
       .order("day_of_week")
 
     if (error) {
@@ -608,15 +620,15 @@ const parseTimeToDate = (timeStr: string, date: Date): Date | null => {
   return newDate
 }
 
-export async function getScheduleEventsForMonth(clinicId: number, month: string) {
+export async function getScheduleEventsForMonth(clinicId: number, month: string, serviceTypeIds?: number[]) {
   noStore()
   try {
     const targetMonth = new Date(`${month}-01T00:00:00`)
     const startDate = startOfMonth(targetMonth)
     const endDate = endOfMonth(targetMonth)
 
-    // Fetch all availability settings for the clinic, with service type info
-    const settings = await getAvailabilitySettingsForClinic(clinicId)
+    // Fetch all availability settings for the clinic, with service type info, applying filter
+    const settings = await getAvailabilitySettingsForClinic(clinicId, serviceTypeIds)
 
     const calendarEvents: {
       title: string
@@ -643,7 +655,10 @@ export async function getScheduleEventsForMonth(clinicId: number, month: string)
         const end = parseTimeToDate(setting.end_time, day)
         if (start && end) {
           calendarEvents.push({
-            title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
+            title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(
+              0,
+              5,
+            )} - ${setting.end_time.substring(0, 5)}`,
             start: start.toISOString(),
             end: end.toISOString(),
             isAvailable: setting.is_available,
@@ -655,26 +670,33 @@ export async function getScheduleEventsForMonth(clinicId: number, month: string)
       }
 
       // Process weekly settings for this day, only if no specific setting overrides it
-      if (specificSettingsForDay.length === 0) {
-        const weeklySettingsForDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
-        for (const setting of weeklySettingsForDay) {
-          // If there's an end_date, don't show past it
-          if (setting.end_date && day > new Date(setting.end_date)) {
-            continue
-          }
-          const start = parseTimeToDate(setting.start_time, day)
-          const end = parseTimeToDate(setting.end_time, day)
-          if (start && end) {
-            calendarEvents.push({
-              title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(0, 5)} - ${setting.end_time.substring(0, 5)}`,
-              start: start.toISOString(),
-              end: end.toISOString(),
-              isAvailable: setting.is_available,
-              isSpecificDate: false,
-              color: setting.service_types?.color || "#808080",
-              resource: setting,
-            })
-          }
+      const weeklySettingsForDay = weeklySettings.filter((s) => s.day_of_week === dayOfWeek)
+      // Check if there's a specific setting for the same service type on this day
+      const specificServiceTypeIds = new Set(specificSettingsForDay.map((s) => s.service_type_id))
+
+      for (const setting of weeklySettingsForDay) {
+        if (specificServiceTypeIds.has(setting.service_type_id)) {
+          continue // Skip weekly if a specific setting for the same service type exists
+        }
+        // If there's an end_date, don't show past it
+        if (setting.end_date && day > new Date(setting.end_date)) {
+          continue
+        }
+        const start = parseTimeToDate(setting.start_time, day)
+        const end = parseTimeToDate(setting.end_time, day)
+        if (start && end) {
+          calendarEvents.push({
+            title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(
+              0,
+              5,
+            )} - ${setting.end_time.substring(0, 5)}`,
+            start: start.toISOString(),
+            end: end.toISOString(),
+            isAvailable: setting.is_available,
+            isSpecificDate: false,
+            color: setting.service_types?.color || "#808080",
+            resource: setting,
+          })
         }
       }
     }
