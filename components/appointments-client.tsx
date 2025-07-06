@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useTransition, useCallback } from "react"
 import type { Tables } from "@/lib/supabase/database.types"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -21,6 +20,7 @@ import { ArrowUpDown, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { getAppointments } from "@/app/actions/reservation-actions"
 import { useDebounce } from "use-debounce"
+import { format } from "date-fns"
 
 type AppointmentsResponse = Awaited<ReturnType<typeof getAppointments>>
 type Appointment = AppointmentsResponse["data"][number]
@@ -34,16 +34,16 @@ type AppointmentWithDetails = Tables<"reservations"> & {
 type SortKey = "date" | "time" | "status" | "patient_name"
 
 interface AppointmentsClientProps {
-  initialAppointments: Appointment[]
   user: {
     id: string
     name: string | null
     email: string | undefined
   }
+  selectedDate?: Date
 }
 
-export function AppointmentsClient({ initialAppointments, user }: AppointmentsClientProps) {
-  const [appointments, setAppointments] = useState(initialAppointments)
+export function AppointmentsClient({ user, selectedDate }: AppointmentsClientProps) {
+  const [appointments, setAppointments] = useState<Appointment[]>([])
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [activeChart, setActiveChart] = useState<"breast" | "postpartum" | null>(null)
@@ -57,21 +57,20 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
 
   const fetchAppointments = useCallback(() => {
     startTransition(async () => {
+      const dateString = selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined
       const { data } = await getAppointments({
         search: debouncedSearchTerm,
         sortBy: sortConfig?.key,
         sortOrder: sortConfig?.direction,
+        date: dateString,
       })
       setAppointments(data || [])
     })
-  }, [debouncedSearchTerm, sortConfig])
+  }, [debouncedSearchTerm, sortConfig, selectedDate])
 
   useEffect(() => {
-    // We only want to fetch when search term or sort config changes, not on initial load
-    if (debouncedSearchTerm || sortConfig) {
-      fetchAppointments()
-    }
-  }, [debouncedSearchTerm, sortConfig, fetchAppointments])
+    fetchAppointments()
+  }, [fetchAppointments])
 
   const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
@@ -96,7 +95,9 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A"
     try {
-      const date = new Date(dateString)
+      // Parse YYYY-MM-DD as local date to avoid timezone issues
+      const [year, month, day] = dateString.split("-").map(Number)
+      const date = new Date(year, month - 1, day)
       return date.toLocaleDateString("ja-JP", {
         year: "numeric",
         month: "long",
@@ -217,7 +218,7 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
                   <TableRow key={appointment.id}>
                     <TableCell className="font-medium">
                       {appointment.patients.name}{" "}
-                      <span className="text-xs text-muted-foreground">({appointment.patient_id})</span>
+                      <span className="text-xs text-muted-foreground">({appointment.patients.id})</span>
                     </TableCell>
                     <TableCell>{formatDate(appointment.reservation_date)}</TableCell>
                     <TableCell>{formatTime(appointment.start_time)}</TableCell>
