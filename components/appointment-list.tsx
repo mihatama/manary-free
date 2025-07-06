@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { cancelAppointment } from "@/app/actions/reservation-actions"
 import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
 
 interface AppointmentListProps {
   appointments: any[]
@@ -149,7 +150,16 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
                       </div>
 
                       {appointment.status === "confirmed" && (
-                        <div className="flex justify-end">
+                        <div className="flex justify-end items-center space-x-2">
+                          {!appointment.questionnaire_id ? (
+                            <Button asChild className="bg-[#f8a0a0] hover:bg-[#f78b8b]">
+                              <Link href={`/reservation/questionnaire?token=${appointment.token}`}>問診票を記入</Link>
+                            </Button>
+                          ) : (
+                            <Badge variant="secondary" className="text-sm font-normal bg-gray-100 text-gray-600">
+                              問診票 記入済み
+                            </Badge>
+                          )}
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
