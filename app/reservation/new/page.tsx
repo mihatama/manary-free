@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { redirect } from "next/navigation"
 
 interface NewReservationPageProps {
   searchParams: {
@@ -27,12 +28,7 @@ export default function NewReservationPage({ searchParams }: NewReservationPageP
   if (!clinicId || !serviceTypeId || !date || !startTime || !endTime) {
     console.log("必要なパラメータが不足しています。リダイレクトします。")
     // クライアントサイドでリダイレクトするためのメタタグを返す
-    return (
-      <>
-        <meta httpEquiv="refresh" content="0;url=/reservation" />
-        <p>リダイレクト中...</p>
-      </>
-    )
+    redirect("/reservation")
   }
 
   // 電話番号認証済みの場合

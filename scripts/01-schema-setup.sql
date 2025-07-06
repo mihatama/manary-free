@@ -35,99 +35,100 @@ DROP TABLE IF EXISTS public.clinics CASCADE;
 -- Step 3: Re-create tables with the correct schema
 
 CREATE TABLE public.clinics (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  address VARCHAR(255),
-  phone_number VARCHAR(20),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+id SERIAL PRIMARY KEY,
+name VARCHAR(255) NOT NULL,
+address VARCHAR(255),
+phone_number VARCHAR(20),
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE public.service_types (
-  id SERIAL PRIMARY KEY,
-  clinic_id INT NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  duration INT NOT NULL,
-  price INT NOT NULL,
-  color VARCHAR(7) DEFAULT '#808080',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+id SERIAL PRIMARY KEY,
+clinic_id INT NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+name VARCHAR(255) NOT NULL,
+description TEXT,
+duration INT NOT NULL,
+price INT NOT NULL,
+interval_minutes INT NOT NULL DEFAULT 0,
+color VARCHAR(7) DEFAULT '#808080',
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE public.patients (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  kana VARCHAR(255) NOT NULL,
-  phone_number VARCHAR(20) UNIQUE NOT NULL,
-  email VARCHAR(255) UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+id SERIAL PRIMARY KEY,
+name VARCHAR(255) NOT NULL,
+kana VARCHAR(255) NOT NULL,
+phone_number VARCHAR(20) UNIQUE NOT NULL,
+email VARCHAR(255) UNIQUE,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE public.reservations (
+id SERIAL PRIMARY KEY,
+patient_id INT NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+clinic_id INT NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+service_type_id INT NOT NULL REFERENCES public.service_types(id) ON DELETE CASCADE,
+reservation_date DATE NOT NULL,
+start_time TIME NOT NULL,
+end_time TIME NOT NULL,
+status VARCHAR(50) DEFAULT 'confirmed',
+note TEXT,
+access_token UUID UNIQUE DEFAULT gen_random_uuid(),
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE public.availability_settings (
+id SERIAL PRIMARY KEY,
+service_type_id INT NOT NULL REFERENCES public.service_types(id) ON DELETE CASCADE,
+day_of_week INT,
+specific_date DATE,
+start_time TIME NOT NULL,
+end_time TIME NOT NULL,
+is_available BOOLEAN DEFAULT TRUE,
+end_date DATE,
+created_at TIMESTAMPTZ DEFAULT NOW(),
+updated_at TIMESTAMPTZ DEFAULT NOW(),
+CHECK (day_of_week IS NOT NULL OR specific_date IS NOT NULL)
+);
+
+CREATE TABLE public.breast_care_charts (
   id SERIAL PRIMARY KEY,
   patient_id INT NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
-  clinic_id INT NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
-  service_type_id INT NOT NULL REFERENCES public.service_types(id) ON DELETE CASCADE,
-  reservation_date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  status VARCHAR(50) DEFAULT 'confirmed',
-  note TEXT,
-  access_token UUID UNIQUE DEFAULT gen_random_uuid(),
+  visit_date DATE NOT NULL,
+  practitioner_name VARCHAR(255),
+  concerns TEXT,
+  left_breast_condition JSONB,
+  right_breast_condition JSONB,
+  care_details TEXT,
+  recommendations TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE public.availability_settings (
-  id SERIAL PRIMARY KEY,
-  service_type_id INT NOT NULL REFERENCES public.service_types(id) ON DELETE CASCADE,
-  day_of_week INT,
-  specific_date DATE,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  is_available BOOLEAN DEFAULT TRUE,
-  end_date DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  CHECK (day_of_week IS NOT NULL OR specific_date IS NOT NULL)
-);
-
-CREATE TABLE public.breast_care_charts (
-    id SERIAL PRIMARY KEY,
-    patient_id INT NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
-    visit_date DATE NOT NULL,
-    practitioner_name VARCHAR(255),
-    concerns TEXT,
-    left_breast_condition JSONB,
-    right_breast_condition JSONB,
-    care_details TEXT,
-    recommendations TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 CREATE TABLE public.postpartum_care_charts (
-    id SERIAL PRIMARY KEY,
-    patient_id INT NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
-    visit_date DATE NOT NULL,
-    practitioner_name VARCHAR(255),
-    weeks_postpartum INT,
-    physical_condition TEXT,
-    mental_condition TEXT,
-    care_provided TEXT,
-    guidance TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+  id SERIAL PRIMARY KEY,
+  patient_id INT NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+  visit_date DATE NOT NULL,
+  practitioner_name VARCHAR(255),
+  weeks_postpartum INT,
+  physical_condition TEXT,
+  mental_condition TEXT,
+  care_provided TEXT,
+  guidance TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE public.questionnaires (
-    id SERIAL PRIMARY KEY,
-    reservation_id INT REFERENCES public.reservations(id) ON DELETE SET NULL,
-    data JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+  id SERIAL PRIMARY KEY,
+  reservation_id INT REFERENCES public.reservations(id) ON DELETE SET NULL,
+  data JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Step 4: Enable Row Level Security (RLS) for all tables
@@ -174,12 +175,12 @@ CREATE POLICY "Allow authenticated to manage questionnaires" ON public.questionn
 INSERT INTO public.clinics (name, address, phone_number) VALUES
 ('助産院マナリー', '東京都渋谷区', '03-1111-1111');
 
-INSERT INTO public.service_types (clinic_id, name, description, duration, price, color) VALUES
-(1, '初回相談', '初めての方の相談メニュー', 60, 5000, '#3498db'),
-(1, '産後ケア', '産後の体と心のケア', 90, 8000, '#2ecc71'),
-(1, '母乳相談', '母乳育児に関する相談', 60, 6000, '#f1c40f'),
-(1, '沐浴指導', '赤ちゃんの沐浴指導', 45, 4000, '#e74c3c'),
-(1, '育児相談', '育児全般に関する相談', 60, 5000, '#9b59b6');
+INSERT INTO public.service_types (clinic_id, name, description, duration, price, interval_minutes, color) VALUES
+(1, '初回相談', '初めての方の相談メニュー', 60, 5000, 0, '#3498db'),
+(1, '産後ケア', '産後の体と心のケア', 90, 8000, 0, '#2ecc71'),
+(1, '母乳相談', '母乳育児に関する相談', 60, 6000, 0, '#f1c40f'),
+(1, '沐浴指導', '赤ちゃんの沐浴指導', 45, 4000, 0, '#e74c3c'),
+(1, '育児相談', '育児全般に関する相談', 60, 5000, 0, '#9b59b6');
 
 INSERT INTO public.availability_settings (service_type_id, day_of_week, start_time, end_time, is_available) VALUES
 (1, 1, '09:00:00', '17:00:00', TRUE),
