@@ -21,6 +21,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast"
 import { PlusCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface UserManagementClientProps {
   users: User[]
@@ -80,6 +82,20 @@ function AddUserForm({ closeDialog }: { closeDialog: () => void }) {
         {state.errors?.password && (
           <p className="col-start-2 col-span-3 text-sm text-red-500">{state.errors.password[0]}</p>
         )}
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="isAdmin" className="text-right">
+            役割
+          </Label>
+          <div className="col-span-3 flex items-center space-x-2">
+            <Checkbox id="isAdmin" name="isAdmin" />
+            <label
+              htmlFor="isAdmin"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              この利用者を管理者として登録する
+            </label>
+          </div>
+        </div>
       </div>
       <DialogFooter>
         <DialogClose asChild>
@@ -120,8 +136,8 @@ export function UserManagementClient({ users }: UserManagementClientProps) {
           <TableHeader>
             <TableRow>
               <TableHead>メールアドレス</TableHead>
+              <TableHead>役割</TableHead>
               <TableHead>登録日時</TableHead>
-              <TableHead>最終サインイン</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -129,10 +145,10 @@ export function UserManagementClient({ users }: UserManagementClientProps) {
               users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.email}</TableCell>
-                  <TableCell>{user.created_at ? new Date(user.created_at).toLocaleString("ja-JP") : "N/A"}</TableCell>
                   <TableCell>
-                    {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString("ja-JP") : "N/A"}
+                    {user.user_metadata?.role === "admin" && <Badge variant="outline">管理者</Badge>}
                   </TableCell>
+                  <TableCell>{user.created_at ? new Date(user.created_at).toLocaleString("ja-JP") : "N/A"}</TableCell>
                 </TableRow>
               ))
             ) : (

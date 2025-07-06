@@ -42,11 +42,15 @@ export async function createUser(prevState: any, formData: FormData) {
   }
 
   const { email, password } = validatedFields.data
+  const isAdmin = formData.get("isAdmin") === "on"
+
+  const userMetadata = isAdmin ? { role: "admin" } : {}
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true, // You can set this to false if you don't want to require email confirmation
+    email_confirm: true,
+    user_metadata: userMetadata,
   })
 
   if (error) {
@@ -68,7 +72,7 @@ export async function createUser(prevState: any, formData: FormData) {
   revalidatePath("/dashboard/users")
   return {
     errors: null,
-    message: `ユーザー ${data.user.email} を作成しました。`,
+    message: `ユーザー ${data.user.email} を作成しました。${isAdmin ? " (管理者)" : ""}`,
     success: true,
   }
 }
