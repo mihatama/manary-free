@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { cn } from "@/lib/utils"
 
 type DiagramData = {
@@ -16,9 +16,17 @@ interface BreastDiagramInputProps {
 export function BreastDiagramInput({ value = {}, onChange, side }: BreastDiagramInputProps) {
   const [selections, setSelections] = useState<DiagramData>(value)
 
+  // The original code had an issue where `useEffect` could cause an infinite loop.
+  // This happens when the parent component re-renders and passes a new object
+  // reference for the `value` prop, even if the object's contents are identical.
+  // To fix this, we memoize the stringified version of the `value` prop.
+  const valueString = useMemo(() => JSON.stringify(value), [value])
+
   useEffect(() => {
-    setSelections(value || {})
-  }, [value])
+    // This effect now only runs when the actual content of `value` changes,
+    // preventing the infinite re-render loop.
+    setSelections(JSON.parse(valueString) || {})
+  }, [valueString])
 
   const positions = ["12", "3", "6", "9"]
 

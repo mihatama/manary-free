@@ -62,9 +62,15 @@ export async function getAppointments({
     }
     const dbSortBy = sortableColumns[sortBy] || "reservation_date"
 
-    query = query
-      .order(dbSortBy, { ascending: sortOrder === "asc", referencedTable: "patients" })
-      .range(offset, offset + limit - 1)
+    const orderOptions: { ascending: boolean; referencedTable?: string } = {
+      ascending: sortOrder === "asc",
+    }
+
+    if (sortBy === "patient_name") {
+      orderOptions.referencedTable = "patients"
+    }
+
+    query = query.order(dbSortBy, orderOptions).range(offset, offset + limit - 1)
 
     const { data, error, count } = await query
 

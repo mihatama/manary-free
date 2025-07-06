@@ -48,7 +48,7 @@ export default async function DashboardPage() {
       end_time,
       status,
       service_types (name),
-      users (full_name)
+      patients (name)
     `,
     )
     .gte("reservation_date", today)
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
                         {safeFormat(apt.reservation_date, apt.end_time, "HH:mm")}
                       </div>
                     </TableCell>
-                    <TableCell>{(apt.users as any)?.full_name || "N/A"}</TableCell>
+                    <TableCell>{(apt.patients as any)?.name || "N/A"}</TableCell>
                     <TableCell>{(apt.service_types as any)?.name || "N/A"}</TableCell>
                     <TableCell>
                       <Badge

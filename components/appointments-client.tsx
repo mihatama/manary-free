@@ -22,15 +22,16 @@ import { Input } from "@/components/ui/input"
 import { getAppointments } from "@/app/actions/reservation-actions"
 import { useDebounce } from "use-debounce"
 
+type AppointmentsResponse = Awaited<ReturnType<typeof getAppointments>>
+type Appointment = AppointmentsResponse["data"][number]
+
 type AppointmentWithDetails = Tables<"reservations"> & {
   questionnaires: Tables<"questionnaires"> | null
   service_types: Tables<"service_types"> | null
   clinics: Tables<"clinics"> | null
 }
 
-type Appointment = Awaited<ReturnType<typeof getAppointments>>[0]
-
-type SortKey = keyof Appointment | "patient_name"
+type SortKey = "date" | "time" | "status" | "patient_name"
 
 interface AppointmentsClientProps {
   initialAppointments: Appointment[]
@@ -56,18 +57,21 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
 
   const fetchAppointments = useCallback(() => {
     startTransition(async () => {
-      const data = await getAppointments({
-        query: debouncedSearchTerm,
+      const { data } = await getAppointments({
+        search: debouncedSearchTerm,
         sortBy: sortConfig?.key,
         sortOrder: sortConfig?.direction,
       })
-      setAppointments(data)
+      setAppointments(data || [])
     })
   }, [debouncedSearchTerm, sortConfig])
 
   useEffect(() => {
-    fetchAppointments()
-  }, [fetchAppointments])
+    // We only want to fetch when search term or sort config changes, not on initial load
+    if (debouncedSearchTerm || sortConfig) {
+      fetchAppointments()
+    }
+  }, [debouncedSearchTerm, sortConfig, fetchAppointments])
 
   const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
@@ -122,12 +126,12 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
   }
 
   const SortableHeader = ({ sortKey, children }: { sortKey: SortKey; children: React.ReactNode }) => (
-    <Button variant="ghost" onClick={() => handleSort(sortKey)} className="px-0">
+    <Button variant="ghost" onClick={() => handleSort(sortKey)} className="px-0 hover:bg-transparent">
       {children}
       {sortConfig?.key === sortKey ? (
         <ArrowUpDown className="ml-2 h-4 w-4" />
       ) : (
-        <ArrowUpDown className="ml-2 h-4 w-4 opacity-0" />
+        <ArrowUpDown className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-50" />
       )}
     </Button>
   )
@@ -175,7 +179,7 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="患者名またはIDで検索..."
+            placeholder="患者名で検索..."
             className="pl-8 w-full md:w-1/3"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -185,19 +189,17 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>
+                <TableHead className="group">
                   <SortableHeader sortKey="patient_name">患者名</SortableHeader>
                 </TableHead>
-                <TableHead>
+                <TableHead className="group">
                   <SortableHeader sortKey="date">予約日</SortableHeader>
                 </TableHead>
-                <TableHead>
+                <TableHead className="group">
                   <SortableHeader sortKey="time">時間</SortableHeader>
                 </TableHead>
-                <TableHead>
-                  <SortableHeader sortKey="service">サービス</SortableHeader>
-                </TableHead>
-                <TableHead>
+                <TableHead>サービス</TableHead>
+                <TableHead className="group">
                   <SortableHeader sortKey="status">ステータス</SortableHeader>
                 </TableHead>
                 <TableHead>アクション</TableHead>
@@ -214,12 +216,12 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
                 appointments.map((appointment) => (
                   <TableRow key={appointment.id}>
                     <TableCell className="font-medium">
-                      {appointment.patient_name}{" "}
+                      {appointment.patients.name}{" "}
                       <span className="text-xs text-muted-foreground">({appointment.patient_id})</span>
                     </TableCell>
-                    <TableCell>{new Date(appointment.date).toLocaleDateString("ja-JP")}</TableCell>
-                    <TableCell>{appointment.time}</TableCell>
-                    <TableCell>{appointment.service}</TableCell>
+                    <TableCell>{formatDate(appointment.reservation_date)}</TableCell>
+                    <TableCell>{formatTime(appointment.start_time)}</TableCell>
+                    <TableCell>{appointment.service_types?.name}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{appointment.status}</Badge>
                     </TableCell>
@@ -259,15 +261,15 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">患者名</label>
-                  <p className="mt-1">{selectedAppointment.patient_name}</p>
+                  <p className="mt-1">{selectedAppointment.patients.name}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">電話番号</label>
-                  <p className="mt-1">{selectedAppointment.patient_phone}</p>
+                  <p className="mt-1">{selectedAppointment.patients.phone_number}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">メールアドレス</label>
-                  <p className="mt-1">{selectedAppointment.patient_email || "未入力"}</p>
+                  <p className="mt-1">{selectedAppointment.patients.email || "未入力"}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">診療種別</label>
@@ -285,10 +287,10 @@ export function AppointmentsClient({ initialAppointments, user }: AppointmentsCl
                 </div>
               </div>
 
-              {selectedAppointment.notes && (
+              {selectedAppointment.note && (
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">備考</label>
-                  <p className="mt-1 p-3 bg-gray-50 rounded-md">{selectedAppointment.notes}</p>
+                  <p className="mt-1 p-3 bg-gray-50 rounded-md">{selectedAppointment.note}</p>
                 </div>
               )}
 

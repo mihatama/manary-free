@@ -92,20 +92,34 @@ export async function getQuestionnaires({
   // Step 2: Extract non-null reservation IDs
   const reservationIds = questionnairesData.map((q) => q.reservation_id).filter((id): id is number => id !== null)
 
-  let reservationsMap = new Map<number, Pick<Reservation, "id" | "patient_name" | "reservation_date">>()
+  let reservationsMap = new Map<number, { patient_name: string; reservation_date: string | null }>()
 
   // Step 3: Fetch the corresponding reservations if there are any IDs
   if (reservationIds.length > 0) {
     const { data: reservationsData, error: reservationsError } = await supabase
       .from("reservations")
-      .select("id, patient_name, reservation_date")
+      .select("id, reservation_date, patients(name)")
       .in("id", reservationIds)
 
     if (reservationsError) {
-      console.error("Error fetching reservations:", reservationsError.message)
+      console.error("Error fetching reservations for questionnaires:", reservationsError.message)
       // Proceed without reservation data, but log the error.
     } else if (reservationsData) {
-      reservationsMap = new Map(reservationsData.map((r) => [r.id, r]))
+      const typedReservationsData = reservationsData as {
+        id: number
+        reservation_date: string | null
+        patients: { name: string | null } | null
+      }[]
+
+      reservationsMap = new Map(
+        typedReservationsData.map((r) => [
+          r.id,
+          {
+            patient_name: r.patients?.name || "",
+            reservation_date: r.reservation_date,
+          },
+        ]),
+      )
     }
   }
 
@@ -201,27 +215,27 @@ export async function submitAndLinkQuestionnaire(formData: FormData) {
   delete (dataForBlob as any).csrf_token
   delete (dataForBlob as any).phone_number // This is on the appointment, not needed in blob
 
-  // Fetch the appointment to check for an existing questionnaire
-  const { data: appointment, error: appointmentError } = await supabase
-    .from("appointments")
+  // Fetch the reservation to check for an existing questionnaire
+  const { data: reservation, error: reservationError } = await supabase
+    .from("reservations")
     .select("questionnaire_id")
     .eq("id", appointment_id)
     .single()
 
-  if (appointmentError) {
-    console.error("Error fetching appointment:", appointmentError.message)
+  if (reservationError) {
+    console.error("Error fetching reservation:", reservationError.message)
     return { success: false, message: "予約情報の取得に失敗しました。" }
   }
 
   let questionnaire
   let message = "問診票が正常に送信されました。"
 
-  if (appointment.questionnaire_id) {
+  if (reservation.questionnaire_id) {
     // Update existing questionnaire
     const { data: updatedQuestionnaire, error } = await supabase
       .from("questionnaires")
       .update({ data: dataForBlob, updated_at: new Date().toISOString() })
-      .eq("id", appointment.questionnaire_id)
+      .eq("id", reservation.questionnaire_id)
       .select()
       .single()
 
@@ -233,8 +247,8 @@ export async function submitAndLinkQuestionnaire(formData: FormData) {
     message = "問診票が正常に更新されました。"
   } else {
     // Insert new questionnaire
-    const questionnairePayload: any = {
-      appointment_id: appointment_id,
+    const questionnairePayload: QuestionnaireInsert = {
+      reservation_id: appointment_id,
       data: dataForBlob,
     }
     const { data: newQuestionnaire, error: insertError } = await supabase
@@ -249,14 +263,14 @@ export async function submitAndLinkQuestionnaire(formData: FormData) {
     }
     questionnaire = newQuestionnaire
 
-    // Link questionnaire to appointment
-    const { error: updateAppointmentError } = await supabase
-      .from("appointments")
+    // Link questionnaire to reservation
+    const { error: updateReservationError } = await supabase
+      .from("reservations")
       .update({ questionnaire_id: questionnaire.id })
       .eq("id", appointment_id)
 
-    if (updateAppointmentError) {
-      console.error("Error updating appointment with questionnaire_id:", updateAppointmentError.message)
+    if (updateReservationError) {
+      console.error("Error updating reservation with questionnaire_id:", updateReservationError.message)
       // Not fatal, but should be logged.
     }
   }
