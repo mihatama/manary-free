@@ -144,7 +144,7 @@ export function AppointmentList({ appointments, phoneNumber, onUpdate }: Appoint
                         </div>
                         <div className="flex items-center">
                           <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                          <span>{appointment.clinics?.phone || "電話番号情報なし"}</span>
+                          <span>{appointment.clinics?.phone_number || "電話番号情報なし"}</span>
                         </div>
                       </div>
 
