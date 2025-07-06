@@ -46,14 +46,18 @@ export async function getServiceTypes(clinicId?: number) {
     const { data, error } = await query
 
     if (error) {
-      console.error("Database query error")
-      throw new Error("データの取得に失敗しました")
+      console.error(`Error fetching service types for clinic ${clinicId}:`, error)
+      throw new Error("診療種別データの取得に失敗しました")
+    }
+
+    if (!data || data.length === 0) {
+      console.log(`No service types found for clinic ${clinicId}. This could be due to no data or RLS policies.`)
     }
 
     return data
   } catch (error) {
-    console.error("Error in getServiceTypes")
-    throw new Error("データの取得に失敗しました")
+    console.error("Exception in getServiceTypes", error)
+    throw new Error("診療種別データの取得中に例外が発生しました")
   }
 }
 
