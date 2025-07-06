@@ -5,15 +5,14 @@ import { revalidatePath } from "next/cache"
 import type { Tables } from "@/lib/supabase/database.types"
 import { unstable_noStore as noStore } from "next/cache"
 
-type ChartInsert = Tables<"postpartum_care_charts">["Insert"]
-type ChartUpdate = Tables<"postpartum_care_charts">["Update"]
+export type PostpartumCareChart = Tables<"postpartum_care_charts">["Insert"]
 
 export async function getPostpartumCareChartByAppointmentId(appointmentId: number) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from("postpartum_care_charts")
     .select("*")
-    .eq("appointment_id", appointmentId)
+    .eq("reservation_id", appointmentId)
     .single()
 
   if (error && error.code !== "PGRST116") {
@@ -25,16 +24,16 @@ export async function getPostpartumCareChartByAppointmentId(appointmentId: numbe
   return { data }
 }
 
-export async function upsertPostpartumCareChart(chartData: ChartInsert | ChartUpdate) {
+export async function upsertPostpartumCareChart(chartData: PostpartumCareChart) {
   const supabase = createClient()
 
-  if (!chartData.appointment_id) {
-    return { error: "Appointment ID is required." }
+  if (!chartData.reservation_id) {
+    return { error: "Reservation ID is required." }
   }
 
   const { data, error } = await supabase
     .from("postpartum_care_charts")
-    .upsert(chartData, { onConflict: "appointment_id" })
+    .upsert(chartData, { onConflict: "reservation_id" })
     .select()
     .single()
 

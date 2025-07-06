@@ -4,11 +4,7 @@ import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import {
-  getPostpartumCareChartByAppointmentId,
-  upsertPostpartumCareChart,
-  type PostpartumCareChart as ChartFormData,
-} from "@/app/actions/postpartum-care-actions"
+import { getPostpartumCareChartByAppointmentId, upsertPostpartumCareChart } from "@/app/actions/postpartum-care-actions"
 import type { Tables } from "@/lib/supabase/database.types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { toast } from "sonner"
 
-type Appointment = Tables<"appointments"> & {
+type Appointment = Tables<"reservations"> & {
   questionnaires: Tables<"questionnaires"> | null
 }
 
@@ -33,8 +29,9 @@ interface PostpartumCareChartProps {
 
 const chartSchema = z.object({
   id: z.number().optional(),
-  appointment_id: z.number(),
-  visit_date: z.string().optional().nullable(),
+  reservation_id: z.number(),
+  patient_id: z.number(),
+  visit_date: z.string(),
   practitioner_name: z.string().optional().nullable(),
   mother_condition: z.string().optional().nullable(),
   lochia_status: z.string().optional().nullable(),
@@ -49,6 +46,10 @@ const chartSchema = z.object({
   care_plan: z.string().optional().nullable(),
   guidance: z.string().optional().nullable(),
   payment_details: z.string().optional().nullable(),
+  weeks_postpartum: z.coerce.number().optional().nullable(),
+  physical_condition: z.string().optional().nullable(),
+  mental_condition: z.string().optional().nullable(),
+  care_provided: z.string().optional().nullable(),
 })
 
 export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCareChartProps) {
@@ -57,11 +58,8 @@ export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCa
     handleSubmit,
     reset,
     formState: { isSubmitting },
-  } = useForm<ChartFormData>({
+  } = useForm<z.infer<typeof chartSchema>>({
     resolver: zodResolver(chartSchema),
-    defaultValues: {
-      appointment_id: appointment.id,
-    },
   })
 
   useEffect(() => {
@@ -75,15 +73,17 @@ export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCa
         const questionnaire = appointment.questionnaires
 
         const baseData = {
-          appointment_id: appointment.id,
+          reservation_id: appointment.id,
+          patient_id: appointment.patient_id,
           visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
           practitioner_name: user.name || "",
         }
 
-        let questionnaireData: Partial<ChartFormData> = {}
-        if (questionnaire) {
+        let questionnaireData: Partial<z.infer<typeof chartSchema>> = {}
+        if (questionnaire?.data && typeof questionnaire.data === "object") {
+          const qData = questionnaire.data as any
           questionnaireData = {
-            mother_condition: questionnaire.notes || "",
+            mother_condition: qData.notes || "",
           }
         }
 
@@ -93,7 +93,7 @@ export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCa
           ...baseData,
         }
 
-        reset(finalData as ChartFormData)
+        reset(finalData as z.infer<typeof chartSchema>)
       } catch (e) {
         console.error("Error fetching chart data:", e)
         toast.error("産後ケアカルテの読み込み中にエラーが発生しました。")
@@ -102,7 +102,7 @@ export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCa
     fetchChartData()
   }, [appointment, reset, user])
 
-  const onSubmit = async (formData: ChartFormData) => {
+  const onSubmit = async (formData: z.infer<typeof chartSchema>) => {
     try {
       const { error } = await upsertPostpartumCareChart(formData)
       if (error) {
@@ -117,7 +117,10 @@ export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCa
     }
   }
 
-  const questionnaire = appointment.questionnaires
+  const questionnaireData =
+    appointment.questionnaires?.data && typeof appointment.questionnaires.data === "object"
+      ? (appointment.questionnaires.data as any)
+      : {}
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -125,7 +128,7 @@ export function PostpartumCareChart({ appointment, onClose, user }: PostpartumCa
         <CardHeader>
           <CardTitle>産後ケアカルテ</CardTitle>
           <div className="text-sm text-muted-foreground">
-            {questionnaire?.mother_last_name} {questionnaire?.mother_first_name} 様 (
+            {questionnaireData?.mother_last_name} {questionnaireData?.mother_first_name} 様 (
             {new Date(appointment.start_time).toLocaleString("ja-JP")})
           </div>
         </CardHeader>

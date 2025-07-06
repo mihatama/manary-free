@@ -24,10 +24,10 @@ DROP POLICY IF EXISTS "Allow authenticated to manage questionnaires" ON public.q
 
 -- Step 2: Drop tables in reverse order of dependency
 DROP TABLE IF EXISTS public.questionnaires CASCADE;
-DROP TABLE IF EXISTS public.reservations CASCADE;
-DROP TABLE IF EXISTS public.availability_settings CASCADE;
 DROP TABLE IF EXISTS public.breast_care_charts CASCADE;
 DROP TABLE IF EXISTS public.postpartum_care_charts CASCADE;
+DROP TABLE IF EXISTS public.reservations CASCADE;
+DROP TABLE IF EXISTS public.availability_settings CASCADE;
 DROP TABLE IF EXISTS public.patients CASCADE;
 DROP TABLE IF EXISTS public.service_types CASCADE;
 DROP TABLE IF EXISTS public.clinics CASCADE;
@@ -97,6 +97,7 @@ CHECK (day_of_week IS NOT NULL OR specific_date IS NOT NULL)
 
 CREATE TABLE public.breast_care_charts (
   id SERIAL PRIMARY KEY,
+  reservation_id INT UNIQUE NOT NULL REFERENCES public.reservations(id) ON DELETE CASCADE,
   patient_id INT NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
   visit_date DATE NOT NULL,
   practitioner_name VARCHAR(255),
@@ -111,6 +112,7 @@ CREATE TABLE public.breast_care_charts (
 
 CREATE TABLE public.postpartum_care_charts (
   id SERIAL PRIMARY KEY,
+  reservation_id INT UNIQUE NOT NULL REFERENCES public.reservations(id) ON DELETE CASCADE,
   patient_id INT NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
   visit_date DATE NOT NULL,
   practitioner_name VARCHAR(255),

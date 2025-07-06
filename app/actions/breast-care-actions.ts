@@ -13,7 +13,7 @@ export async function getBreastCareChartByAppointmentId(appointmentId: number) {
   const { data, error } = await supabase
     .from("breast_care_charts")
     .select("*")
-    .eq("appointment_id", appointmentId)
+    .eq("reservation_id", appointmentId)
     .single()
 
   if (error && error.code !== "PGRST116") {
@@ -28,13 +28,13 @@ export async function getBreastCareChartByAppointmentId(appointmentId: number) {
 export async function upsertBreastCareChart(chartData: ChartInsert | ChartUpdate) {
   const supabase = createClient()
 
-  if (!chartData.appointment_id) {
-    return { error: "Appointment ID is required." }
+  if (!chartData.reservation_id) {
+    return { error: "Reservation ID is required." }
   }
 
   const { data, error } = await supabase
     .from("breast_care_charts")
-    .upsert(chartData, { onConflict: "appointment_id" })
+    .upsert(chartData, { onConflict: "reservation_id" })
     .select()
     .single()
 

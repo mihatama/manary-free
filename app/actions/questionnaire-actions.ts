@@ -215,27 +215,28 @@ export async function submitAndLinkQuestionnaire(formData: FormData) {
   delete (dataForBlob as any).csrf_token
   delete (dataForBlob as any).phone_number // This is on the appointment, not needed in blob
 
-  // Fetch the reservation to check for an existing questionnaire
-  const { data: reservation, error: reservationError } = await supabase
-    .from("reservations")
-    .select("questionnaire_id")
-    .eq("id", appointment_id)
+  // Fetch existing questionnaire for this reservation
+  const { data: existingQuestionnaire, error: fetchError } = await supabase
+    .from("questionnaires")
+    .select("id")
+    .eq("reservation_id", appointment_id)
     .single()
 
-  if (reservationError) {
-    console.error("Error fetching reservation:", reservationError.message)
-    return { success: false, message: "予約情報の取得に失敗しました。" }
+  // PGRST116: no rows found, which is fine. Any other error is a problem.
+  if (fetchError && fetchError.code !== "PGRST116") {
+    console.error("Error fetching existing questionnaire:", fetchError.message)
+    return { success: false, message: "既存の問診票の確認に失敗しました。" }
   }
 
   let questionnaire
   let message = "問診票が正常に送信されました。"
 
-  if (reservation.questionnaire_id) {
+  if (existingQuestionnaire) {
     // Update existing questionnaire
     const { data: updatedQuestionnaire, error } = await supabase
       .from("questionnaires")
       .update({ data: dataForBlob, updated_at: new Date().toISOString() })
-      .eq("id", reservation.questionnaire_id)
+      .eq("id", existingQuestionnaire.id)
       .select()
       .single()
 
@@ -262,17 +263,6 @@ export async function submitAndLinkQuestionnaire(formData: FormData) {
       return { success: false, message: "問診票の作成に失敗しました。" }
     }
     questionnaire = newQuestionnaire
-
-    // Link questionnaire to reservation
-    const { error: updateReservationError } = await supabase
-      .from("reservations")
-      .update({ questionnaire_id: questionnaire.id })
-      .eq("id", appointment_id)
-
-    if (updateReservationError) {
-      console.error("Error updating reservation with questionnaire_id:", updateReservationError.message)
-      // Not fatal, but should be logged.
-    }
   }
 
   revalidatePath("/dashboard/questionnaires")
@@ -323,4 +313,31 @@ export async function getLatestQuestionnaireByPhone(phone: string): Promise<{ [k
   }
 
   return latestQuestionnaire?.data as { [key: string]: any } | null
+}
+
+export async function getQuestionnairesByPatientId(patientId: number): Promise<DetailedQuestionnaireWithReservation[]> {
+  noStore()
+  if (!patientId) {
+    return []
+  }
+
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from("questionnaires")
+    .select(
+      `
+      *,
+      reservations: reservations!inner(*)
+    `,
+    )
+    .eq("reservations.patient_id", patientId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Error fetching questionnaires by patient ID:", error.message)
+    return []
+  }
+
+  return (data as DetailedQuestionnaireWithReservation[]) || []
 }

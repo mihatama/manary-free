@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { toast } from "sonner"
 import { BreastDiagramInput } from "./breast-diagram-input"
 
-type Appointment = Tables<"appointments"> & {
+type Appointment = Tables<"reservations"> & {
   questionnaires: Tables<"questionnaires"> | null
   service_types: Tables<"service_types"> | null
 }
@@ -33,9 +33,10 @@ interface BreastCareChartProps {
 
 const chartSchema = z.object({
   id: z.number().optional(),
-  appointment_id: z.number(),
+  reservation_id: z.number(),
+  patient_id: z.number(),
   no: z.string().optional().nullable(),
-  visit_date: z.string().optional().nullable(),
+  visit_date: z.string(),
   clinic_location: z.array(z.string()).optional().nullable(),
   practitioner_name: z.string().optional().nullable(),
   trainee_name: z.string().optional().nullable(),
@@ -73,6 +74,11 @@ const chartSchema = z.object({
   other_fee_description: z.string().optional().nullable(),
   breast_diagram_right: z.any().optional().nullable(),
   breast_diagram_left: z.any().optional().nullable(),
+  concerns: z.string().optional().nullable(),
+  left_breast_condition: z.any().optional().nullable(),
+  right_breast_condition: z.any().optional().nullable(),
+  care_details: z.string().optional().nullable(),
+  recommendations: z.string().optional().nullable(),
 })
 
 type ChartFormData = z.infer<typeof chartSchema>
@@ -99,23 +105,25 @@ export function BreastCareChart({ appointment, onClose, user }: BreastCareChartP
         const questionnaire = appointment.questionnaires
 
         const baseData = {
-          appointment_id: appointment.id,
+          reservation_id: appointment.id,
+          patient_id: appointment.patient_id,
           visit_date: new Date(appointment.start_time).toLocaleDateString("ja-JP"),
           practitioner_name: user.name || "",
         }
 
         let questionnaireData: Partial<ChartFormData> = {}
-        if (questionnaire) {
+        if (questionnaire?.data && typeof questionnaire.data === "object") {
+          const qData = questionnaire.data as any
           const locations = []
-          if (questionnaire.location_nishinomiya) locations.push("西宮")
-          if (questionnaire.location_takarazuka) locations.push("宝塚")
-          if (questionnaire.location_nihonbashi) locations.push("日本橋")
-          if (questionnaire.location_aichi) locations.push("愛知")
-          if (questionnaire.location_visit) locations.push("訪問")
+          if (qData.location_nishinomiya) locations.push("西宮")
+          if (qData.location_takarazuka) locations.push("宝塚")
+          if (qData.location_nihonbashi) locations.push("日本橋")
+          if (qData.location_aichi) locations.push("愛知")
+          if (qData.location_visit) locations.push("訪問")
 
           questionnaireData = {
             clinic_location: locations,
-            s_text: questionnaire.notes || "",
+            s_text: qData.notes || "",
           }
         }
 
@@ -149,7 +157,10 @@ export function BreastCareChart({ appointment, onClose, user }: BreastCareChartP
     }
   }
 
-  const questionnaire = appointment.questionnaires
+  const questionnaireData =
+    appointment.questionnaires?.data && typeof appointment.questionnaires.data === "object"
+      ? (appointment.questionnaires.data as any)
+      : {}
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
@@ -157,7 +168,7 @@ export function BreastCareChart({ appointment, onClose, user }: BreastCareChartP
         <CardHeader>
           <CardTitle>すいな法乳房ケアカルテ</CardTitle>
           <div className="text-sm text-muted-foreground">
-            {questionnaire?.child_last_name} {questionnaire?.child_first_name} 様 (
+            {questionnaireData?.child_last_name} {questionnaireData?.child_first_name} 様 (
             {new Date(appointment.start_time).toLocaleString("ja-JP")})
           </div>
         </CardHeader>

@@ -34,24 +34,40 @@ export async function getAppointments({
   sortBy = "reservation_date",
   sortOrder = "desc",
   search = "",
+  filterDate = "all", // new parameter: 'today', 'all', or a 'YYYY-MM-DD' string
 }: {
   page?: number
   limit?: number
   sortBy?: string
   sortOrder?: "asc" | "desc"
   search?: string
+  filterDate?: "today" | "all" | string
 }) {
   noStore()
   const supabase = createClient()
   const offset = (page - 1) * limit
 
   try {
-    let query = supabase
-      .from("reservations")
-      .select("*, service_types(id, name, color), patients!inner(name, kana, email, phone_number)", { count: "exact" })
+    let query = supabase.from("reservations").select(
+      `
+        *,
+        service_types ( id, name, color ),
+        patients!inner ( id, name, kana, email, phone_number ),
+        questionnaires ( id, data, created_at )
+      `,
+      { count: "exact" },
+    )
 
     if (search) {
       query = query.ilike("patients.name", `%${search}%`)
+    }
+
+    // New date filtering logic
+    if (filterDate === "today") {
+      const today = format(new Date(), "yyyy-MM-dd")
+      query = query.eq("reservation_date", today)
+    } else if (filterDate !== "all") {
+      query = query.eq("reservation_date", filterDate)
     }
 
     const sortableColumns: { [key: string]: string } = {
