@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CSRFForm } from "@/components/csrf-form"
@@ -26,6 +27,8 @@ export function NewReservationForm({
 }: NewReservationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [newReservationId, setNewReservationId] = useState<number | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -42,6 +45,7 @@ export function NewReservationForm({
   const handleSubmit = async (formData: FormData) => {
     setIsSubmitting(true)
     setError(null)
+    setIsSuccess(false)
 
     // Client-side validation
     if (!clinicId || !serviceTypeId || !date || !startTime || !endTime || !phoneNumber) {
@@ -67,18 +71,31 @@ export function NewReservationForm({
       const result = await createReservation(formData)
       console.log("Reservation creation result:", result)
 
-      if (!result.success || !result.data) {
+      if (!result.success || !result.data?.id) {
         throw new Error(result.message || "予約の作成に失敗しました")
       }
 
-      // Redirect to confirmation page using the ID from the returned data
-      router.push(`/reservation/confirmation?id=${result.data.id}`)
+      // Set success state instead of redirecting
+      setIsSuccess(true)
+      setNewReservationId(result.data.id)
     } catch (err) {
       console.error("予約フォーム送信エラー:", err)
       setError(err instanceof Error ? err.message : "予約の作成中にエラーが発生しました")
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (isSuccess && newReservationId) {
+    return (
+      <div className="bg-white p-8 rounded-lg shadow-md text-center space-y-6">
+        <h2 className="text-2xl font-bold text-green-600">予約が完了しました！</h2>
+        <p className="text-gray-700">ご予約ありがとうございます。以下のボタンから予約内容をご確認いただけます。</p>
+        <Button asChild className="w-full bg-[#f8a0a0] hover:bg-[#f78b8b] text-white py-3">
+          <Link href={`/reservation/confirmation?id=${newReservationId}`}>予約内容を確認する</Link>
+        </Button>
+      </div>
+    )
   }
 
   return (
