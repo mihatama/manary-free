@@ -73,25 +73,29 @@ export async function verifyCodeAction(formData: FormData) {
 }
 
 // 電話番号で予約を取得
-export async function getAppointmentsByPhone(phoneNumber: string) {
+export async function getAppointmentsByPhone(
+  phoneNumber: string,
+): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const supabase = createClient()
   try {
     const { data, error } = await supabase
       .from("reservations")
-      .select(`
-        *,
-        service_types (
-          id,
-          name,
-          duration,
-          color
-        ),
-        clinics (
-          name,
-          address,
-          phone
-        )
-      `)
+      .select(
+        `
+          *,
+          service_types (
+            id,
+            name,
+            duration,
+            color
+          ),
+          clinics (
+            name,
+            address,
+            phone
+          )
+        `,
+      )
       .eq("patient_phone", phoneNumber)
       .neq("status", "cancelled")
       .order("reservation_date", { ascending: true })
@@ -99,13 +103,13 @@ export async function getAppointmentsByPhone(phoneNumber: string) {
 
     if (error) {
       console.error("予約取得エラー:", error)
-      throw new Error("予約情報の取得に失敗しました")
+      return { success: false, error: "予約情報の取得に失敗しました。" }
     }
 
-    return data
-  } catch (error) {
+    return { success: true, data: data }
+  } catch (error: any) {
     console.error("Error in getAppointmentsByPhone:", error)
-    throw new Error("予約情報の取得に失敗しました")
+    return { success: false, error: "予約情報の取得中に予期せぬエラーが発生しました。" }
   }
 }
 

@@ -43,22 +43,22 @@ export function PhoneAuthReservationManager() {
     setIsLoading(true)
     setError(null)
 
-    try {
-      console.log("[Manager] Calling server action getAppointmentsByPhone...")
-      const data = await getAppointmentsByPhone(phone)
-      console.log("[Manager] Received data from server:", data)
-      setAppointments(data)
+    const result = await getAppointmentsByPhone(phone)
 
-      if (data.length === 0) {
+    if (result.success && result.data) {
+      console.log("[Manager] Received data from server:", result.data)
+      setAppointments(result.data)
+      if (result.data.length === 0) {
         console.log("[Manager] No appointments found for this phone number.")
       }
-    } catch (err: any) {
-      console.error("[Manager] Error fetching appointments:", err)
-      setError(err.message || "予約情報の取得に失敗しました")
-    } finally {
-      console.log("[Manager] loadAppointments finished.")
-      setIsLoading(false)
+    } else {
+      console.error("[Manager] Error fetching appointments:", result.error)
+      setError(result.error || "予約情報の取得に失敗しました")
+      setAppointments([]) // エラー時にリストをクリア
     }
+
+    console.log("[Manager] loadAppointments finished.")
+    setIsLoading(false)
   }
 
   const handleReservationComplete = async () => {
