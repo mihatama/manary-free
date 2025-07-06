@@ -123,8 +123,9 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
 
     async function fetchMonthEvents() {
       const monthStr = format(currentDate, "yyyy-MM")
-      if (memoizedEvents[monthStr]) {
-        setEvents(memoizedEvents[monthStr])
+      const memoKey = `${monthStr}-${serviceType.id}`
+      if (memoizedEvents[memoKey]) {
+        setEvents(memoizedEvents[memoKey])
         return
       }
 
@@ -160,7 +161,7 @@ export function ReservationCalendar({ clinicId, serviceType, onSelectSlot, selec
           .filter((e): e is CalendarEvent => e !== null) // Filter out nulls
 
         console.log(`[ReservationCalendar:useEffect] Total processed events for month: ${processedEvents.length}`)
-        setMemoizedEvents((prev) => ({ ...prev, [monthStr]: processedEvents }))
+        setMemoizedEvents((prev) => ({ ...prev, [memoKey]: processedEvents }))
         setEvents(processedEvents)
       } catch (err: any) {
         console.error("[ReservationCalendar] A top-level error occurred:", err)
