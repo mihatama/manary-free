@@ -72,12 +72,13 @@ export async function verifyCodeAction(formData: FormData) {
   }
 }
 
-// 電話番号で予約を取得
+// 電話番号で予約を取得 (Simplified Logic)
 export async function getAppointmentsByPhone(
   phoneNumber: string,
 ): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const supabase = createClient()
   try {
+    // Directly query the reservations table using the new patient_phone column
     const { data, error } = await supabase
       .from("reservations")
       .select(
@@ -96,20 +97,19 @@ export async function getAppointmentsByPhone(
         )
       `,
       )
-      .eq("patient_phone", phoneNumber)
+      .eq("patient_phone", phoneNumber) // Use the new column for direct lookup
       .neq("status", "cancelled")
       .order("reservation_date", { ascending: true })
       .order("start_time", { ascending: true })
 
     if (error) {
-      console.error("Supabase予約取得エラー:", error) // Log the full error object
-      // Return the specific error message instead of a generic one
+      console.error("Supabase reservation lookup error:", error)
       return { success: false, error: `データベースエラー: ${error.message}` }
     }
 
     return { success: true, data: data }
   } catch (error: any) {
-    console.error("Error in getAppointmentsByPhone:", error)
+    console.error("Unhandled error in getAppointmentsByPhone:", error)
     return { success: false, error: "予約情報の取得中に予期せぬエラーが発生しました。" }
   }
 }

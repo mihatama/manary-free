@@ -227,11 +227,12 @@ export async function createReservation(formData: FormData) {
   console.log("[Action:createReservation] Received FormData:", Object.fromEntries(formData.entries()))
 
   try {
+    const patientPhoneNumber = formData.get("patient_phone") as string
     const email = formData.get("patient_email") as string
     const patientData = {
       name: formData.get("patient_name") as string,
       kana: formData.get("patient_kana") as string,
-      phone_number: formData.get("patient_phone") as string,
+      phone_number: patientPhoneNumber,
       email: email || null, // Use null if email is empty
     }
     console.log("[Action:createReservation] Parsed patient data:", patientData)
@@ -245,6 +246,7 @@ export async function createReservation(formData: FormData) {
       status: "confirmed" as const,
       note: null, // Notes field is removed from form
       access_token: uuidv4(),
+      patient_phone: patientPhoneNumber, // Save the phone number directly
     }
     console.log("[Action:createReservation] Parsed reservation data:", reservationData)
 
