@@ -124,10 +124,10 @@ export function ClinicManager({
                       <span>{clinic.address}</span>
                     </div>
                   )}
-                  {clinic.phone && (
+                  {clinic.phone_number && (
                     <div className="flex items-center text-sm text-gray-500">
                       <Phone className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                      <span>{clinic.phone}</span>
+                      <span>{clinic.phone_number}</span>
                     </div>
                   )}
                 </CardContent>
@@ -183,8 +183,8 @@ export function ClinicManager({
                 <Input id="address" name="address" defaultValue={editingClinic?.address ?? ""} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">電話番号</Label>
-                <Input id="phone" name="phone" defaultValue={editingClinic?.phone ?? ""} />
+                <Label htmlFor="phone_number">電話番号</Label>
+                <Input id="phone_number" name="phone_number" defaultValue={editingClinic?.phone_number ?? ""} />
               </div>
             </div>
             <DialogFooter>
