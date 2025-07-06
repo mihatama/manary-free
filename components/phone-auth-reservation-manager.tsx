@@ -18,6 +18,30 @@ export function PhoneAuthReservationManager() {
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<"list" | "new">("list")
 
+  // On component mount, check for existing session verification
+  useEffect(() => {
+    try {
+      const storedVerification = sessionStorage.getItem("phoneVerified")
+      if (storedVerification) {
+        const { phone, timestamp } = JSON.parse(storedVerification)
+        // Verification is valid for 30 minutes
+        const thirtyMinutes = 30 * 60 * 1000
+        if (Date.now() - timestamp < thirtyMinutes) {
+          console.log(`[Manager] Found valid session for ${phone}. Skipping SMS auth.`)
+          // Set state to reflect verification and load data
+          setPhoneNumber(phone)
+          setIsVerified(true)
+          loadAppointments(phone)
+        } else {
+          console.log("[Manager] Found expired session. Clearing it.")
+          sessionStorage.removeItem("phoneVerified")
+        }
+      }
+    } catch (e) {
+      console.error("Could not read from sessionStorage", e)
+    }
+  }, []) // Empty dependency array ensures this runs only once on mount
+
   useEffect(() => {
     console.log("[Manager] State changed:", {
       isVerified,
@@ -32,6 +56,14 @@ export function PhoneAuthReservationManager() {
   // 電話番号認証が完了したときの処理
   const handleVerified = async (verifiedPhoneNumber: string) => {
     console.log(`[Manager] handleVerified called with phone: ${verifiedPhoneNumber}`)
+    try {
+      const verificationData = { phone: verifiedPhoneNumber, timestamp: Date.now() }
+      sessionStorage.setItem("phoneVerified", JSON.stringify(verificationData))
+      console.log("[Manager] Stored verification in session.")
+    } catch (e) {
+      console.error("Could not write to sessionStorage", e)
+    }
+
     setPhoneNumber(verifiedPhoneNumber)
     setIsVerified(true)
     await loadAppointments(verifiedPhoneNumber)
