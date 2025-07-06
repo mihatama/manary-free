@@ -651,9 +651,9 @@ export async function getScheduleEventsForMonth(clinicId: number, month: string,
       // Process specific date settings for this day
       const specificSettingsForDay = specificDateSettings.filter((s) => s.specific_date === dayStr)
       for (const setting of specificSettingsForDay) {
-        const start = parseTimeToDate(setting.start_time, day)
-        const end = parseTimeToDate(setting.end_time, day)
-        if (start && end) {
+        const start = new Date(`${dayStr}T${setting.start_time}+09:00`)
+        const end = new Date(`${dayStr}T${setting.end_time}+09:00`)
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
           calendarEvents.push({
             title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(
               0,
@@ -682,9 +682,9 @@ export async function getScheduleEventsForMonth(clinicId: number, month: string,
         if (setting.end_date && day > new Date(setting.end_date)) {
           continue
         }
-        const start = parseTimeToDate(setting.start_time, day)
-        const end = parseTimeToDate(setting.end_time, day)
-        if (start && end) {
+        const start = new Date(`${dayStr}T${setting.start_time}+09:00`)
+        const end = new Date(`${dayStr}T${setting.end_time}+09:00`)
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
           calendarEvents.push({
             title: `${setting.service_types?.name || "未分類"}: ${setting.start_time.substring(
               0,

@@ -393,7 +393,10 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
       .select("*")
       .eq("service_type_id", serviceTypeId)
       .or(
-        `specific_date.gte.${format(startDate, "yyyy-MM-dd")},specific_date.lte.${format(endDate, "yyyy-MM-dd")},specific_date.is.null`,
+        `specific_date.gte.${format(startDate, "yyyy-MM-dd")},specific_date.lte.${format(
+          endDate,
+          "yyyy-MM-dd",
+        )},specific_date.is.null`,
       )
 
     if (settingsError) throw new Error(`予約設定の取得に失敗しました: ${settingsError.message}`)
@@ -408,12 +411,16 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
     // Add existing reservations to events
     reservations?.forEach((res) => {
       if (res.reservation_date && res.start_time && res.end_time) {
-        events.push({
-          title: "予約済",
-          start: `${res.reservation_date}T${res.start_time}`,
-          end: `${res.reservation_date}T${res.end_time}`,
-          isAvailable: false,
-        })
+        const start = new Date(`${res.reservation_date}T${res.start_time}+09:00`)
+        const end = new Date(`${res.reservation_date}T${res.end_time}+09:00`)
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          events.push({
+            title: "予約済",
+            start: start.toISOString(),
+            end: end.toISOString(),
+            isAvailable: false,
+          })
+        }
       }
     })
 
@@ -445,12 +452,16 @@ export async function getCalendarEventsForMonth(clinicId: number, serviceTypeId:
           const slotStartDateTime = `${dayStr}T${slotStartTime}:00`
 
           if (!bookedSlots.has(slotStartDateTime.substring(0, 19))) {
-            events.push({
-              title: slotStartTime,
-              start: `${dayStr}T${slotStartTime}:00`,
-              end: `${dayStr}T${slotEndTime}:00`,
-              isAvailable: true,
-            })
+            const start = new Date(`${dayStr}T${slotStartTime}:00+09:00`)
+            const end = new Date(`${dayStr}T${slotEndTime}:00+09:00`)
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+              events.push({
+                title: slotStartTime,
+                start: start.toISOString(),
+                end: end.toISOString(),
+                isAvailable: true,
+              })
+            }
           }
           currentMinutes += duration
         }
