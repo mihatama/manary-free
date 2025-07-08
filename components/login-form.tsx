@@ -49,7 +49,7 @@ export function LoginForm() {
   return (
     <Card className="w-full shadow-md border-border">
       <CardHeader>
-        <CardTitle className="text-xl text-center text-foreground">マナリー管理システム</CardTitle>
+        <CardTitle className="text-xl text-center text-foreground">ログイン</CardTitle>
         <CardDescription className="text-center text-muted-foreground">
           管理者アカウントでログインしてください。
         </CardDescription>
@@ -123,7 +123,9 @@ export function LoginForm() {
               パスワードをお忘れですか？
             </Link>
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" 
+          className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          disabled={pending}>
             {pending ? "ログイン中..." : "ログイン"}
           </Button>
         </CSRFForm>

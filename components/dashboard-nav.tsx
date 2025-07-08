@@ -23,31 +23,63 @@ export function DashboardNav() {
   const pathname = usePathname()
 
   return (
-    <aside className="hidden w-64 flex-col border-r bg-card p-4 sm:flex">
-      <div className="flex items-center gap-2 mb-8">
-        <Image src="/manary-logo.png" alt="Manary Logo" width={32} height={32} />
-        <h1 className="text-lg font-bold text-foreground">管理画面</h1>
+    <aside className="hidden w-64 flex-col border-r border-pink-100 p-6 sm:flex" 
+           style={{ backgroundColor: '#ffeaed' }}>
+      {/* ヘッダー部分 */}
+      <div className="flex items-center gap-3 mb-10 pb-6 border-b border-pink-200/60">
+        <div className="relative">
+          <Image 
+            src="/manary-logo.png" 
+            alt="Manary Logo" 
+            width={50} 
+            height={50}
+            className="rounded-xl shadow-sm"
+          />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
+            Manary
+          </h1>
+          <p className="text-xs text-rose-500/70 font-medium">管理画面</p>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1">
+
+      {/* ナビゲーション */}
+      <nav className="flex-1 space-y-2">
         {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-all hover:text-primary",
-              pathname === item.href && "bg-primary/10 text-primary",
+              "group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ease-in-out",
+              pathname === item.href 
+                ? "bg-white/80 text-rose-700 shadow-md shadow-pink-200/50 scale-[1.02]" 
+                : "text-rose-600/70 hover:text-rose-700 hover:bg-white/50 hover:scale-[1.01] hover:shadow-sm"
             )}
           >
-            <item.icon className="h-4 w-4" />
-            {item.label}
+            <item.icon className={cn(
+              "h-5 w-5 transition-colors duration-200",
+              pathname === item.href 
+                ? "text-rose-600" 
+                : "text-rose-500/60 group-hover:text-rose-600"
+            )} />
+            <span className="font-medium">{item.label}</span>
+            {pathname === item.href && (
+              <div className="ml-auto w-2 h-2 bg-rose-500 rounded-full shadow-sm"></div>
+            )}
           </Link>
         ))}
       </nav>
-      <div className="mt-auto">
+
+      {/* ログアウトボタン */}
+      <div className="mt-auto pt-6 border-t border-pink-200/60">
         <form action={logOut}>
-          <Button variant="ghost" className="w-full justify-start">
-            <LogOut className="mr-2 h-4 w-4" />
-            ログアウト
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start group text-rose-600/70 hover:text-rose-700 hover:bg-white/50 transition-all duration-200 rounded-xl py-3"
+          >
+            <LogOut className="mr-3 h-5 w-5 text-rose-500/60 group-hover:text-rose-600 transition-colors duration-200" />
+            <span className="font-medium">ログアウト</span>
           </Button>
         </form>
       </div>
