@@ -21,7 +21,7 @@ export default function ReservationPage() {
 
       <main className="container mx-auto px-4 bg-[#ffeaed] py-12">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">予約の確認・変更・追加</h1>
+          <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">予約の確認・変更・追加</h1>
           <PhoneAuthReservationManager />
         </div>
       </main>

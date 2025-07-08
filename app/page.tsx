@@ -9,6 +9,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
+            <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">Manary</h1>
           </div>
           <div>
             <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
