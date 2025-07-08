@@ -313,7 +313,16 @@ export function AppointmentsClient({ initialAppointments, initialCount, user }: 
                 <TableCell>{formatTime(appointment.start_time)}</TableCell>
                 <TableCell>{appointment.service_types?.name}</TableCell>
                 <TableCell>
-                  <Badge variant="outline">{appointment.status}</Badge>
+                    <Badge
+                    variant="outline"
+                    className={
+                      appointment.status === 'confirmed' 
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                      : 'bg-rose-50 border-rose-200 text-rose-700'
+                    }
+                    >
+                      {appointment.status === 'confirmed' ? '確認済み' : 'キャンセル'}
+                    </Badge>
                 </TableCell>
                 <TableCell className="flex items-center space-x-1 whitespace-nowrap">
                   <Button
