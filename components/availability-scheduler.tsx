@@ -182,7 +182,7 @@ function SimpleCalendar({
                   key={index}
                   className={`
               h-8 w-full flex items-center justify-center rounded-sm text-sm
-              ${isSelected(date) ? "bg-blue-500 text-white" : ""}
+              ${isSelected(date) ? "bg-green-500 text-white" : ""}
               ${!isCurrentMonth(date) ? "text-gray-400" : ""}
               ${isDateDisabled(date) ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-100"}
             `}
@@ -499,7 +499,7 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
                     variant="link"
                     size="sm"
                     onClick={() => setShowBreak(!showBreak)}
-                    className="p-0 h-auto text-blue-600"
+                    className="p-0 h-auto text-green-600"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     {showBreak ? "休憩設定をキャンセル" : "休憩時間を設定する"}
@@ -659,7 +659,7 @@ export function AvailabilityScheduler({ serviceType }: AvailabilitySchedulerProp
                     variant="link"
                     size="sm"
                     onClick={() => setSpecificShowBreak(!specificShowBreak)}
-                    className="p-0 h-auto text-blue-600"
+                    className="p-0 h-auto text-green-600"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     {specificShowBreak ? "休憩設定をキャンセル" : "休憩時間を設定する"}
