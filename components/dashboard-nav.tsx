@@ -33,7 +33,7 @@ export function DashboardNav() {
             alt="Manary Logo" 
             width={50} 
             height={50}
-            className="rounded-xl shadow-sm bg-white p-2"
+            className="rounded-xl shadow-sm bg-white"
           />
         </div>
         <div>
