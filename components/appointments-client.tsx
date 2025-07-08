@@ -321,6 +321,7 @@ export function AppointmentsClient({ initialAppointments, initialCount, user }: 
                     size="sm"
                     onClick={() => setViewingQuestionnaireId(appointment.questionnaire_id)}
                     disabled={!appointment.questionnaire_id}
+                    className="bg-white hover:bg-pink-50 border-pink-200 text-pink-700 hover:border-pink-300 disabled:opacity-50 disabled:bg-gray-50 disabled:border-gray-200 disabled:text-gray-400"
                   >
                     <FileText className="h-4 w-4 mr-1" /> 問診票
                   </Button>
@@ -330,13 +331,18 @@ export function AppointmentsClient({ initialAppointments, initialCount, user }: 
                     onClick={() =>
                       setViewingPastPatient({ id: appointment.patients.id, name: appointment.patients.name })
                     }
+                    className="bg-white hover:bg-pink-50 border-pink-200 text-pink-700 hover:border-pink-300"
                   >
                     <History className="h-4 w-4 mr-1" /> 過去分
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleOpenChart("breast", appointment)}>
+                  <Button variant="outline" size="sm" onClick={() => handleOpenChart("breast", appointment)}
+                    className="bg-white hover:bg-pink-50 border-pink-200 text-pink-700 hover:border-pink-300"
+                  >
                     乳房ケア
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleOpenChart("postpartum", appointment)}>
+                  <Button variant="outline" size="sm" onClick={() => handleOpenChart("postpartum", appointment)}
+                    className="bg-white hover:bg-pink-50 border-pink-200 text-pink-700 hover:border-pink-300"
+                  >
                     産後ケア
                   </Button>
                 </TableCell>
