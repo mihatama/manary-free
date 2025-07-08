@@ -51,7 +51,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle className="text-xl text-center text-foreground">マナリー管理システム</CardTitle>
         <CardDescription className="text-center text-muted-foreground">
-          管理者アカウントでログインしてください
+          管理者アカウントでログインしてください。
         </CardDescription>
       </CardHeader>
       <CardContent>
