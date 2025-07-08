@@ -107,7 +107,7 @@ export function NewReservationFlow({
 
       <Card>
         <CardHeader>
-          <CardTitle>ステップ1: クリニックとメニューを選択</CardTitle>
+          <CardTitle>Step1: クリニックとメニューを選択</CardTitle>
           <CardDescription>ご希望のクリニックと施術メニューを選択してください。</CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-8">
@@ -179,7 +179,7 @@ export function NewReservationFlow({
       {selectedClinic && selectedServiceType && (
         <Card>
           <CardHeader>
-            <CardTitle>ステップ2: ご希望の日時を選択</CardTitle>
+            <CardTitle>Step2: ご希望の日時を選択</CardTitle>
             <CardDescription>カレンダーからご希望の予約可能な日時（水色の枠）をクリックしてください。</CardDescription>
           </CardHeader>
           <CardContent>
@@ -196,7 +196,7 @@ export function NewReservationFlow({
       {selectedClinic && selectedServiceType && selectedSlot && (
         <Card id="reservation-form-section">
           <CardHeader>
-            <CardTitle>ステップ3: 予約者情報の入力</CardTitle>
+            <CardTitle>Step3: 予約者情報の入力</CardTitle>
             <CardDescription>以下の内容をご確認の上、お客様の情報を入力してください。</CardDescription>
           </CardHeader>
           <CardContent>
