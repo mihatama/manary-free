@@ -120,15 +120,16 @@ export default async function DashboardPage() {
                     <TableCell>{(apt.service_types as any)?.name || "N/A"}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={
-                          apt.status === "confirmed"
-                            ? "default"
-                            : apt.status === "cancelled"
-                              ? "destructive"
-                              : "secondary"
+                      variant="outline"
+                      className={
+                        apt.status === "confirmed"
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : apt.status === "cancelled"
+                        ? 'bg-rose-50 border-rose-200 text-rose-700'
+                        : 'bg-pink-50 border-pink-200 text-pink-700'
                         }
-                      >
-                        {apt.status}
+                        >
+                          {apt.status === "confirmed" ? "確認済み" : apt.status === "cancelled" ? "キャンセル" : apt.status}
                       </Badge>
                     </TableCell>
                   </TableRow>
