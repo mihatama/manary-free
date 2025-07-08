@@ -315,7 +315,7 @@ export function AppointmentsClient({ initialAppointments, initialCount, user }: 
                 <TableCell>
                   <Badge variant="outline">{appointment.status}</Badge>
                 </TableCell>
-                <TableCell className="space-x-1 whitespace-nowrap">
+                <TableCell className="flex items-center space-x-1 whitespace-nowrap">
                   <Button
                     variant="outline"
                     size="sm"
