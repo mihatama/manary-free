@@ -18,6 +18,7 @@ export default function Home() {
         </div>
       </header>
 
+
       <main className="container mx-auto px-4 py-12 flex flex-col items-center">
         <div className="w-full max-w-md">
           <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">管理者ログイン</h1>
