@@ -91,7 +91,7 @@ export function NewReservationFlow({
   return (
     <div className="space-y-8">
       {onBack && (
-        <Button variant="outline" onClick={onBack} className="mb-4 bg-transparent">
+        <Button variant="outline" onClick={onBack} className="mb-4 bg-white shadow-sm">
           <ArrowLeft className="mr-2 h-4 w-4" />
           予約一覧に戻る
         </Button>
