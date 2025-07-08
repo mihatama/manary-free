@@ -262,8 +262,8 @@ export function ReservationManager({ initialToken }: ReservationManagerProps) {
                       />
                     </div>
                     {selectedDate && selectedTimeSlot && (
-                      <div className="mt-2 p-2 bg-blue-50 rounded-md">
-                        <p className="text-blue-700">
+                      <div className="mt-2 p-2 bg-green-50 rounded-md">
+                        <p className="text-green-700">
                           選択された日時: {format(selectedDate, "yyyy年MM月dd日(EEE)", { locale: ja })}{" "}
                           {selectedTimeSlot.start} - {selectedTimeSlot.end}
                         </p>

@@ -104,7 +104,7 @@ export default async function ConfirmationPage({
                         {token.split("").map((digit, index) => (
                           <div
                             key={index}
-                            className="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-lg border border-blue-300 text-xl font-bold"
+                            className="w-12 h-12 flex items-center justify-center bg-green-100 rounded-lg border border-green-300 text-xl font-bold"
                           >
                             {digit}
                           </div>
