@@ -59,12 +59,12 @@ export default function ResetPasswordPage() {
       <header className="border-b border-gray-100">
         <div className="container mx-auto px-4 py-4">
           <Link href="/" className="text-lg font-semibold text-[#f8a0a0]">
-            マナリー
+            Manary
           </Link>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4">
+      <main className="flex-1 flex items-center justify-center bg-[#ffeaed] p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-xl text-center">パスワードをリセット</CardTitle>

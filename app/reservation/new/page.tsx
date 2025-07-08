@@ -46,7 +46,7 @@ export default function NewReservationPage({ searchParams }: NewReservationPageP
           <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <div className="flex items-center">
               <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
-              <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
+              <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">Manary</h1>
             </div>
             <div>
               <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
@@ -56,7 +56,7 @@ export default function NewReservationPage({ searchParams }: NewReservationPageP
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-12">
+        <main className="container mx-auto px-4 bg-[#ffeaed] py-12">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8">
               初めての方は問診票の記入をお願いします

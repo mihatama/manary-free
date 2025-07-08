@@ -10,7 +10,7 @@ export default function NewCalendarPage() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
-            <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">マナリー</h1>
+            <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">Manary</h1>
           </div>
           <div>
             <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
@@ -20,7 +20,7 @@ export default function NewCalendarPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 bg-[#ffeaed] py-8">
         <h1 className="text-2xl font-bold text-center mb-8 text-[#f8a0a0]">新規予約</h1>
 
         <div className="max-w-5xl mx-auto">
