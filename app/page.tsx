@@ -1,4 +1,6 @@
 import Image from "next/image"
+import { Suspense } from "react"
+
 import { LoginForm } from "@/components/login-form"
 
 export default function Home() {
@@ -18,7 +20,15 @@ export default function Home() {
       <main className="container mx-auto px-4 flex flex-col items-center bg-[#ffeaed] py-12">
         <div className="w-full max-w-md">
           {/* <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8 text-[rgba(159,118,77,1)]">ログイン</h1> */}
-          <LoginForm />
+          <Suspense
+            fallback={
+              <div className="flex justify-center py-12 text-sm text-muted-foreground">
+                読み込み中...
+              </div>
+            }
+          >
+            <LoginForm />
+          </Suspense>
         </div>
       </main>
 
