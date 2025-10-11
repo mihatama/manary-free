@@ -37,7 +37,7 @@ export async function logoutAction(formData: FormData) {
       console.error("CSRF validation failed during logout - proceeding anyway")
     }
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerActionClient<Database>({ cookies: () => cookieStore })
 
     await supabase.auth.signOut()
@@ -52,7 +52,7 @@ export async function logoutAction(formData: FormData) {
 }
 
 export async function logOut() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerActionClient<Database>({ cookies: () => cookieStore })
   await supabase.auth.signOut()
   redirect("/")

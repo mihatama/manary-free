@@ -248,7 +248,7 @@ export async function getAvailableSlots(clinicId: number, date: string) {
 
 export async function createReservation(formData: FormData) {
   const supabase = createClient()
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   console.log("[Action:createReservation] Received FormData:", Object.fromEntries(formData.entries()))
 
