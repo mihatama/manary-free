@@ -1,8 +1,8 @@
 # Manary - 助産院予約管理システム / Clinic Reservation and Management System
 
-Manaryは、助産院やクリニック向けの顧客管理システムです。管理者向けのダッシュボード機能を中心に提供しており、以前存在したオンライン予約や問診票の提出機能は廃止されています。This is an internal-facing web application for managing clinic information and medical records. It is built with Next.js, Supabase, and Tailwind CSS.
+Manaryは、助産院やクリニック向けの顧客管理システムです。管理者向けのダッシュボード機能を中心に提供しており、以前存在したオンライン予約や問診票の提出機能は廃止されています。This is an internal-facing web application for managing clinic information and medical records. It is built with Next.js, Supabase, Tailwind CSS, and AWS Amplify UI.
 
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev)
+[![Built with AWS Amplify UI](https://img.shields.io/badge/Built%20with-AWS%20Amplify%20UI-orange?style=for-the-badge&logo=aws-amplify)](https://docs.amplify.aws/react/build-a-backend/ui-components/)
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
 
 ## 目次 / Project Overview
@@ -34,7 +34,7 @@ Manaryは、助産院やクリニック向けの顧客管理システムです�
 ## 技術スタック / Tech Stack
 
 - **フレームワーク**: [Next.js (App Router)](https://nextjs.org/)
-- **UI**: [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/)
+- **UI**: [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/), [AWS Amplify UI](https://ui.docs.amplify.aws/react)
 - **データベース & 認証**: [Supabase](https://supabase.com/)
 - **SMS通知 & 認証**: [Twilio](https://www.twilio.com/)
 - **フォーム管理**: [React Hook Form](https://react-hook-form.com/), [Zod](https://zod.dev/)
