@@ -1,34 +1,32 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-export function LoginForm() {
-  const searchParams = useSearchParams()
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [infoMessage, setInfoMessage] = useState<string | null>(null)
+export interface LoginFormProps {
+  defaultErrorMessage?: string | null
+  defaultInfoMessage?: string | null
+}
+
+export function LoginForm({
+  defaultErrorMessage = null,
+  defaultInfoMessage = null,
+}: LoginFormProps) {
+  const [errorMessage, setErrorMessage] = useState<string | null>(defaultErrorMessage)
+  const [infoMessage, setInfoMessage] = useState<string | null>(defaultInfoMessage)
   const [isRedirecting, setIsRedirecting] = useState(false)
 
   useEffect(() => {
-    const error = searchParams.get("error")
-    const info = searchParams.get("message")
-    const loggedOut = searchParams.get("logged_out")
+    setErrorMessage(defaultErrorMessage ?? null)
+  }, [defaultErrorMessage])
 
-    setErrorMessage(error)
-
-    if (info) {
-      setInfoMessage(info)
-    } else if (loggedOut) {
-      setInfoMessage("ログアウトしました。再度ログインしてください。")
-    } else if (!error) {
-      setInfoMessage(null)
-    }
-  }, [searchParams])
+  useEffect(() => {
+    setInfoMessage(defaultInfoMessage ?? null)
+  }, [defaultInfoMessage])
 
   const handleLogin = useCallback(() => {
     setIsRedirecting(true)
