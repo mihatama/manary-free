@@ -65,7 +65,8 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = createRouteHandlerClient<Database>({ cookies })
+    const cookieStore = await cookies()
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
