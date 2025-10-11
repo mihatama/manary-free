@@ -1,160 +1,164 @@
-"use client"
+'use client'
 
-import { useState, useEffect, useActionState } from "react"
-import { useFormStatus } from "react-dom"
-import type { User } from "@supabase/supabase-js"
-import { createUser } from "@/app/actions/user-actions"
-import { Button } from "@/components/ui/button"
+import { useMemo, useState } from "react"
+import { PlusCircle, Trash2 } from "lucide-react"
+
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog"
+  deleteUser as deleteStoredUser,
+  saveUser as saveStoredUser,
+  useLocalDataSelector,
+} from "@/lib/storage/local-storage"
+import type { StoredUser, UserRole } from "@/types/local-data"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useToast } from "@/hooks/use-toast"
-import { PlusCircle } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
-interface UserManagementClientProps {
-  users: User[]
+const roleLabels: Record<UserRole, string> = {
+  admin: "管理者",
+  staff: "スタッフ",
 }
 
-function SubmitButton() {
-  const { pending } = useFormStatus()
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "作成中..." : "ユーザーを作成"}
-    </Button>
-  )
+function formatDate(timestamp?: string) {
+  if (!timestamp) return "--"
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) {
+    return "--"
+  }
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)
 }
 
-// Form logic is encapsulated in its own component
-function AddUserForm({ closeDialog }: { closeDialog: () => void }) {
-  const router = useRouter()
-  const { toast } = useToast()
-  const initialState = { message: null, errors: null, success: false }
-  const [state, dispatch] = useActionState(createUser, initialState)
+export function UserManagementClient() {
+  const users = useLocalDataSelector((data) => data.users)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [email, setEmail] = useState("")
+  const [role, setRole] = useState<UserRole>("staff")
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (state.message) {
-      if (state.success) {
-        toast({
-          title: "成功",
-          description: state.message,
-        })
-        router.refresh() // Refresh the page to show the new user
-        closeDialog() // Close dialog on success
-      } else {
-        toast({
-          title: "エラー",
-          description: state.message,
-          variant: "destructive",
-        })
-      }
+  const sortedUsers = useMemo<StoredUser[]>(() => [...users].sort((a, b) => a.email.localeCompare(b.email)), [users])
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setError("メールアドレスを入力してください。")
+      return
     }
-  }, [state, toast, closeDialog, router])
+    if (!trimmedEmail.includes("@")) {
+      setError("有効なメールアドレスを入力してください。")
+      return
+    }
+    saveStoredUser(trimmedEmail, role)
+    setEmail("")
+    setRole("staff")
+    setError(null)
+    setIsDialogOpen(false)
+  }
 
-  return (
-    <form action={dispatch}>
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="email" className="text-right">
-            メールアドレス
-          </Label>
-          <Input id="email" name="email" type="email" className="col-span-3" required />
-        </div>
-        {state.errors?.email && <p className="col-start-2 col-span-3 text-sm text-red-500">{state.errors.email[0]}</p>}
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="password" className="text-right">
-            パスワード
-          </Label>
-          <Input id="password" name="password" type="password" className="col-span-3" required />
-        </div>
-        {state.errors?.password && (
-          <p className="col-start-2 col-span-3 text-sm text-red-500">{state.errors.password[0]}</p>
-        )}
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="isAdmin" className="text-right">
-            役割
-          </Label>
-          <div className="col-span-3 flex items-center space-x-2">
-            <Checkbox id="isAdmin" name="isAdmin" />
-            <label
-              htmlFor="isAdmin"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              この利用者を管理者として登録する
-            </label>
-          </div>
-        </div>
-      </div>
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="outline">
-            キャンセル
-          </Button>
-        </DialogClose>
-        <SubmitButton />
-      </DialogFooter>
-    </form>
-  )
-}
-
-export function UserManagementClient({ users }: UserManagementClientProps) {
-  const [open, setOpen] = useState(false)
+  const handleDelete = (user: StoredUser) => {
+    if (!confirm(`${user.email} を削除しますか？`)) {
+      return
+    }
+    deleteStoredUser(user.id)
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              利用者を追加
+              <PlusCircle className="mr-2 h-4 w-4" /> 新しい利用者を追加
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>新しい利用者を追加</DialogTitle>
-              <DialogDescription>新しい利用者のメールアドレスと初期パスワードを設定してください。</DialogDescription>
-            </DialogHeader>
-            <AddUserForm closeDialog={() => setOpen(false)} />
+          <DialogContent className="sm:max-w-[420px]">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>利用者の追加</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="user-email">メールアドレス</Label>
+                  <Input
+                    id="user-email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="example@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="user-role">役割</Label>
+                  <Select value={role} onValueChange={(value: UserRole) => setRole(value)}>
+                    <SelectTrigger id="user-role">
+                      <SelectValue placeholder="役割を選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">スタッフ</SelectItem>
+                      <SelectItem value="admin">管理者</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  キャンセル
+                </Button>
+                <Button type="submit">保存</Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
-      <div className="rounded-md border">
+
+      <div className="rounded-md border bg-white">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>メールアドレス</TableHead>
               <TableHead>役割</TableHead>
-              <TableHead>登録日時</TableHead>
+              <TableHead>作成日時</TableHead>
+              <TableHead className="w-24 text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.length > 0 ? (
-              users.map((user) => (
+            {sortedUsers.length > 0 ? (
+              sortedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.email}</TableCell>
                   <TableCell>
-                    {user.user_metadata?.role === "admin" && <Badge variant="outline">管理者</Badge>}
+                    <Badge variant={user.role === "admin" ? "default" : "outline"}>{roleLabels[user.role]}</Badge>
                   </TableCell>
-                  <TableCell>{user.created_at ? new Date(user.created_at).toLocaleString("ja-JP") : "N/A"}</TableCell>
+                  <TableCell>{formatDate(user.updatedAt ?? user.createdAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(user)}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <span className="sr-only">削除</span>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={3} className="text-center">
-                  利用者が見つかりません。
+                <TableCell colSpan={4} className="text-center py-6 text-gray-500">
+                  利用者がまだ登録されていません。
                 </TableCell>
               </TableRow>
             )}

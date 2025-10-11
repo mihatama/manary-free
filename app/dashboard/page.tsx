@@ -1,18 +1,7 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { FeatureDisabledMessage } from "@/components/feature-disabled-message"
 
-export default async function DashboardPage() {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return redirect("/")
-  }
-
+export default function DashboardPage() {
   return (
     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
       <div className="flex items-center justify-between space-y-2">
@@ -20,15 +9,13 @@ export default async function DashboardPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>オンライン予約機能について</CardTitle>
-          <CardDescription>
-            予約および問診票の機能はシステムから削除されました。
-          </CardDescription>
+          <CardTitle>ローカル管理モード</CardTitle>
+          <CardDescription>すべてのデータはブラウザのローカルストレージに保存されます。</CardDescription>
         </CardHeader>
         <CardContent>
           <FeatureDisabledMessage
-            title="予約関連の管理機能は無効化されています"
-            description="管理画面からは引き続きカルテやユーザー管理などの機能をご利用いただけます。オンライン予約や問診票に関する情報は今後表示されません。"
+            title="この環境では外部データベースを利用していません"
+            description="サンプルとしてローカルストレージにデータを保存し、ブラウザ内で助産院や診療種別、利用者情報を管理できます。データを初期化したい場合はサイドバーの『ローカルデータを削除』を使用してください。"
           />
         </CardContent>
       </Card>

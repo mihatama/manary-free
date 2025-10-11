@@ -1,30 +1,19 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { FeatureDisabledMessage } from "@/components/feature-disabled-message"
 
 export const dynamic = "force-dynamic"
 
-export default async function AppointmentsPage() {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
+export default function AppointmentsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>予約一覧</CardTitle>
-        <CardDescription>オンライン予約機能は廃止されました。</CardDescription>
+        <CardTitle>予約一覧 (ローカル)</CardTitle>
+        <CardDescription>オンライン予約機能の代わりに、ローカルストレージを利用したサンプル運用です。</CardDescription>
       </CardHeader>
       <CardContent>
         <FeatureDisabledMessage
-          title="予約一覧は利用できません"
-          description="オンライン予約機能を停止したため、予約データの表示や管理は行えません。"
+          title="外部システムとの連携は停止中"
+          description="予約の保存は未実装です。必要に応じてローカルストレージを利用したカレンダー機能を追加してください。"
           backHref="/dashboard"
           backLabel="ダッシュボードに戻る"
         />

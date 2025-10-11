@@ -1,43 +1,95 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
+type TimestampString = string
+
 export interface Database {
   public: {
     Tables: {
-      profiles: {
+      clinics: {
         Row: {
-          avatar_url: string | null
-          full_name: string | null
           id: string
-          updated_at: string | null
-          username: string | null
-          website: string | null
+          name: string
+          address: string | null
+          phone_number: string | null
+          created_at: TimestampString
+          updated_at: TimestampString
         }
         Insert: {
-          avatar_url?: string | null
-          full_name?: string | null
           id: string
-          updated_at?: string | null
-          username?: string | null
-          website?: string | null
+          name: string
+          address?: string | null
+          phone_number?: string | null
+          created_at: TimestampString
+          updated_at: TimestampString
         }
-        Update: {
-          avatar_url?: string | null
-          full_name?: string | null
-          id?: string
-          updated_at?: string | null
-          username?: string | null
-          website?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey"
-            columns: ["id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Update: Partial<Database["public"]["Tables"]["clinics"]["Insert"]>
+        Relationships: []
       }
       service_types: {
+        Row: {
+          id: string
+          clinic_id: string
+          name: string
+          description: string | null
+          duration: number
+          interval_minutes: number
+          price: number | null
+          color: string | null
+          created_at: TimestampString
+          updated_at: TimestampString
+        }
+        Insert: Row
+        Update: Partial<Row>
+        Relationships: []
+      }
+      availability_settings: {
+        Row: {
+          id: string
+          service_type_id: string
+          day_of_week: number | null
+          start_time: string
+          end_time: string
+          specific_date: string | null
+          is_available: boolean
+          created_at: TimestampString
+          updated_at: TimestampString
+        }
+        Insert: Row
+        Update: Partial<Row>
+        Relationships: []
+      }
+      reservations: {
+        Row: {
+          id: string
+          clinic_id: string
+          service_type_id: string
+          reservation_date: string
+          start_time: string
+          end_time: string
+          patient_name: string
+          patient_phone: string | null
+          status: string
+          note: string | null
+          created_at: TimestampString
+          updated_at: TimestampString
+        }
+        Insert: Row
+        Update: Partial<Row>
+        Relationships: []
+      }
+      questionnaires: {
+        Row: Record<string, Json>
+        Insert: Row
+        Update: Partial<Row>
+        Relationships: []
+      }
+    }
+    Views: never
+    Functions: never
+    Enums: never
+    CompositeTypes: never
+  }
+}
         Row: {
           created_at: string
           description: string | null

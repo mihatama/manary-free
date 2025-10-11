@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState } from "react"
-import { getSupabaseBrowser } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,32 +21,23 @@ export default function ResetPasswordPage() {
     setMessage(null)
 
     try {
-      // 現在のURLからベースURLを取得（Vercel環境でも動作するように）
-      const baseUrl = window.location.origin
-      const supabase = getSupabaseBrowser()
-
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${baseUrl}/update-password`,
-      })
-
-      if (error) {
-        // 詳細なエラーはログにのみ記録
-        console.error("Password reset request failed")
-        throw new Error("パスワードリセットに失敗しました")
+      const existing = JSON.parse(window.localStorage.getItem("manary.password-reset-requests") || "[]") as string[]
+      if (!existing.includes(email)) {
+        existing.push(email)
+        window.localStorage.setItem("manary.password-reset-requests", JSON.stringify(existing))
       }
+
+      await new Promise((resolve) => setTimeout(resolve, 400))
 
       setMessage({
         type: "success",
-        text: "パスワードリセットのリンクをメールで送信しました。メールをご確認ください。",
+        text: "パスワードリセット依頼を記録しました。サポート担当者からの連絡をお待ちください。",
       })
     } catch (error: any) {
-      // 詳細なエラーはログにのみ記録
-      console.error("Password reset process error")
-
-      // ユーザーには一般的なメッセージのみを表示
+      console.error("Password reset process error", error)
       setMessage({
         type: "error",
-        text: "パスワードリセット処理に失敗しました。メールアドレスを確認してもう一度お試しください。",
+        text: "パスワードリセットの記録に失敗しました。もう一度お試しください。",
       })
     } finally {
       setIsSubmitting(false)
