@@ -159,6 +159,10 @@ function computeSecretHash(username: string, clientId: string, clientSecret: str
 
 type CognitoError = Error & { code?: string }
 
+function isAbortError(error: unknown): error is Error {
+  return error instanceof Error && error.name === "AbortError"
+}
+
 function extractCognitoErrorCode(rawCode?: string | null) {
   if (!rawCode) {
     return undefined
@@ -188,39 +192,59 @@ async function signUpWithCognito({
   const secretHash = computeSecretHash(email, clientId, clientSecret)
   const endpoint = `https://cognito-idp.${region}.amazonaws.com/`
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-amz-json-1.1",
-      "X-Amz-Target": "AWSCognitoIdentityProviderService.SignUp",
-    },
-    body: JSON.stringify({
-      ClientId: clientId,
-      SecretHash: secretHash,
-      Username: email,
-      Password: password,
-      UserAttributes: [{ Name: "email", Value: email }],
-    }),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10_000)
 
-  let payload: any = null
+  let response: Response
 
   try {
-    payload = await response.json()
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-amz-json-1.1",
+        "X-Amz-Target": "AWSCognitoIdentityProviderService.SignUp",
+      },
+      body: JSON.stringify({
+        ClientId: clientId,
+        SecretHash: secretHash,
+        Username: email,
+        Password: password,
+        UserAttributes: [{ Name: "email", Value: email }],
+      }),
+      signal: controller.signal,
+    })
   } catch (error) {
-    if (!response.ok) {
-      const networkError = new Error(
-        `Cognito sign up failed with status ${response.status}: ${response.statusText}`,
-      ) as CognitoError
-      throw networkError
+    if (isAbortError(error)) {
+      const timeoutError = new Error("Cognito sign up request timed out") as CognitoError
+      timeoutError.code = "Timeout"
+      throw timeoutError
     }
 
-    return
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  const hasJsonPayload = response.headers.get("content-type")?.includes("application/json")
+  let payload: any = null
+
+  if (hasJsonPayload) {
+    try {
+      payload = await response.json()
+    } catch (error) {
+      console.error("Failed to parse Cognito sign up response as JSON", error)
+      if (!response.ok) {
+        const networkError = new Error(
+          `Cognito sign up failed with status ${response.status}: ${response.statusText}`,
+        ) as CognitoError
+        throw networkError
+      }
+    }
   }
 
   if (!response.ok) {
     const normalizedCode = extractCognitoErrorCode(payload?.__type ?? payload?.code ?? payload?.name)
-    const errorMessage = payload?.message ?? "Cognito sign up request failed"
+    const errorMessage = payload?.message ?? `Cognito sign up request failed (${response.status})`
     const error = new Error(errorMessage) as CognitoError
     error.code = normalizedCode
     throw error
