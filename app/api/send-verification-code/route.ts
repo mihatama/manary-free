@@ -9,8 +9,11 @@ export async function POST(request: NextRequest) {
     const csrfToken = formData.get("csrf_token") as string | null
 
     // CSRFトークンがある場合のみ検証
-    if (csrfToken && !validateCSRFToken(csrfToken)) {
-      return NextResponse.json({ success: false, error: "セキュリティトークンが無効です" }, { status: 403 })
+    if (csrfToken) {
+      const isValidToken = await validateCSRFToken(csrfToken)
+      if (!isValidToken) {
+        return NextResponse.json({ success: false, error: "セキュリティトークンが無効です" }, { status: 403 })
+      }
     }
 
     if (!phoneNumber) {

@@ -3,36 +3,24 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
-import { CognitoIdentityProviderClient, SignUpCommand } from "@aws-sdk/client-cognito-identity-provider"
-import { createHmac } from "node:crypto"
-import { z } from "zod"
 
 import type { AuthError } from "@/lib/auth"
 import type { Database } from "@/lib/supabase/database.types"
 import { validateCSRFToken } from "@/lib/csrf"
-import { getCognitoConfig, getMissingCognitoConfig } from "@/lib/cognito"
-
-const registerSchema = z
-  .object({
-    email: z
-      .string()
-      .min(1, "メールアドレスを入力してください。")
-      .email("有効なメールアドレスを入力してください。"),
-    password: z
-      .string()
-      .min(8, "パスワードは8文字以上で入力してください。")
-      .max(64, "パスワードは64文字以内で入力してください。"),
-    confirmPassword: z.string().min(1, "確認用パスワードを入力してください。"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "パスワードが一致しません。",
-    path: ["confirmPassword"],
-  })
+import { registerWithCognito, validateRegisterInput } from "@/lib/auth/register"
 
 // CSRF検証を行うヘルパー関数
 async function validateCSRF(formData: FormData) {
-  const csrfToken = formData.get("csrf_token") as string
-  if (!validateCSRFToken(csrfToken)) {
+  const csrfToken = formData.get("csrf_token")
+  if (!csrfToken || typeof csrfToken !== "string") {
+    return {
+      success: false,
+      error: "セキュリティトークンが無効です。ページを再読み込みしてください。",
+    }
+  }
+
+  const isValid = await validateCSRFToken(csrfToken)
+  if (!isValid) {
     return {
       success: false,
       error: "セキュリティトークンが無効です。ページを再読み込みしてください。",
@@ -154,10 +142,6 @@ type RegisterActionState = {
   message?: string
 }
 
-function computeSecretHash(username: string, clientId: string, clientSecret: string) {
-  return createHmac("sha256", clientSecret).update(username + clientId).digest("base64")
-}
-
 export async function registerAction(prevState: RegisterActionState, formData: FormData) {
   const csrfValidation = await validateCSRF(formData)
   if (!csrfValidation.success) {
@@ -169,123 +153,20 @@ export async function registerAction(prevState: RegisterActionState, formData: F
     }
   }
 
-  const parseResult = registerSchema.safeParse({
+  const validation = validateRegisterInput({
     email: formData.get("email"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
   })
 
-  if (!parseResult.success) {
-    const { fieldErrors, formErrors } = parseResult.error.flatten()
-    const errors: NonNullable<RegisterActionState["errors"]> = {}
-
-    if (fieldErrors.email?.length) {
-      errors.email = fieldErrors.email
-    }
-
-    if (fieldErrors.password?.length) {
-      errors.password = fieldErrors.password
-    }
-
-    if (fieldErrors.confirmPassword?.length) {
-      errors.confirmPassword = fieldErrors.confirmPassword
-    }
-
-    if (formErrors.length) {
-      errors.general = formErrors
-    }
-
+  if (!validation.success) {
     return {
       status: "error",
-      errors,
+      errors: validation.errors,
     }
   }
 
-  const { email, password } = parseResult.data
+  const { email, password } = validation
 
-  const missingConfig = getMissingCognitoConfig()
-  if (missingConfig.length) {
-    console.error(
-      "Missing Cognito configuration:",
-      missingConfig.join(", "),
-    )
-
-    return {
-      status: "error",
-      errors: {
-        general: [
-          "現在アカウントの新規作成を行うことができません。管理者にお問い合わせください。",
-        ],
-      },
-    }
-  }
-
-  const cognitoConfig = getCognitoConfig()
-  if (!cognitoConfig) {
-    console.error("Cognito configuration could not be loaded even though no values appear missing.")
-
-    return {
-      status: "error",
-      errors: {
-        general: [
-          "現在アカウントの新規作成を行うことができません。管理者にお問い合わせください。",
-        ],
-      },
-    }
-  }
-
-  const client = new CognitoIdentityProviderClient({ region: cognitoConfig.region })
-  const secretHash = computeSecretHash(
-    email,
-    cognitoConfig.clientId,
-    cognitoConfig.clientSecret,
-  )
-
-  try {
-    await client.send(
-      new SignUpCommand({
-        ClientId: cognitoConfig.clientId,
-        Username: email,
-        Password: password,
-        SecretHash: secretHash,
-        UserAttributes: [
-          { Name: "email", Value: email },
-        ],
-      }),
-    )
-
-    return {
-      status: "success",
-      message: "アカウントの仮登録が完了しました。確認メールをご確認ください。",
-    }
-  } catch (error: any) {
-    console.error("Cognito sign up error:", error)
-
-    if (error?.name === "UsernameExistsException") {
-      return {
-        status: "error",
-        errors: {
-          general: ["このメールアドレスは既に登録されています。ログインをお試しください。"],
-        },
-      }
-    }
-
-    if (error?.name === "InvalidPasswordException") {
-      return {
-        status: "error",
-        errors: {
-          password: [
-            "パスワードの要件を満たしていません。大文字・小文字・数字・記号を含む8文字以上のパスワードを設定してください。",
-          ],
-        },
-      }
-    }
-
-    return {
-      status: "error",
-      errors: {
-        general: ["アカウントの作成中にエラーが発生しました。時間をおいて再度お試しください。"],
-      },
-    }
-  }
+  return registerWithCognito({ email, password })
 }

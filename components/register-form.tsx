@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useActionState } from "react"
+import { useState, type FormEvent } from "react"
 import Link from "next/link"
 import { EyeIcon, EyeOffIcon } from "lucide-react"
 
-import { registerAction } from "@/app/actions/auth-actions"
 import { CSRFForm } from "@/components/csrf-form"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -33,10 +32,65 @@ const initialState: RegisterFormState = {
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [state, formAction] = useActionState(registerAction, initialState)
+  const [state, setState] = useState<RegisterFormState>(initialState)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev)
   const toggleConfirmVisibility = () => setShowConfirmPassword((prev) => !prev)
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const formElement = event.currentTarget
+
+    if (isSubmitting) {
+      return
+    }
+
+    setIsSubmitting(true)
+    setState({ ...initialState })
+
+    try {
+      const formData = new FormData(formElement)
+      const payload = {
+        email: String(formData.get("email") ?? ""),
+        password: String(formData.get("password") ?? ""),
+        confirmPassword: String(formData.get("confirmPassword") ?? ""),
+        csrfToken: String(formData.get("csrf_token") ?? ""),
+      }
+
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setState({ status: "error", errors: result.errors ?? { general: ["登録に失敗しました。"] } })
+        return
+      }
+
+      setState(result)
+
+      if (result.status === "success") {
+        formElement.reset()
+      }
+    } catch (error) {
+      console.error("Register form submission error:", error)
+      setState({
+        status: "error",
+        errors: {
+          general: ["登録処理中にエラーが発生しました。後でもう一度お試しください。"],
+        },
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <Card className="w-full shadow-md border-border">
@@ -60,7 +114,7 @@ export function RegisterForm() {
           </Alert>
         )}
 
-        <CSRFForm action={formAction} className="space-y-4">
+        <CSRFForm onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">メールアドレス</Label>
             <Input
@@ -142,9 +196,10 @@ export function RegisterForm() {
 
           <Button
             type="submit"
+            disabled={isSubmitting}
             className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
-            登録
+            {isSubmitting ? "登録中..." : "登録"}
           </Button>
         </CSRFForm>
 
