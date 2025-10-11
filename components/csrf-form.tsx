@@ -10,9 +10,10 @@ interface CSRFFormProps {
   action?: (formData: FormData) => Promise<void> | void
   onSubmit?: React.FormEventHandler<HTMLFormElement>
   className?: string
+  formRef?: React.Ref<HTMLFormElement>
 }
 
-export function CSRFForm({ children, action, onSubmit, className = "" }: CSRFFormProps) {
+export function CSRFForm({ children, action, onSubmit, className = "", formRef }: CSRFFormProps) {
   const { csrfToken, isLoading, error } = useCSRF()
 
   if (isLoading) {
@@ -28,7 +29,7 @@ export function CSRFForm({ children, action, onSubmit, className = "" }: CSRFFor
   }
 
   return (
-    <form action={action} onSubmit={onSubmit} className={className}>
+    <form ref={formRef} action={action} onSubmit={onSubmit} className={className}>
       <input type="hidden" name="csrf_token" value={csrfToken} />
       {children}
     </form>

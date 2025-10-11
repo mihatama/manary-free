@@ -167,6 +167,15 @@ export async function registerAction(prevState: RegisterActionState, formData: F
   }
 
   const { email, password } = validation
-
-  return registerWithCognito({ email, password })
+  try {
+    return await registerWithCognito({ email, password })
+  } catch (error) {
+    console.error("Register action unexpected error:", error)
+    return {
+      status: "error",
+      errors: {
+        general: ["アカウントの作成中にエラーが発生しました。時間をおいて再度お試しください。"],
+      },
+    }
+  }
 }

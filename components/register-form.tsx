@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, type FormEvent } from "react"
+import { useActionState, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { EyeIcon, EyeOffIcon } from "lucide-react"
+import { useFormStatus } from "react-dom"
 
 import { CSRFForm } from "@/components/csrf-form"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { registerAction } from "@/app/actions/auth-actions"
 
 
 type RegisterFormState = {
@@ -25,72 +27,38 @@ type RegisterFormState = {
 
 const initialState: RegisterFormState = {
   status: "idle",
-  errors: {},
-  message: undefined,
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <Button
+      type="submit"
+      disabled={pending}
+      className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+    >
+      {pending ? "登録中..." : "登録"}
+    </Button>
+  )
 }
 
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [state, setState] = useState<RegisterFormState>(initialState)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [state, formAction] = useActionState(registerAction, initialState)
+
+  useEffect(() => {
+    if (state.status === "success") {
+      formRef.current?.reset()
+      setShowPassword(false)
+      setShowConfirmPassword(false)
+    }
+  }, [state.status])
 
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev)
   const toggleConfirmVisibility = () => setShowConfirmPassword((prev) => !prev)
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const formElement = event.currentTarget
-
-    if (isSubmitting) {
-      return
-    }
-
-    setIsSubmitting(true)
-    setState({ ...initialState })
-
-    try {
-      const formData = new FormData(formElement)
-      const payload = {
-        email: String(formData.get("email") ?? ""),
-        password: String(formData.get("password") ?? ""),
-        confirmPassword: String(formData.get("confirmPassword") ?? ""),
-        csrfToken: String(formData.get("csrf_token") ?? ""),
-      }
-
-      const response = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        setState({ status: "error", errors: result.errors ?? { general: ["登録に失敗しました。"] } })
-        return
-      }
-
-      setState(result)
-
-      if (result.status === "success") {
-        formElement.reset()
-      }
-    } catch (error) {
-      console.error("Register form submission error:", error)
-      setState({
-        status: "error",
-        errors: {
-          general: ["登録処理中にエラーが発生しました。後でもう一度お試しください。"],
-        },
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   return (
     <Card className="w-full shadow-md border-border">
@@ -114,7 +82,7 @@ export function RegisterForm() {
           </Alert>
         )}
 
-        <CSRFForm onSubmit={handleSubmit} className="space-y-4">
+        <CSRFForm action={formAction} formRef={formRef} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">メールアドレス</Label>
             <Input
@@ -124,10 +92,12 @@ export function RegisterForm() {
               placeholder="example@manary.care"
 
               required
-              aria-invalid={!!state.errors?.email}
-              aria-errormessage={state.errors?.email ? "register-email-error" : undefined}
+              aria-invalid={state.status === "error" && !!state.errors?.email}
+              aria-errormessage={
+                state.status === "error" && state.errors?.email ? "register-email-error" : undefined
+              }
             />
-            {state.errors?.email && (
+            {state.status === "error" && state.errors?.email && (
               <p id="register-email-error" className="text-sm text-destructive mt-1">
                 {state.errors.email[0]}
               </p>
@@ -144,8 +114,12 @@ export function RegisterForm() {
                 placeholder="パスワードを入力"
 
                 required
-                aria-invalid={!!state.errors?.password}
-                aria-errormessage={state.errors?.password ? "register-password-error" : undefined}
+                aria-invalid={state.status === "error" && !!state.errors?.password}
+                aria-errormessage={
+                  state.status === "error" && state.errors?.password
+                    ? "register-password-error"
+                    : undefined
+                }
               />
               <button
                 type="button"
@@ -156,7 +130,7 @@ export function RegisterForm() {
                 {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
               </button>
             </div>
-            {state.errors?.password && (
+            {state.status === "error" && state.errors?.password && (
               <p id="register-password-error" className="text-sm text-destructive mt-1">
                 {state.errors.password[0]}
               </p>
@@ -173,9 +147,11 @@ export function RegisterForm() {
                 placeholder="もう一度パスワードを入力"
 
                 required
-                aria-invalid={!!state.errors?.confirmPassword}
+                aria-invalid={state.status === "error" && !!state.errors?.confirmPassword}
                 aria-errormessage={
-                  state.errors?.confirmPassword ? "register-confirm-password-error" : undefined
+                  state.status === "error" && state.errors?.confirmPassword
+                    ? "register-confirm-password-error"
+                    : undefined
                 }
               />
               <button
@@ -187,20 +163,14 @@ export function RegisterForm() {
                 {showConfirmPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
               </button>
             </div>
-            {state.errors?.confirmPassword && (
+            {state.status === "error" && state.errors?.confirmPassword && (
               <p id="register-confirm-password-error" className="text-sm text-destructive mt-1">
                 {state.errors.confirmPassword[0]}
               </p>
             )}
           </div>
 
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            {isSubmitting ? "登録中..." : "登録"}
-          </Button>
+          <SubmitButton />
         </CSRFForm>
 
         <p className="text-sm text-center text-muted-foreground mt-6">
