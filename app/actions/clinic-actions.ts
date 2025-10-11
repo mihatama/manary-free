@@ -10,8 +10,13 @@ type ServiceType = Database["public"]["Tables"]["service_types"]["Row"]
 
 // CSRF検証を行うヘルパー関数
 async function validateCSRF(formData: FormData) {
-  const csrfToken = formData.get("csrf_token") as string
-  if (!validateCSRFToken(csrfToken)) {
+  const csrfToken = formData.get("csrf_token")
+  if (!csrfToken || typeof csrfToken !== "string") {
+    throw new Error("セキュリティトークンが無効です。ページを再読み込みしてください。")
+  }
+
+  const isValid = await validateCSRFToken(csrfToken)
+  if (!isValid) {
     throw new Error("セキュリティトークンが無効です。ページを再読み込みしてください。")
   }
 }
