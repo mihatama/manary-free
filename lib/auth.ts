@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+
 import type { Database } from "@/lib/supabase/database.types"
+import { hasSupabaseAuthConfig } from "@/lib/supabase/env"
 
 export type AuthError = {
   email?: string[]
@@ -11,6 +13,11 @@ export type AuthError = {
 
 // エラーログの詳細度を下げ、一貫したエラーハンドリングを実装
 export async function getSession() {
+  if (!hasSupabaseAuthConfig()) {
+    console.warn("Supabase authentication環境変数が設定されていないため、セッションを取得できません。")
+    return null
+  }
+
   try {
     const cookieStore = cookies()
     const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore })
@@ -47,6 +54,11 @@ export async function getSession() {
 }
 
 export async function requireAuth() {
+  if (!hasSupabaseAuthConfig()) {
+    console.warn("Supabase認証の設定がないため、認証チェックをスキップします。")
+    return null
+  }
+
   const session = await getSession()
 
   if (!session) {

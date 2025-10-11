@@ -1,9 +1,12 @@
 import { requireAuth } from "@/lib/auth"
+import { hasSupabaseAuthConfig } from "@/lib/supabase/env"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { FeatureDisabledMessage } from "@/components/feature-disabled-message"
 
 export default async function ScheduleSettingsPage() {
-  await requireAuth()
+  if (hasSupabaseAuthConfig()) {
+    await requireAuth()
+  }
 
   return (
     <Card>
