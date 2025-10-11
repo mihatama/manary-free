@@ -35,7 +35,7 @@ Manaryは、助産院やクリニック向けの顧客管理システムです�
 
 - **フレームワーク**: [Next.js (App Router)](https://nextjs.org/)
 - **UI**: [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/), [AWS Amplify UI](https://ui.docs.amplify.aws/react)
-- **データベース & 認証**: [Supabase](https://supabase.com/)
+- **データストレージ**: ブラウザのローカルストレージ（サーバーサイドのデータベースは利用していません）
 - **SMS通知 & 認証**: [Twilio](https://www.twilio.com/)
 - **フォーム管理**: [React Hook Form](https://react-hook-form.com/), [Zod](https://zod.dev/)
 - **UIコンポーネント**: [Radix UI](https://www.radix-ui.com/), [Lucide React](https://lucide.dev/guide/packages/lucide-react) (Icons)
@@ -75,7 +75,7 @@ manary/
 
 - [Node.js](https://nodejs.org/) (v18以降)
 - [pnpm](https://pnpm.io/installation) (推奨)
-- [Supabase](https://supabase.com/) アカウント
+- ブラウザのローカルストレージにアクセスできるモダンブラウザ
 - [Twilio](https://www.twilio.com/) アカウント (オプション、SMS認証用)
 
 ### インストールと設定 / Installation
@@ -88,19 +88,7 @@ npm install
 \`\`\`
 
 2.  **環境変数を設定** / Set up environment variables:
-プロジェクトルートに `.env.local` ファイルを作成し、自身の値に書き換えてください。 / Create a `.env.local` file in the root of the project and add your Supabase project URL and anon key.
-\`\`\`
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-COGNITO_REGION=ap-northeast-1
-COGNITO_CLIENT_ID=17dfvdao2o2qbmbmmtmhhlqpfl
-COGNITO_CLIENT_SECRET=your-cognito-client-secret
-# Add other variables like Twilio credentials if needed
-
-> **Note:** Managed hosting providers sometimes only expose variables with the `NEXT_PUBLIC_` prefix.
-> If that is your case, set `NEXT_PUBLIC_COGNITO_REGION`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`, and `NEXT_PUBLIC_COGNITO_CLIENT_SECRET`.
-> The application will fall back to these when the standard server-only variables are missing.
-\`\`\`
+このプロジェクトではブラウザのローカルストレージを使用するため、追加の環境変数は不要です。 / This project stores data entirely in browser local storage, so no environment variables are required.
 
 3.  **開発サーバーを起動** / Run the development server:
 \`\`\`bash

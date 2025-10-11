@@ -2,11 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Users, MessageSquare, Settings, LogOut, BarChart3 } from "lucide-react"
+import { Home, Users, MessageSquare, Settings, Trash2, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { Button } from "./ui/button"
-import { logOut } from "@/app/actions/auth-actions"
+import { resetLocalData } from "@/lib/storage/local-storage"
 
 const navItems = [
   { href: "/dashboard", label: "ダッシュボード", icon: Home },
@@ -70,15 +70,18 @@ export function DashboardNav() {
 
       {/* ログアウトボタン */}
       <div className="mt-auto pt-6 border-t border-pink-200/60">
-        <form action={logOut}>
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start group text-rose-600/70 hover:text-rose-700 hover:bg-white/50 transition-all duration-200 rounded-xl py-3"
-          >
-            <LogOut className="mr-3 h-5 w-5 text-rose-500/60 group-hover:text-rose-600 transition-colors duration-200" />
-            <span className="font-medium">ログアウト</span>
-          </Button>
-        </form>
+        <Button
+          variant="ghost"
+          className="w-full justify-start group text-rose-600/70 hover:text-rose-700 hover:bg-white/50 transition-all duration-200 rounded-xl py-3"
+          onClick={() => {
+            if (window.confirm("保存済みのローカルデータをすべて削除しますか？")) {
+              resetLocalData()
+            }
+          }}
+        >
+          <Trash2 className="mr-3 h-5 w-5 text-rose-500/60 group-hover:text-rose-600 transition-colors duration-200" />
+          <span className="font-medium">ローカルデータを削除</span>
+        </Button>
       </div>
     </aside>
   )

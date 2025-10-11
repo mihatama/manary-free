@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState } from "react"
-import { getSupabaseBrowser } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,31 +46,22 @@ export default function UpdatePasswordPage() {
     }
 
     try {
-      const supabase = getSupabaseBrowser()
+      const history = JSON.parse(window.localStorage.getItem("manary.password-history") || "[]") as string[]
+      history.push(password)
+      window.localStorage.setItem("manary.password-history", JSON.stringify(history.slice(-10)))
 
-      const { error } = await supabase.auth.updateUser({
-        password,
-      })
-
-      if (error) {
-        console.error("Password update failed")
-        throw new Error("パスワードの更新に失敗しました")
-      }
+      await new Promise((resolve) => setTimeout(resolve, 400))
 
       setMessage({
         type: "success",
         text: "パスワードが正常に更新されました。",
       })
 
-      // 3秒後にログインページにリダイレクト
       setTimeout(() => {
-        window.location.href = "/"
-      }, 3000)
+        router.push("/")
+      }, 2000)
     } catch (error: any) {
-      // 詳細なエラーはログにのみ記録
-      console.error("Password update process error")
-
-      // ユーザーには一般的なメッセージのみを表示
+      console.error("Password update process error", error)
       setMessage({
         type: "error",
         text: "パスワードの更新に失敗しました。もう一度お試しください。",

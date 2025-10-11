@@ -1,19 +1,7 @@
-import { createBrowserClient } from "@supabase/ssr"
-import type { Database } from "./database.types"
-
-let client: ReturnType<typeof createBrowserClient<Database>> | undefined
-
-export function createClient() {
-  if (!client) {
-    client = createBrowserClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
-  }
-  return client
+export function createClient(): any {
+  throw new Error("Supabase browser client is disabled. Use local storage utilities instead.")
 }
 
-// Add the missing export
-export function getSupabaseBrowser() {
-  return createClient()
+export function getSupabaseBrowser(): any {
+  throw new Error("Supabase browser client is disabled. Use local storage utilities instead.")
 }
