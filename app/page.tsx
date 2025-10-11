@@ -1,6 +1,5 @@
 import Image from "next/image"
 import { LoginForm } from "@/components/login-form"
-import Link from "next/link"
 
 export default function Home() {
   return (
@@ -11,11 +10,7 @@ export default function Home() {
             <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
             <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">Manary</h1>
           </div>
-          <div>
-            <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
-              予約ページ
-            </Link>
-          </div>
+          <div className="text-sm text-[#f8a0a0]">&nbsp;</div>
         </div>
       </header>
 

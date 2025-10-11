@@ -1,6 +1,7 @@
 {
-  "name": "my-v0-project",
+  "name": "manary-amplify",
   "version": "0.1.0",
+  "description": "Clinic management dashboard refocused around AWS Amplify UI",
   "private": true,
   "scripts": {
     "build": "next build",
@@ -37,6 +38,7 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@aws-amplify/ui-react": "^5.0.3",
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
@@ -62,6 +64,7 @@
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "aws-amplify": "^6.3.0",
     "twilio": "latest",
     "use-debounce": "latest",
     "uuid": "latest",

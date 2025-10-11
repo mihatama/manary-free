@@ -1,15 +1,13 @@
 # Manary - 助産院予約管理システム / Clinic Reservation and Management System
 
-Manaryは、助産院やクリニック向けの予約管理・顧客管理システムです。管理者向けのダッシュボードと、顧客（患者）向けの予約・問診票提出機能を提供します。This is a comprehensive web application for managing clinic reservations, patient information, and medical records. It is built with Next.js, Supabase, and Tailwind CSS.
+Manaryは、助産院やクリニック向けの顧客管理システムです。管理者向けのダッシュボード機能を中心に提供しており、以前存在したオンライン予約や問診票の提出機能は廃止されています。This is an internal-facing web application for managing clinic information and medical records. It is built with Next.js, Supabase, Tailwind CSS, and AWS Amplify UI.
 
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev)
+[![Built with AWS Amplify UI](https://img.shields.io/badge/Built%20with-AWS%20Amplify%20UI-orange?style=for-the-badge&logo=aws-amplify)](https://docs.amplify.aws/react/build-a-backend/ui-components/)
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
 
 ## 目次 / Project Overview
 
-- [主な機能](#主な機能) / The application provides two main interfaces:
-1. **Public-facing Reservation System:** Allows patients to book, view, and manage their appointments.
-2. **Admin Dashboard:** A secure area for clinic staff to manage appointments, view patient questionnaires (charts), and configure clinic settings.
+- [主な機能](#主な機能) / The application now focuses on internal operations for clinic staff.
 - [技術スタック](#技術スタック) / Tech Stack
 - [プロジェクト構成](#プロジェクト構成) / Project Structure
 - [ローカル開発環境のセットアップ](#ローカル開発環境のセットアップ) / Getting Started
@@ -23,23 +21,20 @@ Manaryは、助産院やクリニック向けの予約管理・顧客管理シ�
 
 ### 管理者向け機能 / Admin Dashboard (`/dashboard`)
 
-- **ダッシュボード**: 予約状況の概要を確認できます。 / View, search, and sort all patient reservations. Update appointment status.
-- **予約管理**: 全ての予約をカレンダー形式またはリスト形式で表示・編集・新規作成できます。 / Access and review patient-submitted medical questionnaires.
-- **問診票・カルテ管理**: 提出された問診票（カルテ情報）を一覧で確認できます。 / View a summary or detailed medical charts derived from questionnaires.
-- **スケジュール設定**: 助産院、診療種別、予約可能時間を管理できます。 / Manage staff user accounts.
-- **ユーザー管理**: 管理者ユーザーの追加・一覧表示が可能です。 / Configure clinic availability and booking rules.
+- **ダッシュボード**: システムの最新情報と主要な案内を確認できます。 / Review high-level information that is relevant to clinic staff.
+- **カルテ管理**: 既存のカルテ情報を一覧・検索できます。 / View a summary or detailed medical charts derived from questionnaires.
+- **ユーザー管理**: 管理者ユーザーの追加・一覧表示が可能です。 / Manage staff user accounts.
+- **メッセージ管理**: 連絡事項を確認できます。 / Review internal messages.
 - **一般設定**: クリニック情報や他のアプリケーション設定を管理できます。 / Manage clinic information and other application settings.
 
 ### 顧客（患者）向け機能 / Patient-facing Pages
 
-- **新規予約**: 空き状況を確認しながらオンラインで予約できます。 / A form for new patients to book an appointment.
-- **予約確認・管理**: SMS認証を通じて、自身の予約を確認・変更・キャンセルできます。 / Allows patients to view or cancel their existing appointment using a secure token or phone verification.
-- **問診票**: オンラインで問診票を提出できます。 / A form for patients to fill out their medical history, linked to their reservation.
+オンライン予約およびオンライン問診票は廃止されました。公開ページでは、機能終了のお知らせのみを表示します。 / The public pages now display a notice explaining that online reservations and questionnaires are no longer available.
 
 ## 技術スタック / Tech Stack
 
 - **フレームワーク**: [Next.js (App Router)](https://nextjs.org/)
-- **UI**: [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/)
+- **UI**: [React](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/), [AWS Amplify UI](https://ui.docs.amplify.aws/react)
 - **データベース & 認証**: [Supabase](https://supabase.com/)
 - **SMS通知 & 認証**: [Twilio](https://www.twilio.com/)
 - **フォーム管理**: [React Hook Form](https://react-hook-form.com/), [Zod](https://zod.dev/)
@@ -54,7 +49,7 @@ manary/
 │   ├── (admin)/              # 管理者向けページ（認証必須）
 │   │   ├── dashboard/
 │   │   └── layout.tsx
-│   ├── (public)/             # 公開ページ
+│   ├── (public)/             # 公開ページ（オンライン予約は廃止済み）
 │   │   ├── reservation/
 │   │   └── page.tsx
 │   ├── actions/              # Server Actions
