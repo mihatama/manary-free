@@ -16,3 +16,6 @@ npm config delete https-proxy >/dev/null 2>&1 || true
 if [ "$#" -eq 0 ]; then
   set -- npm install
 fi
+
+echo "Running install command: $*"
+"$@"
