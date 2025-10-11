@@ -1,10 +1,7 @@
-import { AppointmentsClient } from "@/components/appointments-client"
-import { getAppointments } from "@/app/actions/reservation-actions"
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { format } from "date-fns"
-import { ja } from "date-fns/locale"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { FeatureDisabledMessage } from "@/components/feature-disabled-message"
 
 export const dynamic = "force-dynamic"
 
@@ -18,29 +15,18 @@ export default async function AppointmentsPage() {
     redirect("/login")
   }
 
-  let initialAppointmentsData: any = { data: [], count: 0 }
-  try {
-    // Fetch today's appointments by default
-    initialAppointmentsData = await getAppointments({ filterDate: "today" })
-  } catch (error) {
-    console.error("Failed to fetch initial appointments:", error)
-  }
-
-  const { data: initialAppointments, count } = initialAppointmentsData
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>予約一覧</CardTitle>
-        <CardDescription>
-          本日 ({format(new Date(), "yyyy年M月d日 (E)", { locale: ja })}) の予約一覧です。タブで全予約の表示も可能です。
-        </CardDescription>
+        <CardDescription>オンライン予約機能は廃止されました。</CardDescription>
       </CardHeader>
       <CardContent>
-        <AppointmentsClient
-          initialAppointments={initialAppointments || []}
-          initialCount={count || 0}
-          user={{ id: user.id, name: user.user_metadata.name || null, email: user.email }}
+        <FeatureDisabledMessage
+          title="予約一覧は利用できません"
+          description="オンライン予約機能を停止したため、予約データの表示や管理は行えません。"
+          backHref="/dashboard"
+          backLabel="ダッシュボードに戻る"
         />
       </CardContent>
     </Card>

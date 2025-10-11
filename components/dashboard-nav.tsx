@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Calendar, FileText, Users, MessageSquare, Settings, LogOut, BarChart3 } from "lucide-react"
+import { Home, Users, MessageSquare, Settings, LogOut, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { Button } from "./ui/button"
@@ -10,10 +10,7 @@ import { logOut } from "@/app/actions/auth-actions"
 
 const navItems = [
   { href: "/dashboard", label: "ダッシュボード", icon: Home },
-  { href: "/dashboard/appointments", label: "予約一覧", icon: Calendar },
-  { href: "/dashboard/questionnaires", label: "問診票一覧", icon: FileText },
   { href: "/dashboard/charts", label: "カルテ一覧", icon: BarChart3 },
-  { href: "/dashboard/schedule-settings", label: "予約設定", icon: Settings },
   { href: "/dashboard/users", label: "利用者管理", icon: Users },
   { href: "/dashboard/messages", label: "メッセージ", icon: MessageSquare },
   { href: "/dashboard/settings", label: "システム設定", icon: Settings },
