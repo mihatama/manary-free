@@ -68,8 +68,10 @@ manary-free/
 
 ## AWS Amplify へのデプロイ
 
+以下は概要です。詳細なスクリーンショット付き手順や運用時の注意点は [`AMPLIFY_SETUP.md`](./AMPLIFY_SETUP.md) を参照してください。
+
 1. **GitHub リポジトリを Amplify に接続**
-   - AWS コンソールで Amplify Hosting を開き、「Deploy without Git or Deploy from GitHub」を選択。
+   - AWS コンソールで Amplify Hosting を開き、「Deploy without Git」または「Deploy from GitHub」を選択。
    - GitHub 連携を有効化してリポジトリとブランチを選択します。
 2. **ビルド設定**
    - Build コマンド: `pnpm install && pnpm build`
