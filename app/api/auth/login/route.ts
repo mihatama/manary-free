@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 
-import type { Database } from "@/lib/supabase/database.types"
 import type { AuthError } from "@/lib/auth"
 import { validateCSRFToken } from "@/lib/csrf"
+import { loginWithCognito } from "@/lib/auth/login"
+
+const ACCESS_TOKEN_COOKIE = "cognitoAccessToken"
+const ID_TOKEN_COOKIE = "cognitoIdToken"
+const REFRESH_TOKEN_COOKIE = "cognitoRefreshToken"
 
 export async function POST(request: Request) {
   try {
@@ -65,52 +68,56 @@ export async function POST(request: Request) {
       )
     }
 
+    const loginResult = await loginWithCognito({ email, password })
 
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-      options: {
-        expiresIn: remember ? 7 * 24 * 60 * 60 : 60 * 60,
-      },
-    })
-
-    if (error) {
-      console.error("Authentication error occurred:", error.message)
-      return NextResponse.json(
-        {
-          status: "error",
-          errors: {
-            general: ["認証に失敗しました。入力情報を確認してください。"],
-          } satisfies AuthError,
-        },
-        { status: 401 },
-      )
+    if (loginResult.status === "error") {
+      return NextResponse.json({ status: "error", errors: loginResult.errors }, { status: 401 })
     }
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const cookieStore = cookies()
+    const secure = process.env.NODE_ENV === "production"
+    const accessTokenMaxAge = loginResult.tokens.expiresIn
+    const refreshTokenMaxAge = remember ? 30 * 24 * 60 * 60 : 24 * 60 * 60
 
-    if (userError || !user) {
-      console.error("Failed to get authenticated user:", userError?.message)
-      return NextResponse.json(
-        {
-          status: "error",
-          errors: {
-            general: ["認証に失敗しました。もう一度お試しください。"],
-          } satisfies AuthError,
-        },
-        { status: 401 },
-      )
+    cookieStore.set({
+      name: ACCESS_TOKEN_COOKIE,
+      value: loginResult.tokens.accessToken,
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: accessTokenMaxAge,
+    })
+
+    cookieStore.set({
+      name: ID_TOKEN_COOKIE,
+      value: loginResult.tokens.idToken,
+      httpOnly: true,
+      secure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: accessTokenMaxAge,
+    })
+
+    if (loginResult.tokens.refreshToken) {
+      cookieStore.set({
+        name: REFRESH_TOKEN_COOKIE,
+        value: loginResult.tokens.refreshToken,
+        httpOnly: true,
+        secure,
+        sameSite: "lax",
+        path: "/",
+        maxAge: refreshTokenMaxAge,
+      })
+    } else if (cookieStore.has(REFRESH_TOKEN_COOKIE)) {
+      cookieStore.delete(REFRESH_TOKEN_COOKIE)
     }
 
     return NextResponse.json({
       status: "success",
       user: {
-        id: user.id,
-        email: user.email,
+        id: loginResult.user.id,
+        email: loginResult.user.email,
       },
     })
   } catch (error) {
