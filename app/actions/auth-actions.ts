@@ -10,6 +10,24 @@ import { z } from "zod"
 import type { AuthError } from "@/lib/auth"
 import type { Database } from "@/lib/supabase/database.types"
 import { validateCSRFToken } from "@/lib/csrf"
+import { getCognitoConfig, getMissingCognitoConfig } from "@/lib/cognito"
+
+const registerSchema = z
+  .object({
+    email: z
+      .string()
+      .min(1, "メールアドレスを入力してください。")
+      .email("有効なメールアドレスを入力してください。"),
+    password: z
+      .string()
+      .min(8, "パスワードは8文字以上で入力してください。")
+      .max(64, "パスワードは64文字以内で入力してください。"),
+    confirmPassword: z.string().min(1, "確認用パスワードを入力してください。"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "パスワードが一致しません。",
+    path: ["confirmPassword"],
+  })
 
 const registerSchema = z
   .object({
@@ -202,12 +220,7 @@ export async function registerAction(prevState: RegisterActionState, formData: F
 
   const { email, password } = parseResult.data
 
-  const clientId = process.env.COGNITO_CLIENT_ID
-  const clientSecret = process.env.COGNITO_CLIENT_SECRET
-  const region = process.env.COGNITO_REGION
 
-  if (!clientId || !clientSecret || !region) {
-    console.error("Missing Cognito configuration for registration")
     return {
       status: "error",
       errors: {
@@ -217,12 +230,7 @@ export async function registerAction(prevState: RegisterActionState, formData: F
   }
 
   try {
-    const client = new CognitoIdentityProviderClient({ region })
-    const secretHash = computeSecretHash(email, clientId, clientSecret)
 
-    await client.send(
-      new SignUpCommand({
-        ClientId: clientId,
         Username: email,
         Password: password,
         SecretHash: secretHash,

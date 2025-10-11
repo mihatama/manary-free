@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useFormStatus } from "react-dom"
+
 
 type RegisterFormState = {
   status: "idle" | "error" | "success"
@@ -33,8 +33,6 @@ const initialState: RegisterFormState = {
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [state, formAction] = useActionState(registerAction, initialState)
-  const { pending } = useFormStatus()
 
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev)
   const toggleConfirmVisibility = () => setShowConfirmPassword((prev) => !prev)
@@ -69,6 +67,7 @@ export function RegisterForm() {
               name="email"
               type="email"
               placeholder="example@manary.care"
+
               required
               aria-invalid={!!state.errors?.email}
               aria-errormessage={state.errors?.email ? "register-email-error" : undefined}
@@ -88,6 +87,7 @@ export function RegisterForm() {
                 name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="パスワードを入力"
+
                 required
                 aria-invalid={!!state.errors?.password}
                 aria-errormessage={state.errors?.password ? "register-password-error" : undefined}
@@ -116,6 +116,7 @@ export function RegisterForm() {
                 name="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="もう一度パスワードを入力"
+
                 required
                 aria-invalid={!!state.errors?.confirmPassword}
                 aria-errormessage={
@@ -141,9 +142,7 @@ export function RegisterForm() {
           <Button
             type="submit"
             className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            disabled={pending}
-          >
-            {pending ? "登録処理中..." : "登録する"}
+
           </Button>
         </CSRFForm>
 
