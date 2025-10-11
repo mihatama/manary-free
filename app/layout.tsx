@@ -2,11 +2,11 @@ import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import "react-big-calendar/lib/css/react-big-calendar.css"
+import { RootProvider } from "@/components/providers/root-provider"
 
 export const metadata: Metadata = {
-  title: "manary",
-  description: "Created with v0",
-  generator: "v0.dev",
+  title: "Manary",
+  description: "助産院向け予約管理のローカル保存版",
 }
 
 export default function RootLayout({
@@ -16,7 +16,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <RootProvider>{children}</RootProvider>
+      </body>
     </html>
   )
 }

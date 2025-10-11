@@ -1,49 +1,44 @@
 "use client"
 
-import { useState, useEffect, useActionState } from "react"
-import { useFormStatus } from "react-dom"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { EyeIcon, EyeOffIcon } from "lucide-react"
-import { loginAction } from "@/app/actions/auth-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import Link from "next/link"
-import { CSRFForm } from "@/components/csrf-form"
-
-const initialState = {
-  status: "idle",
-  errors: {},
-}
+import { EyeIcon, EyeOffIcon } from "lucide-react"
+import { useAppState } from "@/components/providers/app-state-provider"
 
 export function LoginForm() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [state, formAction] = useActionState(loginAction, initialState)
-  const { pending } = useFormStatus()
   const router = useRouter()
-  const [isRedirecting, setIsRedirecting] = useState(false)
+  const { login, currentUser, isReady } = useAppState()
+  const [email, setEmail] = useState("admin@manary.local")
+  const [password, setPassword] = useState("password123")
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // ログイン成功時にダッシュボードにリダイレクト
   useEffect(() => {
-    if (state.status === "success" && !isRedirecting) {
-      setIsRedirecting(true)
-
-      // 直接ダッシュボードにリダイレクト
-      window.location.href = "/dashboard"
+    if (isReady && currentUser) {
+      router.replace("/dashboard")
     }
-  }, [state.status, isRedirecting])
+  }, [isReady, currentUser, router])
 
-  if (isRedirecting) {
-    return (
-      <div className="text-center py-8 space-y-6">
-        <div className="py-4">
-          <p className="text-lg mb-2">ログインに成功しました。ダッシュボードにリダイレクトしています...</p>
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-        </div>
-      </div>
-    )
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsSubmitting(true)
+
+    const result = login(email, password)
+
+    if (result.success) {
+      setError(null)
+      router.push("/dashboard")
+    } else {
+      setError(result.error)
+    }
+
+    setIsSubmitting(false)
   }
 
   return (
@@ -55,29 +50,24 @@ export function LoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {state.status === "error" && state.errors?.general && (
+        {error && (
           <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{state.errors.general[0]}</AlertDescription>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <CSRFForm action={formAction} className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="email">メールアドレス</Label>
             <Input
               id="email"
               name="email"
               type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="example@manary.care"
               required
-              aria-invalid={!!state.errors?.email}
-              aria-errormessage={state.errors?.email ? "email-error" : undefined}
             />
-            {state.errors?.email && (
-              <p id="email-error" className="text-sm text-destructive mt-1">
-                {state.errors.email[0]}
-              </p>
-            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">パスワード</Label>
@@ -86,11 +76,11 @@ export function LoginForm() {
                 id="password"
                 name="password"
                 type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="パスワードを入力"
                 required
-                className={`pr-10 ${state.errors?.password ? "border-destructive" : ""}`}
-                aria-invalid={!!state.errors?.password}
-                aria-errormessage={state.errors?.password ? "password-error" : undefined}
+                className="pr-10"
               />
               <button
                 type="button"
@@ -101,34 +91,15 @@ export function LoginForm() {
                 {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
               </button>
             </div>
-            {state.errors?.password && (
-              <p id="password-error" className="text-sm text-destructive mt-1">
-                {state.errors.password[0]}
-              </p>
-            )}
           </div>
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="remember"
-                name="remember"
-                className="rounded border-gray-300 text-primary focus:ring-ring"
-              />
-              <Label htmlFor="remember" className="text-sm font-normal">
-                ログイン状態を保存
-              </Label>
-            </div>
-            <Link href="/reset-password" className="text-sm text-primary hover:underline">
-              パスワードをお忘れですか？
-            </Link>
-          </div>
-          <Button type="submit" 
-          className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          disabled={pending}>
-            {pending ? "ログイン中..." : "ログイン"}
+          <Button
+            type="submit"
+            className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "ログイン中..." : "ログイン"}
           </Button>
-        </CSRFForm>
+        </form>
       </CardContent>
     </Card>
   )

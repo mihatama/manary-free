@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "manary-amplify",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -37,9 +37,6 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
-    "@supabase/auth-helpers-nextjs": "latest",
-    "@supabase/ssr": "latest",
-    "@supabase/supabase-js": "latest",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -62,7 +59,6 @@
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "twilio": "latest",
     "use-debounce": "latest",
     "uuid": "latest",
     "vaul": "latest",

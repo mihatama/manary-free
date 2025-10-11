@@ -21,9 +21,22 @@ export default function Home() {
 
 
       <main className="container mx-auto px-4 flex flex-col items-center bg-[#ffeaed] py-12">
-        <div className="w-full max-w-md">
-          {/* <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8 text-[rgba(159,118,77,1)]">ログイン</h1> */}
-          <LoginForm />
+        <div className="w-full max-w-4xl space-y-10">
+          <section className="text-center space-y-4">
+            <h2 className="text-3xl font-bold text-[#f8a0a0]">ローカル保存版 Manary</h2>
+            <p className="text-muted-foreground">
+              このバージョンのManaryはデータベースを使わず、ブラウザのローカルストレージに予約やユーザー情報を保存します。
+              テスト用の管理者アカウントとして <span className="font-semibold">admin@manary.local</span> /
+              <span className="font-semibold">password123</span> をご利用ください。
+            </p>
+            <p className="text-sm text-muted-foreground">
+              予約フォームは誰でも利用でき、送信された内容は管理ダッシュボードで確認・更新できます。
+            </p>
+          </section>
+
+          <div className="mx-auto w-full max-w-md">
+            <LoginForm />
+          </div>
         </div>
       </main>
 

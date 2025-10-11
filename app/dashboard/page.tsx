@@ -1,150 +1,200 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card"
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { format } from "date-fns"
-import { ja } from "date-fns/locale"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Calendar, AlertCircle } from "lucide-react"
+"use client"
 
-// Helper function to safely format dates and times
-const safeFormat = (dateStr: string, timeStr: string | null, formatStr: string) => {
-  if (!dateStr || !timeStr) return "無効な日時"
-  try {
-    const date = new Date(`${dateStr}T${timeStr}`)
-    if (isNaN(date.getTime())) {
-      // Log the error and the invalid data for debugging
-      console.error("Invalid date/time value encountered in dashboard:", { dateStr, timeStr })
-      return "無効な日時"
-    }
-    return format(date, formatStr, { locale: ja })
-  } catch (e) {
-    console.error("Error formatting date/time in dashboard:", e, { dateStr, timeStr })
-    return "フォーマットエラー"
-  }
+import { useEffect, useMemo } from "react"
+import { useRouter } from "next/navigation"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { useAppState, type ReservationStatus } from "@/components/providers/app-state-provider"
+
+const statusLabels: Record<ReservationStatus, string> = {
+  pending: "確認待ち",
+  confirmed: "確定",
+  cancelled: "キャンセル",
 }
 
-export default async function DashboardPage() {
-  const supabase = createClient()
+const statusBadgeVariant: Record<ReservationStatus, "default" | "secondary" | "destructive"> = {
+  pending: "secondary",
+  confirmed: "default",
+  cancelled: "destructive",
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function DashboardPage() {
+  const router = useRouter()
+  const { reservations, logout, updateReservationStatus, deleteReservation, currentUser, isReady } = useAppState()
 
-  if (!user) {
-    return redirect("/")
-  }
+  useEffect(() => {
+    if (isReady && !currentUser) {
+      router.replace("/")
+    }
+  }, [isReady, currentUser, router])
 
-  const today = format(new Date(), "yyyy-MM-dd")
+  const summary = useMemo(() => {
+    const total = reservations.length
+    const confirmed = reservations.filter((reservation) => reservation.status === "confirmed").length
+    const pending = reservations.filter((reservation) => reservation.status === "pending").length
+    const cancelled = reservations.filter((reservation) => reservation.status === "cancelled").length
 
-  const { data: appointments, error } = await supabase
-    .from("reservations")
-    .select(
-      `
-      id,
-      reservation_date,
-      start_time,
-      end_time,
-      status,
-      service_types (name),
-      patients (name)
-    `,
-    )
-    .gte("reservation_date", today)
-    .order("reservation_date", { ascending: true })
-    .order("start_time", { ascending: true })
-    .limit(10)
+    return { total, confirmed, pending, cancelled }
+  }, [reservations])
 
-  if (error) {
+  if (!isReady || !currentUser) {
     return (
-      <div className="p-4">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>予約情報の読み込み中にエラーが発生しました: {error.message}</AlertDescription>
-        </Alert>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#ffeaed]">
+        <p className="text-lg text-muted-foreground">ダッシュボードを読み込み中です…</p>
       </div>
     )
+  }
+
+  const handleStatusChange = (id: string, status: ReservationStatus) => {
+    updateReservationStatus(id, status)
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">ダッシュボード</h2>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">本日の予約</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {appointments?.filter((a) => a.reservation_date === today).length ?? 0}
-            </div>
-            <p className="text-xs text-muted-foreground">件</p>
-          </CardContent>
-        </Card>
-        {/* Other summary cards can go here */}
-      </div>
+    <div className="min-h-screen bg-[#ffeaed]">
+      <header className="border-b border-slate-300 bg-white">
+        <div className="container mx-auto flex items-center justify-between px-4 py-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[#f8a0a0]">Manary ダッシュボード</h1>
+            <p className="text-sm text-muted-foreground">ローカルストレージで稼働するシンプルな予約管理</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">{currentUser.name}</span>
+            <Button variant="outline" onClick={() => { logout(); router.replace("/") }}>
+              ログアウト
+            </Button>
+          </div>
+        </div>
+      </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>今後の予約</CardTitle>
-          <CardDescription>直近10件の予約が表示されています。</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>日時</TableHead>
-                <TableHead>患者名</TableHead>
-                <TableHead>診療内容</TableHead>
-                <TableHead>ステータス</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {appointments && appointments.length > 0 ? (
-                appointments.map((apt) => (
-                  <TableRow key={apt.id}>
-                    <TableCell>
-                      <div className="font-medium">
-                        {safeFormat(apt.reservation_date, apt.start_time, "M月d日 (E)")}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {safeFormat(apt.reservation_date, apt.start_time, "HH:mm")} -{" "}
-                        {safeFormat(apt.reservation_date, apt.end_time, "HH:mm")}
-                      </div>
-                    </TableCell>
-                    <TableCell>{(apt.patients as any)?.name || "N/A"}</TableCell>
-                    <TableCell>{(apt.service_types as any)?.name || "N/A"}</TableCell>
-                    <TableCell>
-                      <Badge
-                      variant="outline"
-                      className={
-                        apt.status === "confirmed"
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        : apt.status === "cancelled"
-                        ? 'bg-rose-50 border-rose-200 text-rose-700'
-                        : 'bg-pink-50 border-pink-200 text-pink-700'
-                        }
-                        >
-                          {apt.status === "confirmed" ? "確認済み" : apt.status === "cancelled" ? "キャンセル" : apt.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
+      <main className="container mx-auto px-4 py-10">
+        <section className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader>
+              <CardDescription>総予約数</CardDescription>
+              <CardTitle className="text-3xl">{summary.total}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardDescription>確定</CardDescription>
+              <CardTitle className="text-3xl text-emerald-600">{summary.confirmed}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardDescription>確認待ち</CardDescription>
+              <CardTitle className="text-3xl text-amber-600">{summary.pending}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardDescription>キャンセル</CardDescription>
+              <CardTitle className="text-3xl text-rose-600">{summary.cancelled}</CardTitle>
+            </CardHeader>
+          </Card>
+        </section>
+
+        <section className="mt-10">
+          <Card>
+            <CardHeader>
+              <CardTitle>予約一覧</CardTitle>
+              <CardDescription>患者からの予約を確認してステータスを管理できます。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {reservations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">まだ予約がありません。公開予約フォームから登録してみましょう。</p>
               ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center">
-                    今後の予約はありません。
-                  </TableCell>
-                </TableRow>
+                <Table>
+                  <TableCaption>ローカルストレージに保存された予約データ</TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>患者名</TableHead>
+                      <TableHead>連絡先</TableHead>
+                      <TableHead>サービス</TableHead>
+                      <TableHead>予約日時</TableHead>
+                      <TableHead>ステータス</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reservations.map((reservation) => (
+                      <TableRow key={reservation.id}>
+                        <TableCell>
+                          <div className="font-medium">{reservation.patientName}</div>
+                          <div className="text-xs text-muted-foreground">{reservation.patientEmail}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">{reservation.patientPhone}</div>
+                          {reservation.notes ? (
+                            <div className="text-xs text-muted-foreground">{reservation.notes}</div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>{reservation.serviceTypeName}</TableCell>
+                        <TableCell>
+                          <div>{reservation.appointmentDate}</div>
+                          <div className="text-xs text-muted-foreground">{reservation.appointmentTime}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusBadgeVariant[reservation.status]}>
+                            {statusLabels[reservation.status]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusChange(reservation.id, "confirmed")}
+                          >
+                            確定
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusChange(reservation.id, "pending")}
+                          >
+                            保留
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleStatusChange(reservation.id, "cancelled")}
+                          >
+                            キャンセル
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => deleteReservation(reservation.id)}
+                          >
+                            削除
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </section>
+      </main>
     </div>
   )
 }
