@@ -1,7 +1,11 @@
 import Image from "next/image"
+import { use } from "react"
+
 import { LoginForm } from "@/components/login-form"
 
-function toStringParam(value: string | string[] | undefined): string | null {
+type SearchParamValue = string | string[] | undefined
+
+function toStringParam(value: SearchParamValue): string | null {
   if (!value) {
     return null
   }
@@ -9,17 +13,30 @@ function toStringParam(value: string | string[] | undefined): string | null {
   return Array.isArray(value) ? value[0] ?? null : value
 }
 
-type HomePageProps = {
-  searchParams?: Promise<{
-    [key: string]: string | string[] | undefined
-    error?: string | string[]
-    message?: string | string[]
-    logged_out?: string | string[]
-  }>
+type SearchParamsRecord = Record<string, SearchParamValue> & {
+  error?: SearchParamValue
+  message?: SearchParamValue
+  logged_out?: SearchParamValue
 }
 
-export default async function Home({ searchParams }: HomePageProps) {
-  const params = searchParams ? await searchParams : {}
+type HomePageProps = {
+  searchParams?: Promise<SearchParamsRecord> | SearchParamsRecord
+}
+
+function resolveSearchParams(searchParams: HomePageProps["searchParams"]): SearchParamsRecord {
+  if (!searchParams) {
+    return {}
+  }
+
+  if (typeof (searchParams as Promise<unknown>).then === "function") {
+    return use(searchParams as Promise<SearchParamsRecord>)
+  }
+
+  return searchParams
+}
+
+export default function Home({ searchParams }: HomePageProps) {
+  const params = resolveSearchParams(searchParams)
 
   const errorParam = toStringParam(params.error)
   const messageParam = toStringParam(params.message)
