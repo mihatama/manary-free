@@ -29,23 +29,6 @@ const registerSchema = z
     path: ["confirmPassword"],
   })
 
-const registerSchema = z
-  .object({
-    email: z
-      .string()
-      .min(1, "メールアドレスを入力してください。")
-      .email("有効なメールアドレスを入力してください。"),
-    password: z
-      .string()
-      .min(8, "パスワードは8文字以上で入力してください。")
-      .max(64, "パスワードは64文字以内で入力してください。"),
-    confirmPassword: z.string().min(1, "確認用パスワードを入力してください。"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "パスワードが一致しません。",
-    path: ["confirmPassword"],
-  })
-
 // CSRF検証を行うヘルパー関数
 async function validateCSRF(formData: FormData) {
   const csrfToken = formData.get("csrf_token") as string
@@ -220,17 +203,48 @@ export async function registerAction(prevState: RegisterActionState, formData: F
 
   const { email, password } = parseResult.data
 
+  const missingConfig = getMissingCognitoConfig()
+  if (missingConfig.length) {
+    console.error(
+      "Missing Cognito configuration:",
+      missingConfig.join(", "),
+    )
 
     return {
       status: "error",
       errors: {
-        general: ["現在アカウントの新規作成を行うことができません。管理者にお問い合わせください。"],
+        general: [
+          "現在アカウントの新規作成を行うことができません。管理者にお問い合わせください。",
+        ],
       },
     }
   }
 
-  try {
+  const cognitoConfig = getCognitoConfig()
+  if (!cognitoConfig) {
+    console.error("Cognito configuration could not be loaded even though no values appear missing.")
 
+    return {
+      status: "error",
+      errors: {
+        general: [
+          "現在アカウントの新規作成を行うことができません。管理者にお問い合わせください。",
+        ],
+      },
+    }
+  }
+
+  const client = new CognitoIdentityProviderClient({ region: cognitoConfig.region })
+  const secretHash = computeSecretHash(
+    email,
+    cognitoConfig.clientId,
+    cognitoConfig.clientSecret,
+  )
+
+  try {
+    await client.send(
+      new SignUpCommand({
+        ClientId: cognitoConfig.clientId,
         Username: email,
         Password: password,
         SecretHash: secretHash,
