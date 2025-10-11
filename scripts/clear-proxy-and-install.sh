@@ -10,31 +10,9 @@ done
 # Ensure npm itself forgets any persisted proxy settings
 npm config delete proxy >/dev/null 2>&1 || true
 npm config delete https-proxy >/dev/null 2>&1 || true
-npm config set proxy false >/dev/null 2>&1
-npm config set https-proxy false >/dev/null 2>&1
-npm config set registry https://registry.npmjs.org/ >/dev/null 2>&1
-npm config set progress false >/dev/null 2>&1
-npm config set legacy-peer-deps true >/dev/null 2>&1
+
 
 # Run the provided command (defaults to npm install)
 if [ "$#" -eq 0 ]; then
   set -- npm install
 fi
-
-cmd=("$@")
-
-# Ensure legacy peer dependency resolution is enforced even if the caller forgets the flag
-if [ "${cmd[0]}" = "npm" ] && [ "${cmd[1]:-}" = "install" ]; then
-  needs_flag=true
-  for arg in "${cmd[@]:2}"; do
-    if [ "$arg" = "--legacy-peer-deps" ]; then
-      needs_flag=false
-      break
-    fi
-  done
-  if $needs_flag; then
-    cmd+=("--legacy-peer-deps")
-  fi
-fi
-
-exec "${cmd[@]}"
