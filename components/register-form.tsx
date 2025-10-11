@@ -33,6 +33,7 @@ const initialState: RegisterFormState = {
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [state, formAction] = useActionState(registerAction, initialState)
 
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev)
   const toggleConfirmVisibility = () => setShowConfirmPassword((prev) => !prev)
@@ -142,7 +143,8 @@ export function RegisterForm() {
           <Button
             type="submit"
             className="w-full bg-red-300 hover:bg-red-400 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-
+          >
+            登録
           </Button>
         </CSRFForm>
 
