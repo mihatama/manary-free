@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { Alert, Flex, Text } from "@aws-amplify/ui-react"
 
