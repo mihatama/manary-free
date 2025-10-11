@@ -1,0 +1,35 @@
+import Image from "next/image"
+
+import { RegisterForm } from "@/components/register-form"
+
+export const metadata = {
+  title: "Manary | アカウント登録",
+}
+
+export default function RegisterPage() {
+  return (
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-slate-300">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
+            <h1 className="text-xl font-bold text-[#f8a0a0] ml-2">Manary</h1>
+          </div>
+          <div className="text-sm text-[#f8a0a0]">&nbsp;</div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 flex flex-col items-center bg-[#ffeaed] py-12">
+        <div className="w-full max-w-md">
+          <RegisterForm />
+        </div>
+      </main>
+
+      <footer className="mt-auto py-6 border-t border-slate-300">
+        <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
+          &copy; {new Date().getFullYear()} Manary. All rights reserved.
+        </div>
+      </footer>
+    </div>
+  )
+}

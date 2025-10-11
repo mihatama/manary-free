@@ -9,6 +9,7 @@ export type AuthError = {
   email?: string[]
   password?: string[]
   general?: string[]
+  confirmPassword?: string[]
 }
 
 // エラーログの詳細度を下げ、一貫したエラーハンドリングを実装

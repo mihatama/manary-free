@@ -92,6 +92,9 @@ npm install
 \`\`\`
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+COGNITO_REGION=ap-northeast-1
+COGNITO_CLIENT_ID=17dfvdao2o2qbmbmmtmhhlqpfl
+COGNITO_CLIENT_SECRET=your-cognito-client-secret
 # Add other variables like Twilio credentials if needed
 \`\`\`
 
