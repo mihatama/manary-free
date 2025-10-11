@@ -92,7 +92,14 @@ npm install
 \`\`\`
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+COGNITO_REGION=ap-northeast-1
+COGNITO_CLIENT_ID=17dfvdao2o2qbmbmmtmhhlqpfl
+COGNITO_CLIENT_SECRET=your-cognito-client-secret
 # Add other variables like Twilio credentials if needed
+
+> **Note:** Managed hosting providers sometimes only expose variables with the `NEXT_PUBLIC_` prefix.
+> If that is your case, set `NEXT_PUBLIC_COGNITO_REGION`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`, and `NEXT_PUBLIC_COGNITO_CLIENT_SECRET`.
+> The application will fall back to these when the standard server-only variables are missing.
 \`\`\`
 
 3.  **開発サーバーを起動** / Run the development server:

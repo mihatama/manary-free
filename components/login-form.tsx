@@ -129,6 +129,13 @@ export function LoginForm() {
             {pending ? "ログイン中..." : "ログイン"}
           </Button>
         </CSRFForm>
+
+        <p className="text-sm text-center text-muted-foreground mt-6">
+          アカウントをお持ちでない場合は{" "}
+          <Link href="/register" className="text-primary hover:underline">
+            新規登録はこちら
+          </Link>
+        </p>
       </CardContent>
     </Card>
   )
