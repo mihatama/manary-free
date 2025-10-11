@@ -1,7 +1,7 @@
 export type CognitoConfig = {
   region: string
   clientId: string
-  clientSecret: string
+  clientSecret?: string
 }
 
 function resolveRegion() {
@@ -37,21 +37,25 @@ export function getCognitoConfig(): CognitoConfig | null {
   const clientId = resolveClientId()
   const clientSecret = resolveClientSecret()
 
-  if (!region || !clientId || !clientSecret) {
+  if (!region || !clientId) {
     return null
   }
 
-  return {
+  const config: CognitoConfig = {
     region,
     clientId,
-    clientSecret,
   }
+
+  if (clientSecret) {
+    config.clientSecret = clientSecret
+  }
+
+  return config
 }
 
 export function getMissingCognitoConfig(): string[] {
   const region = resolveRegion()
   const clientId = resolveClientId()
-  const clientSecret = resolveClientSecret()
   const missing: string[] = []
 
   if (!region) {
@@ -60,10 +64,6 @@ export function getMissingCognitoConfig(): string[] {
 
   if (!clientId) {
     missing.push("COGNITO_CLIENT_ID")
-  }
-
-  if (!clientSecret) {
-    missing.push("COGNITO_CLIENT_SECRET")
   }
 
   return missing

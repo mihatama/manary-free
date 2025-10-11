@@ -106,18 +106,22 @@ export async function registerWithCognito({
   }
 
   const client = new CognitoIdentityProviderClient({ region: cognitoConfig.region })
-  const secretHash = computeSecretHash(email, cognitoConfig.clientId, cognitoConfig.clientSecret)
+  const secretHash =
+    cognitoConfig.clientSecret && computeSecretHash(email, cognitoConfig.clientId, cognitoConfig.clientSecret)
 
   try {
-    await client.send(
-      new SignUpCommand({
-        ClientId: cognitoConfig.clientId,
-        Username: email,
-        Password: password,
-        SecretHash: secretHash,
-        UserAttributes: [{ Name: "email", Value: email }],
-      }),
-    )
+    const signUpCommand = new SignUpCommand({
+      ClientId: cognitoConfig.clientId,
+      Username: email,
+      Password: password,
+      UserAttributes: [{ Name: "email", Value: email }],
+    })
+
+    if (secretHash) {
+      signUpCommand.input.SecretHash = secretHash
+    }
+
+    await client.send(signUpCommand)
 
     return {
       status: "success",
