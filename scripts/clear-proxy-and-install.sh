@@ -10,13 +10,9 @@ done
 # Ensure npm itself forgets any persisted proxy settings
 npm config delete proxy >/dev/null 2>&1 || true
 npm config delete https-proxy >/dev/null 2>&1 || true
-npm config set proxy "" >/dev/null 2>&1
-npm config set https-proxy "" >/dev/null 2>&1
-npm config set registry https://registry.npmjs.org/ >/dev/null 2>&1
-npm config set progress false >/dev/null 2>&1
+
 
 # Run the provided command (defaults to npm install)
 if [ "$#" -eq 0 ]; then
   set -- npm install
 fi
-exec "$@"
