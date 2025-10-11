@@ -1,7 +1,36 @@
 import Image from "next/image"
 import { LoginForm } from "@/components/login-form"
 
-export default function Home() {
+function toStringParam(value: string | string[] | undefined): string | null {
+  if (!value) {
+    return null
+  }
+
+  return Array.isArray(value) ? value[0] ?? null : value
+}
+
+type HomePageProps = {
+  searchParams?: {
+    [key: string]: string | string[] | undefined
+    error?: string | string[]
+    message?: string | string[]
+    logged_out?: string | string[]
+  }
+}
+
+export default function Home({ searchParams }: HomePageProps) {
+  const params = searchParams ?? {}
+
+  const errorParam = toStringParam(params.error)
+  const messageParam = toStringParam(params.message)
+  const loggedOutParam = toStringParam(params.logged_out)
+
+  const defaultInfoMessage = messageParam
+    ? messageParam
+    : loggedOutParam
+      ? "ログアウトしました。再度ログインしてください。"
+      : null
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-slate-300">
@@ -18,7 +47,7 @@ export default function Home() {
       <main className="container mx-auto px-4 flex flex-col items-center bg-[#ffeaed] py-12">
         <div className="w-full max-w-md">
           {/* <h1 className="text-3xl font-bold text-[#f8a0a0] text-center mb-8 text-[rgba(159,118,77,1)]">ログイン</h1> */}
-          <LoginForm />
+          <LoginForm defaultErrorMessage={errorParam} defaultInfoMessage={defaultInfoMessage} />
         </div>
       </main>
 
