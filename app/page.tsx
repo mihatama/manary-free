@@ -1,5 +1,4 @@
 import Image from "next/image"
-import { use } from "react"
 
 import { LoginForm } from "@/components/login-form"
 
@@ -23,20 +22,18 @@ type HomePageProps = {
   searchParams?: Promise<SearchParamsRecord> | SearchParamsRecord
 }
 
-function resolveSearchParams(searchParams: HomePageProps["searchParams"]): SearchParamsRecord {
+async function resolveSearchParams(
+  searchParams: HomePageProps["searchParams"],
+): Promise<SearchParamsRecord> {
   if (!searchParams) {
     return {}
   }
 
-  if (typeof (searchParams as Promise<unknown>).then === "function") {
-    return use(searchParams as Promise<SearchParamsRecord>)
-  }
-
-  return searchParams
+  return await searchParams
 }
 
-export default function Home({ searchParams }: HomePageProps) {
-  const params = resolveSearchParams(searchParams)
+export default async function Home({ searchParams }: HomePageProps) {
+  const params = await resolveSearchParams(searchParams)
 
   const errorParam = toStringParam(params.error)
   const messageParam = toStringParam(params.message)
