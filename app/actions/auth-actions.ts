@@ -29,6 +29,23 @@ const registerSchema = z
     path: ["confirmPassword"],
   })
 
+const registerSchema = z
+  .object({
+    email: z
+      .string()
+      .min(1, "メールアドレスを入力してください。")
+      .email("有効なメールアドレスを入力してください。"),
+    password: z
+      .string()
+      .min(8, "パスワードは8文字以上で入力してください。")
+      .max(64, "パスワードは64文字以内で入力してください。"),
+    confirmPassword: z.string().min(1, "確認用パスワードを入力してください。"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "パスワードが一致しません。",
+    path: ["confirmPassword"],
+  })
+
 // CSRF検証を行うヘルパー関数
 async function validateCSRF(formData: FormData) {
   const csrfToken = formData.get("csrf_token") as string
@@ -203,13 +220,7 @@ export async function registerAction(prevState: RegisterActionState, formData: F
 
   const { email, password } = parseResult.data
 
-  const cognitoConfig = getCognitoConfig()
 
-  if (!cognitoConfig) {
-    const missing = getMissingCognitoConfig()
-    console.error(
-      `Missing Cognito configuration for registration: ${missing.join(", ") || "unknown"}`,
-    )
     return {
       status: "error",
       errors: {
@@ -219,12 +230,7 @@ export async function registerAction(prevState: RegisterActionState, formData: F
   }
 
   try {
-    const client = new CognitoIdentityProviderClient({ region: cognitoConfig.region })
-    const secretHash = computeSecretHash(email, cognitoConfig.clientId, cognitoConfig.clientSecret)
 
-    await client.send(
-      new SignUpCommand({
-        ClientId: cognitoConfig.clientId,
         Username: email,
         Password: password,
         SecretHash: secretHash,
