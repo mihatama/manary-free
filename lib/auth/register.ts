@@ -1,9 +1,9 @@
 import { CognitoIdentityProviderClient, SignUpCommand } from "@aws-sdk/client-cognito-identity-provider"
-import { createHmac } from "node:crypto"
 import { z } from "zod"
 
 import type { AuthError } from "@/lib/auth"
 import { getCognitoConfig, getMissingCognitoConfig } from "@/lib/cognito"
+import { computeSecretHash } from "@/lib/auth/cognito"
 
 export const registerSchema = z
   .object({
@@ -64,10 +64,6 @@ export function validateRegisterInput(input: {
   }
 
   return { success: false, errors }
-}
-
-function computeSecretHash(username: string, clientId: string, clientSecret: string) {
-  return createHmac("sha256", clientSecret).update(username + clientId).digest("base64")
 }
 
 export async function registerWithCognito({
