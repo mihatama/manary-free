@@ -4,12 +4,40 @@ import { createClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-// This action requires Supabase Admin privileges.
-// Ensure SUPABASE_SERVICE_ROLE_KEY is set in your environment variables.
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+import { getSupabaseAdminCredentials } from "@/lib/supabase/env"
+
+let supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdminClient() {
+  if (supabaseAdmin) {
+    return supabaseAdmin
+  }
+
+  const credentials = getSupabaseAdminCredentials()
+
+  if (!credentials) {
+    return null
+  }
+
+  supabaseAdmin = createClient(credentials.url, credentials.serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+
+  return supabaseAdmin
+}
 
 export async function getUsers() {
-  const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+  const adminClient = getSupabaseAdminClient()
+
+  if (!adminClient) {
+    console.warn("Supabase admin credentials are not configured; returning an empty user list.")
+    return []
+  }
+
+  const { data, error } = await adminClient.auth.admin.listUsers({
     page: 1,
     perPage: 100,
   })
@@ -28,6 +56,16 @@ const CreateUserSchema = z.object({
 })
 
 export async function createUser(prevState: any, formData: FormData) {
+  const adminClient = getSupabaseAdminClient()
+
+  if (!adminClient) {
+    return {
+      errors: null,
+      message: "Supabaseの管理者権限が構成されていません。環境変数を設定してください。",
+      success: false,
+    }
+  }
+
   const validatedFields = CreateUserSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -46,7 +84,7 @@ export async function createUser(prevState: any, formData: FormData) {
 
   const userMetadata = isAdmin ? { role: "admin" } : {}
 
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+  const { data, error } = await adminClient.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
