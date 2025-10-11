@@ -28,8 +28,8 @@ async function createHmacSignature(secret: BufferSource, data: string): Promise<
 }
 
 // This function gets the secret, or creates and sets it as an HTTPOnly cookie if not present.
-function getSecret(): Uint8Array {
-  const cookieStore = cookies()
+async function getSecret(): Promise<Uint8Array> {
+  const cookieStore = await cookies()
   const secretCookie = cookieStore.get("csrf_secret")
   if (secretCookie && secretCookie.value) {
     return hexToUint8Array(secretCookie.value)
@@ -50,14 +50,14 @@ function getSecret(): Uint8Array {
 }
 
 export async function generateCSRFToken(): Promise<string> {
-  const secret = getSecret() // Ensures csrf_secret cookie is set
+  const secret = await getSecret() // Ensures csrf_secret cookie is set
   const token = await createHmacSignature(secret, CSRF_DATA_TO_SIGN)
   return token
 }
 
 export async function validateCSRFToken(token: string): Promise<boolean> {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const secretCookie = cookieStore.get("csrf_secret")
     if (!secretCookie || !secretCookie.value) {
       console.error("CSRF secret cookie not found for validation.")
