@@ -15,6 +15,7 @@ export function useCSRF() {
         // Add a cache-busting parameter to prevent caching
         const response = await fetch(`/api/csrf?t=${Date.now()}`, {
           cache: "no-store",
+          credentials: "same-origin",
           headers: {
             "Cache-Control": "no-cache",
             Pragma: "no-cache",

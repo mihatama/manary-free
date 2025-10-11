@@ -7,11 +7,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface CSRFFormProps {
   children: React.ReactNode
-  action: (formData: FormData) => Promise<void> | void
+  action?: (formData: FormData) => Promise<void> | void
+  onSubmit?: React.FormEventHandler<HTMLFormElement>
   className?: string
 }
 
-export function CSRFForm({ children, action, className = "" }: CSRFFormProps) {
+export function CSRFForm({ children, action, onSubmit, className = "" }: CSRFFormProps) {
   const { csrfToken, isLoading, error } = useCSRF()
 
   if (isLoading) {
@@ -27,7 +28,7 @@ export function CSRFForm({ children, action, className = "" }: CSRFFormProps) {
   }
 
   return (
-    <form action={action} className={className}>
+    <form action={action} onSubmit={onSubmit} className={className}>
       <input type="hidden" name="csrf_token" value={csrfToken} />
       {children}
     </form>
