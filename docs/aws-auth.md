@@ -29,6 +29,25 @@ Amazon Cognito の **ユーザープール** は、アプリケーションユ�
    - `aws-amplify` を使って Cognito User Pool と Hosted UI（任意）を設定します。
    - 既存の Supabase 認証ロジックから移行する場合は、`lib/supabase` 配下のクライアント利用箇所を Cognito 連携コードに置き換えます。
    - Amplify UI の `<Authenticator>` コンポーネントを使用すると、メールアドレス + パスワードでのサインインフォームを即座に利用できます。
+
+### Next.js アプリで Hosted UI を利用する際の環境変数
+
+Next.js の `app` ディレクトリでは、Cognito Hosted UI を使った OpenID Connect フローを `/api/auth/authorize` → `/api/auth/callback` → `/api/auth/logout` で実装しています。以下の環境変数を `.env` に設定してください。
+
+| 変数名 | 説明 |
+| --- | --- |
+| `COGNITO_REGION` | ユーザープールのリージョン（例: `ap-northeast-1`） |
+| `COGNITO_CLIENT_ID` | アプリクライアント ID |
+| `COGNITO_CLIENT_SECRET` | アプリクライアントシークレット |
+| `COGNITO_ISSUER_URL` または `COGNITO_USER_POOL_ID` | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` 形式の Issuer URL。Issuer を直接設定しない場合は `COGNITO_USER_POOL_ID` を指定してください。|
+| `COGNITO_HOSTED_UI_DOMAIN` | Hosted UI ドメイン（例: `https://your-domain.auth.ap-northeast-1.amazoncognito.com`） |
+| `COGNITO_REDIRECT_URI` | Cognito から戻るコールバック URL（例: `https://example.com/api/auth/callback`） |
+| `COGNITO_LOGOUT_REDIRECT_URI` | Hosted UI ログアウト後のリダイレクト先（例: `https://example.com/`）。未設定の場合は `COGNITO_REDIRECT_URI` が利用されます。|
+| `COGNITO_SCOPES` (任意) | `openid email phone` などのスコープをスペース区切りまたはカンマ区切りで指定 |
+
+すべての値が正しく設定されると、ログインボタンから Hosted UI に遷移し、トークンが `cognitoAccessToken` などの HTTP-only Cookie に保存されます。ログアウトボタンは Hosted UI の `/logout` エンドポイントへリダイレクトし、トークン Cookie を破棄します。
+
+アプリケーションでは `/api/auth/config-status` を参照すると現在不足している環境変数を JSON で確認できます。ログインページでも同じチェックを行っているため、未設定の変数があればその場で名称が表示されます。
 4. **管理者がユーザーを登録**
    - Cognito コンソール、または管理用バックエンドから `AdminCreateUser` API を呼び出し、事前にユーザーを登録します。
    - 初回ログイン時にユーザーにパスワード設定を促すワークフローを利用できます。

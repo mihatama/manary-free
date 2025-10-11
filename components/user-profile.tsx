@@ -15,9 +15,9 @@ import type { StoredUser } from "@/types/local-data"
 import { resetLocalData } from "@/lib/storage/local-storage"
 
 export function UserProfile({ user }: { user: StoredUser }) {
-  const handleLogout = async () => {
+  const handleLogout = () => {
     resetLocalData()
-    window.location.href = "/"
+    window.location.href = "/api/auth/logout"
   }
 
   return (
