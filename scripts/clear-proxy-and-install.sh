@@ -20,4 +20,21 @@ npm config set legacy-peer-deps true >/dev/null 2>&1
 if [ "$#" -eq 0 ]; then
   set -- npm install
 fi
-exec "$@"
+
+cmd=("$@")
+
+# Ensure legacy peer dependency resolution is enforced even if the caller forgets the flag
+if [ "${cmd[0]}" = "npm" ] && [ "${cmd[1]:-}" = "install" ]; then
+  needs_flag=true
+  for arg in "${cmd[@]:2}"; do
+    if [ "$arg" = "--legacy-peer-deps" ]; then
+      needs_flag=false
+      break
+    fi
+  done
+  if $needs_flag; then
+    cmd+=("--legacy-peer-deps")
+  fi
+fi
+
+exec "${cmd[@]}"
