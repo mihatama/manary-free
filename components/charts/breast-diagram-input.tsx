@@ -448,11 +448,6 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
             ))
           : null}
       </div>
-      {!readOnly ? (
-        <p className="text-xs leading-snug text-muted-foreground text-center">
-          指やマウスで赤い線を描けます。描画内容は自動的に保存されるので、必要に応じて「クリア」でリセットしてください。
-        </p>
-      ) : null}
     </div>
   )
 }
