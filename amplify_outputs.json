@@ -1,0 +1,10 @@
+{
+  "auth": {
+    "manaryfree": {
+      "amazon_cognito_user_pools_web_client_id": "REPLACE_ME",
+      "aws_cognito_identity_pool_id": "REPLACE_ME_OR_REMOVE",
+      "aws_cognito_region": "REPLACE_ME",
+      "amazon_cognito_user_pools_id": "REPLACE_ME"
+    }
+  }
+}

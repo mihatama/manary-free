@@ -1,8 +1,8 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
-import { signOut, useSession } from "next-auth/react"
-import type { DefaultSession } from "next-auth"
+import { useAuthenticator } from "@aws-amplify/ui-react"
+import type { AuthUser } from "aws-amplify/auth"
 import { v4 as uuidv4 } from "uuid"
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled"
@@ -34,7 +34,7 @@ type AppState = {
 
 type AppStateContextValue = {
   isReady: boolean
-  currentUser?: DefaultSession["user"]
+  currentUser?: AuthUser
   reservations: Reservation[]
   serviceTypes: ServiceType[]
   logout: () => Promise<void>
@@ -101,7 +101,11 @@ function persistState(state: AppState) {
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(defaultState)
   const [isLocalReady, setIsLocalReady] = useState(false)
-  const { data: session, status } = useSession()
+  const { user, signOut, authStatus } = useAuthenticator((context) => ({
+    user: context.user,
+    signOut: context.signOut,
+    authStatus: context.authStatus,
+  }))
 
   useEffect(() => {
     const initialState = loadState()
@@ -116,8 +120,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, [state, isLocalReady])
 
   const logout = useCallback(async () => {
-    await signOut({ callbackUrl: "/" })
-  }, [])
+    if (typeof signOut === "function") {
+      await signOut()
+    }
+  }, [signOut])
 
   const createReservation = useCallback<AppStateContextValue["createReservation"]>((reservation) => {
     const newReservation: Reservation = {
@@ -158,12 +164,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  const isReady = isLocalReady && status !== "loading"
+  const isReady = isLocalReady && authStatus !== "configuring"
 
   const contextValue = useMemo<AppStateContextValue>(() => {
     return {
       isReady,
-      currentUser: session?.user,
+      currentUser: user ?? undefined,
       reservations: state.reservations,
       serviceTypes: state.serviceTypes,
       logout,
@@ -174,7 +180,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [
     isReady,
-    session?.user,
+    user,
     state.reservations,
     state.serviceTypes,
     logout,

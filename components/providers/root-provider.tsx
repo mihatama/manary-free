@@ -1,13 +1,20 @@
 "use client"
 
 import type { PropsWithChildren } from "react"
-import { SessionProvider } from "next-auth/react"
+import { AmplifyProvider, Authenticator } from "@aws-amplify/ui-react"
+
+import { ensureAmplifyConfigured } from "@/lib/amplify-client"
+
 import { AppStateProvider } from "./app-state-provider"
+
+ensureAmplifyConfigured()
 
 export function RootProvider({ children }: PropsWithChildren) {
   return (
-    <SessionProvider>
-      <AppStateProvider>{children}</AppStateProvider>
-    </SessionProvider>
+    <AmplifyProvider>
+      <Authenticator.Provider>
+        <AppStateProvider>{children}</AppStateProvider>
+      </Authenticator.Provider>
+    </AmplifyProvider>
   )
 }

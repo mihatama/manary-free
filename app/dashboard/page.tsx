@@ -44,7 +44,8 @@ export default function DashboardPage() {
     }
   }, [isReady, currentUser, router])
 
-  const userDisplayName = currentUser?.name ?? currentUser?.email ?? "Cognito User"
+  const userDisplayName =
+    currentUser?.signInDetails?.loginId ?? currentUser?.username ?? "Amplify User"
 
   const summary = useMemo(() => {
     const total = reservations.length

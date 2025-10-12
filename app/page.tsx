@@ -26,9 +26,9 @@ export default function Home() {
           <section className="space-y-4 text-center">
             <h2 className="text-3xl font-bold text-[#f8a0a0]">Manary local-storage edition</h2>
             <p className="text-muted-foreground">
-              This edition keeps reservation and client data in the browser localStorage, so no external database
-              is required. Authentication is handled by Amazon Cognito and any account issued in your user pool can
-              sign in.
+              This edition keeps reservation and client data in the browser localStorage, so no external database is
+              required. Authentication is handled by Amplify Auth (Amazon Cognito under the hood), so any user that you
+              allow through Amplify can sign in.
             </p>
             <p className="text-sm text-muted-foreground">
               Anyone can submit the reservation form; submitted data becomes visible on the admin dashboard

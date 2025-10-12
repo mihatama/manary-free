@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 
 import "./globals.css"
 import "react-big-calendar/lib/css/react-big-calendar.css"
+import "@aws-amplify/ui-react/styles.css"
 
 import { RootProvider } from "@/components/providers/root-provider"
 
