@@ -4,6 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { v4 as uuidv4 } from "uuid"
 
 import type { ChartPayload, ChartRecord, BreastCareChartData, PostpartumCareChartData, BreastDiagram } from "@/lib/chart-types"
+import { decryptToString, encryptString } from "@/lib/encryption"
+import { getEncryptedStateKey } from "@/lib/subscription"
+import { useSubscription } from "./subscription-provider"
 
 type AppState = {
   charts: ChartRecord[]
@@ -17,7 +20,8 @@ type AppStateContextValue = {
   resetCharts: () => void
 }
 
-const STORAGE_KEY = "manary-free-charts-state"
+const STORAGE_KEY = getEncryptedStateKey()
+const STORAGE_VERSION = 2
 
 const defaultState: AppState = {
   charts: [],
@@ -278,19 +282,47 @@ function sanitizeCharts(value: unknown): ChartRecord[] {
     .filter((chart): chart is ChartRecord => chart !== null && chart.patientName.length > 0)
 }
 
-function loadState(): AppState {
+async function loadState(encryptionKey?: string | null): Promise<AppState> {
   if (typeof window === "undefined") {
     return defaultState
   }
 
+  const stored = window.localStorage.getItem(STORAGE_KEY)
+  if (!stored) {
+    return defaultState
+  }
+
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) {
+    const parsed = JSON.parse(stored) as
+      | { version: number; payload?: unknown }
+      | { charts?: unknown }
+      | null
+
+    if (parsed && typeof parsed === "object" && "version" in parsed && parsed?.version === STORAGE_VERSION) {
+      if (!("payload" in parsed) || typeof parsed.payload !== "object" || !parsed.payload || !encryptionKey) {
+        return defaultState
+      }
+      const payload = parsed.payload as { iv?: string; ciphertext?: string }
+      if (typeof payload.iv !== "string" || typeof payload.ciphertext !== "string") {
+        return defaultState
+      }
+      const decrypted = await decryptToString(
+        {
+          iv: payload.iv,
+          ciphertext: payload.ciphertext,
+        },
+        encryptionKey,
+      )
+      const raw = JSON.parse(decrypted) as Partial<AppState>
+      const charts = sanitizeCharts(raw?.charts)
+      return { charts }
+    }
+
+    if (!encryptionKey) {
       return defaultState
     }
 
-    const parsed = JSON.parse(stored) as Partial<AppState>
-    const charts = sanitizeCharts(parsed?.charts)
+    const charts = sanitizeCharts((parsed as Partial<AppState> | null)?.charts)
     return { charts }
   } catch (error) {
     console.error("Failed to load chart state", error)
@@ -298,35 +330,64 @@ function loadState(): AppState {
   }
 }
 
-function persistState(state: AppState) {
-  if (typeof window === "undefined") {
+async function persistState(state: AppState, encryptionKey?: string | null) {
+  if (typeof window === "undefined" || !encryptionKey) {
     return
   }
 
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    const payload = await encryptString(JSON.stringify(state), encryptionKey)
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: STORAGE_VERSION,
+        payload,
+      }),
+    )
   } catch (error) {
     console.error("Failed to persist chart state", error)
   }
 }
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
+  const { isReady: isSubscriptionReady, encryptionKey } = useSubscription()
   const [state, setState] = useState<AppState>(defaultState)
   const [isLocalReady, setIsLocalReady] = useState(false)
 
   useEffect(() => {
-    const initialState = loadState()
-    setState(initialState)
-    setIsLocalReady(true)
-  }, [])
+    if (!isSubscriptionReady) {
+      return
+    }
+
+    let cancelled = false
+    setIsLocalReady(false)
+    ;(async () => {
+      const nextState = await loadState(encryptionKey)
+      if (!cancelled) {
+        setState(nextState)
+        setIsLocalReady(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isSubscriptionReady, encryptionKey])
 
   useEffect(() => {
-    if (isLocalReady) {
-      persistState(state)
+    if (!isLocalReady || !encryptionKey) {
+      return
     }
-  }, [state, isLocalReady])
+
+    void (async () => {
+      await persistState(state, encryptionKey)
+    })()
+  }, [state, isLocalReady, encryptionKey])
 
   const saveChart = useCallback<AppStateContextValue["saveChart"]>((payload) => {
+    if (!encryptionKey) {
+      throw new Error("現在のアカウント状態ではデータを編集できません。サブスクリプションを有効化してください。")
+    }
     const timestamp = new Date().toISOString()
     let savedChart: ChartRecord | null = null
 
@@ -346,17 +407,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
 
     return savedChart
-  }, [])
+  }, [encryptionKey])
 
   const deleteChart = useCallback<AppStateContextValue["deleteChart"]>((id) => {
+    if (!encryptionKey) {
+      throw new Error("現在のアカウント状態ではデータを削除できません。サブスクリプションを有効化してください。")
+    }
     setState((prev) => ({
       charts: prev.charts.filter((chart) => chart.id !== id),
     }))
-  }, [])
+  }, [encryptionKey])
 
   const resetCharts = useCallback<AppStateContextValue["resetCharts"]>(() => {
+    if (!encryptionKey) {
+      throw new Error("現在のアカウント状態ではデータを初期化できません。サブスクリプションを有効化してください。")
+    }
     setState(defaultState)
-  }, [])
+  }, [encryptionKey])
 
   const isReady = isLocalReady
 
