@@ -1,7 +1,7 @@
 "use client"
 
 import type { PropsWithChildren } from "react"
-import { AmplifyProvider, Authenticator } from "@aws-amplify/ui-react"
+import { AmplifyProvider } from "@aws-amplify/ui-react"
 
 import { ensureAmplifyConfigured } from "@/lib/amplify-client"
 
@@ -12,9 +12,7 @@ ensureAmplifyConfigured()
 export function RootProvider({ children }: PropsWithChildren) {
   return (
     <AmplifyProvider>
-      <Authenticator.Provider>
-        <AppStateProvider>{children}</AppStateProvider>
-      </Authenticator.Provider>
+      <AppStateProvider>{children}</AppStateProvider>
     </AmplifyProvider>
   )
 }

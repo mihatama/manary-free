@@ -1,7 +1,11 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useMemo } from "react"
+import type { AuthUser } from "aws-amplify/auth"
+import { Authenticator } from "@aws-amplify/ui-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -9,8 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -23,9 +25,9 @@ import {
 import { useAppState, type ReservationStatus } from "@/components/providers/app-state-provider"
 
 const statusLabels: Record<ReservationStatus, string> = {
-  pending: "確認待ち",
-  confirmed: "確定",
-  cancelled: "キャンセル",
+  pending: "Pending",
+  confirmed: "Confirmed",
+  cancelled: "Cancelled",
 }
 
 const statusBadgeVariant: Record<ReservationStatus, "default" | "secondary" | "destructive"> = {
@@ -35,17 +37,22 @@ const statusBadgeVariant: Record<ReservationStatus, "default" | "secondary" | "d
 }
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const { reservations, logout, updateReservationStatus, deleteReservation, currentUser, isReady } = useAppState()
+  return (
+    <Authenticator>
+      {({ user, signOut }) => <DashboardContent user={user} onSignOut={signOut} />}
+    </Authenticator>
+  )
+}
 
-  useEffect(() => {
-    if (isReady && !currentUser) {
-      router.replace("/")
-    }
-  }, [isReady, currentUser, router])
+type DashboardContentProps = {
+  user?: AuthUser
+  onSignOut: () => void | Promise<void>
+}
 
-  const userDisplayName =
-    currentUser?.signInDetails?.loginId ?? currentUser?.username ?? "Amplify User"
+function DashboardContent({ user, onSignOut }: DashboardContentProps) {
+  const { reservations, updateReservationStatus, deleteReservation, isReady } = useAppState()
+
+  const userDisplayName = user?.signInDetails?.loginId ?? user?.username ?? "Amplify User"
 
   const summary = useMemo(() => {
     const total = reservations.length
@@ -56,10 +63,10 @@ export default function DashboardPage() {
     return { total, confirmed, pending, cancelled }
   }, [reservations])
 
-  if (!isReady || !currentUser) {
+  if (!isReady) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#ffeaed]">
-        <p className="text-lg text-muted-foreground">ダッシュボードを読み込み中です…</p>
+        <p className="text-lg text-muted-foreground">Loading dashboard…</p>
       </div>
     )
   }
@@ -73,15 +80,17 @@ export default function DashboardPage() {
       <header className="border-b border-slate-300 bg-white">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#f8a0a0]">Manary ダッシュボード</h1>
-            <p className="text-sm text-muted-foreground">ローカルストレージで稼働するシンプルな予約管理</p>
+            <h1 className="text-2xl font-bold text-[#f8a0a0]">Manary Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage reservations stored locally in your browser.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">{userDisplayName}</span>
             <Button
               variant="outline"
               onClick={() => {
-                void logout()
+                void onSignOut()
               }}
             >
               Sign out
@@ -94,25 +103,25 @@ export default function DashboardPage() {
         <section className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader>
-              <CardDescription>総予約数</CardDescription>
+              <CardDescription>Total reservations</CardDescription>
               <CardTitle className="text-3xl">{summary.total}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader>
-              <CardDescription>確定</CardDescription>
+              <CardDescription>Confirmed</CardDescription>
               <CardTitle className="text-3xl text-emerald-600">{summary.confirmed}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader>
-              <CardDescription>確認待ち</CardDescription>
+              <CardDescription>Pending</CardDescription>
               <CardTitle className="text-3xl text-amber-600">{summary.pending}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader>
-              <CardDescription>キャンセル</CardDescription>
+              <CardDescription>Cancelled</CardDescription>
               <CardTitle className="text-3xl text-rose-600">{summary.cancelled}</CardTitle>
             </CardHeader>
           </Card>
@@ -121,23 +130,27 @@ export default function DashboardPage() {
         <section className="mt-10">
           <Card>
             <CardHeader>
-              <CardTitle>予約一覧</CardTitle>
-              <CardDescription>患者からの予約を確認してステータスを管理できます。</CardDescription>
+              <CardTitle>Reservation list</CardTitle>
+              <CardDescription>
+                Review incoming reservations and adjust their status as needed.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {reservations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">まだ予約がありません。公開予約フォームから登録してみましょう。</p>
+                <p className="text-sm text-muted-foreground">
+                  No reservations yet. Try submitting the public reservation form.
+                </p>
               ) : (
                 <Table>
-                  <TableCaption>ローカルストレージに保存された予約データ</TableCaption>
+                  <TableCaption>Reservations stored in local storage</TableCaption>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>患者名</TableHead>
-                      <TableHead>連絡先</TableHead>
-                      <TableHead>サービス</TableHead>
-                      <TableHead>予約日時</TableHead>
-                      <TableHead>ステータス</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Appointment</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -169,21 +182,21 @@ export default function DashboardPage() {
                             size="sm"
                             onClick={() => handleStatusChange(reservation.id, "confirmed")}
                           >
-                            確定
+                            Confirm
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleStatusChange(reservation.id, "pending")}
                           >
-                            保留
+                            Pending
                           </Button>
                           <Button
                             variant="destructive"
                             size="sm"
                             onClick={() => handleStatusChange(reservation.id, "cancelled")}
                           >
-                            キャンセル
+                            Cancel
                           </Button>
                           <Button
                             variant="ghost"
@@ -191,7 +204,7 @@ export default function DashboardPage() {
                             className="text-destructive"
                             onClick={() => deleteReservation(reservation.id)}
                           >
-                            削除
+                            Delete
                           </Button>
                         </TableCell>
                       </TableRow>

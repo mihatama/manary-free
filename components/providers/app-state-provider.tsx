@@ -1,8 +1,6 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
-import { useAuthenticator } from "@aws-amplify/ui-react"
-import type { AuthUser } from "aws-amplify/auth"
 import { v4 as uuidv4 } from "uuid"
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled"
@@ -34,10 +32,8 @@ type AppState = {
 
 type AppStateContextValue = {
   isReady: boolean
-  currentUser?: AuthUser
   reservations: Reservation[]
   serviceTypes: ServiceType[]
-  logout: () => Promise<void>
   createReservation: (reservation: Omit<Reservation, "id" | "status" | "createdAt">) => Reservation
   updateReservationStatus: (id: string, status: ReservationStatus) => void
   deleteReservation: (id: string) => void
@@ -101,11 +97,6 @@ function persistState(state: AppState) {
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(defaultState)
   const [isLocalReady, setIsLocalReady] = useState(false)
-  const { user, signOut, authStatus } = useAuthenticator((context) => ({
-    user: context.user,
-    signOut: context.signOut,
-    authStatus: context.authStatus,
-  }))
 
   useEffect(() => {
     const initialState = loadState()
@@ -118,12 +109,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       persistState(state)
     }
   }, [state, isLocalReady])
-
-  const logout = useCallback(async () => {
-    if (typeof signOut === "function") {
-      await signOut()
-    }
-  }, [signOut])
 
   const createReservation = useCallback<AppStateContextValue["createReservation"]>((reservation) => {
     const newReservation: Reservation = {
@@ -164,15 +149,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  const isReady = isLocalReady && authStatus !== "configuring"
+  const isReady = isLocalReady
 
   const contextValue = useMemo<AppStateContextValue>(() => {
     return {
       isReady,
-      currentUser: user ?? undefined,
       reservations: state.reservations,
       serviceTypes: state.serviceTypes,
-      logout,
       createReservation,
       updateReservationStatus,
       deleteReservation,
@@ -180,10 +163,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [
     isReady,
-    user,
     state.reservations,
     state.serviceTypes,
-    logout,
     createReservation,
     updateReservationStatus,
     deleteReservation,
