@@ -548,17 +548,26 @@ export function BreastCareChartForm({
                 <Textarea id="familySupportStatus" rows={2} {...register("familySupportStatus")} />
               </div>
             </div>
-            <div className="flex items-center justify-evenly">
-              <Controller
-                name="breastDiagramRight"
-                control={control}
-                render={({ field }) => <BreastDiagramInput side="right" value={field.value} onChange={field.onChange} />}
-              />
-              <Controller
-                name="breastDiagramLeft"
-                control={control}
-                render={({ field }) => <BreastDiagramInput side="left" value={field.value} onChange={field.onChange} />}
-              />
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-xs text-muted-foreground text-center md:text-sm">
+                添付図に赤い線で部位やメモを書き込めます。左右それぞれ必要に応じて描画してください。
+              </p>
+              <div className="flex flex-col items-center gap-6 md:flex-row md:gap-10">
+                <Controller
+                  name="breastDiagramRight"
+                  control={control}
+                  render={({ field }) => (
+                    <BreastDiagramInput side="right" value={field.value} onChange={field.onChange} />
+                  )}
+                />
+                <Controller
+                  name="breastDiagramLeft"
+                  control={control}
+                  render={({ field }) => (
+                    <BreastDiagramInput side="left" value={field.value} onChange={field.onChange} />
+                  )}
+                />
+              </div>
             </div>
           </div>
 

@@ -98,7 +98,10 @@ function normalizeDiagram(value: unknown): BreastDiagram {
   }
 
   if (markerEntries.length > 0) {
-    normalized.markers = Object.fromEntries(markerEntries)
+    const activeEntries = markerEntries.filter(([, val]) => val === true)
+    if (activeEntries.length > 0) {
+      normalized.markers = Object.fromEntries(activeEntries)
+    }
   }
 
   return normalized
