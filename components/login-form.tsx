@@ -56,9 +56,16 @@ const loginTheme = createTheme({
 export function LoginForm() {
   return (
     <section className="w-full max-w-md rounded-3xl bg-white/95 p-10 shadow-xl shadow-rose-100 ring-1 ring-rose-50 backdrop-blur">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-rose-600">Sign in to Manary</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Use your registered email address and password to continue.</p>
+      <div className="mb-8 space-y-3 text-center">
+        <p className="text-xs font-semibold uppercase tracking-widest text-rose-500">初月無料ローカル保存エディション</p>
+        <h1 className="text-2xl font-bold text-rose-600">Manary にサインイン</h1>
+        <p className="text-sm text-muted-foreground">このエディションは30日間無料でご利用いただけます。</p>
+        <p className="text-sm text-muted-foreground">
+          カルテ情報は暗号化された状態でブラウザのローカルストレージに保存され、外部サーバーには送信されません。
+        </p>
+        <p className="text-xs text-muted-foreground">
+          予約管理や事前問診フォームなどのクラウド連携機能をご希望の場合は、別契約のプランが必要です。
+        </p>
       </div>
       <div className="login-auth space-y-6">
         <ThemeProvider theme={loginTheme} colorMode="light">
@@ -88,15 +95,17 @@ function RedirectToDashboard({ signOut, userName }: RedirectProps) {
   return (
     <div className="space-y-4 text-center">
       <p className="text-sm text-muted-foreground">
-        {userName ? `${userName} is being redirected to the dashboard...` : "Redirecting to the dashboard..."}
+        {userName ? `${userName} さん、ダッシュボードへ移動します...` : "ダッシュボードへ移動します..."}
       </p>
       {signOut && (
         <button
           type="button"
           className="w-full rounded-full border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-600 transition hover:border-rose-300 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-200"
-          onClick={() => void signOut()}
+          onClick={() => {
+            void signOut()
+          }}
         >
-          Sign out
+          サインアウト
         </button>
       )}
     </div>
