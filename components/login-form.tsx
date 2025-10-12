@@ -4,6 +4,8 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Authenticator, ThemeProvider, createTheme } from "@aws-amplify/ui-react"
 
+import { PwaInstallButton } from "@/components/pwa-install-button"
+
 const loginTheme = createTheme({
   name: "manary-login",
   tokens: {
@@ -75,6 +77,9 @@ export function LoginForm() {
             )}
           </Authenticator>
         </ThemeProvider>
+      </div>
+      <div className="mt-6 space-y-2 text-center">
+        <PwaInstallButton />
       </div>
     </section>
   )
