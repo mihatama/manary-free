@@ -1,6 +1,9 @@
 export type ChartType = "breast" | "postpartum"
 
-export type BreastDiagram = Record<string, boolean>
+export interface BreastDiagram {
+  imageData?: string | null
+  markers?: Record<string, boolean>
+}
 
 export interface ChartBase {
   id: string

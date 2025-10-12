@@ -72,11 +72,36 @@ function normalizeDiagram(value: unknown): BreastDiagram {
     return {}
   }
 
-  const entries = Object.entries(value as Record<string, unknown>).filter(
-    ([key, val]) => typeof key === "string" && typeof val === "boolean",
-  ) as Array<[string, boolean]>
+  const record = value as Record<string, unknown>
+  const normalized: BreastDiagram = {}
 
-  return Object.fromEntries(entries)
+  if (typeof record.imageData === "string" && record.imageData.startsWith("data:image/")) {
+    normalized.imageData = record.imageData
+  }
+
+  let markerEntries: Array<[string, boolean]> = []
+
+  if (record.markers && typeof record.markers === "object" && !Array.isArray(record.markers)) {
+    markerEntries = Object.entries(record.markers as Record<string, unknown>).filter(
+      ([key, val]) => typeof key === "string" && typeof val === "boolean",
+    ) as Array<[string, boolean]>
+  }
+
+  if (markerEntries.length === 0) {
+    markerEntries = Object.entries(record).filter(
+      ([key, val]) =>
+        key !== "imageData" &&
+        key !== "markers" &&
+        typeof key === "string" &&
+        typeof val === "boolean",
+    ) as Array<[string, boolean]>
+  }
+
+  if (markerEntries.length > 0) {
+    normalized.markers = Object.fromEntries(markerEntries)
+  }
+
+  return normalized
 }
 
 function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCareChartData {

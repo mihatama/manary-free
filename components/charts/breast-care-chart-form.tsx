@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-import type { BreastCareChartRecord, ChartPayload } from "@/lib/chart-types"
+import type { BreastCareChartRecord, BreastDiagram, ChartPayload } from "@/lib/chart-types"
 
 import { BreastDiagramInput } from "./breast-diagram-input"
 
@@ -31,6 +31,16 @@ const feeOptions = [
   { name: "rentalTowelFee", label: "レンタルタオル 350円" },
   { name: "careTowelFee", label: "ケアタオル 250円" },
 ] as const
+
+const breastDiagramFieldSchema = z
+  .union([
+    z.object({
+      imageData: z.string().optional().nullable(),
+      markers: z.record(z.boolean()).optional(),
+    }),
+    z.record(z.boolean()),
+  ])
+  .default({})
 
 const formSchema = z.object({
   patientName: z.string().min(1, "患者名は必須です"),
@@ -69,8 +79,8 @@ const formSchema = z.object({
   rightBreastCondition: z.string().optional(),
   careDetails: z.string().optional(),
   recommendations: z.string().optional(),
-  breastDiagramRight: z.record(z.boolean()).default({}),
-  breastDiagramLeft: z.record(z.boolean()).default({}),
+  breastDiagramRight: breastDiagramFieldSchema,
+  breastDiagramLeft: breastDiagramFieldSchema,
   diagnosis: z.string().optional(),
   paymentMethod: z.string().optional(),
   initialConsultationFee: z.boolean().optional().default(false),
@@ -82,6 +92,7 @@ const formSchema = z.object({
   otherFeeDescription: z.string().optional(),
 })
 
+type DiagramFieldValue = z.infer<typeof breastDiagramFieldSchema>
 type FormValues = z.infer<typeof formSchema>
 
 type BreastCareChartFormProps = {
@@ -124,6 +135,44 @@ const parseCurrency = (value: FormValues["otherFee"]): number | null | undefined
     return undefined
   }
   return parsed
+}
+
+const normalizeDiagramField = (value: DiagramFieldValue | undefined): BreastDiagram => {
+  if (!value || typeof value !== "object") {
+    return {}
+  }
+
+  const record = value as Record<string, unknown>
+  const normalized: BreastDiagram = {}
+
+  const rawImage = record.imageData
+  if (typeof rawImage === "string" && rawImage.trim().length > 0 && rawImage.startsWith("data:image/")) {
+    normalized.imageData = rawImage
+  }
+
+  let markerSource: Record<string, unknown> | undefined
+  if (record.markers && typeof record.markers === "object" && !Array.isArray(record.markers)) {
+    markerSource = record.markers as Record<string, unknown>
+  } else {
+    markerSource = record
+  }
+
+  if (markerSource) {
+    const markerEntries = Object.entries(markerSource).filter(
+      ([key, val]) =>
+        key !== "imageData" &&
+        key !== "markers" &&
+        typeof key === "string" &&
+        typeof val === "boolean" &&
+        val === true,
+    ) as Array<[string, true]>
+
+    if (markerEntries.length > 0) {
+      normalized.markers = Object.fromEntries(markerEntries)
+    }
+  }
+
+  return normalized
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -259,8 +308,8 @@ export function BreastCareChartForm({
         rightBreastCondition: values.rightBreastCondition?.trim() || undefined,
         careDetails: values.careDetails?.trim() || undefined,
         recommendations: values.recommendations?.trim() || undefined,
-        breastDiagramRight: values.breastDiagramRight ?? {},
-        breastDiagramLeft: values.breastDiagramLeft ?? {},
+        breastDiagramRight: normalizeDiagramField(values.breastDiagramRight),
+        breastDiagramLeft: normalizeDiagramField(values.breastDiagramLeft),
         diagnosis: values.diagnosis?.trim() || undefined,
         paymentMethod: values.paymentMethod?.trim() || undefined,
         initialConsultationFee: values.initialConsultationFee ?? false,
