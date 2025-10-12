@@ -1,14 +1,14 @@
 # AWS Amplify でのセットアップ手順
 
-このドキュメントでは、`manary-free`（ローカルストレージ版）を Amplify Hosting にデプロイし、Amplify Auth（Cognito）で管理者認証を構成するまでの流れをまとめます。外部データベースは不要で、予約データはブラウザの `localStorage` に保存されます。
+このドキュメントでは、`manary-free`（ローカルストレージ版）を Amplify Hosting にデプロイし、Amplify Auth（Cognito）で認証を構築するまでの流れをまとめます。外部データベースは不要で、カルテはブラウザの `localStorage` に保存されます。
 
 ---
 
 ## 前提条件
 
 - AWS アカウントと Amplify Hosting の利用権限を保有していること
-- Node.js 18.18+（または 20+）と npm がインストール済みであること
-- Amplify CLI（Gen 2）がインストールされていること  
+- Node.js 18.18+ もしくは 20+ と npm がインストール済みであること
+- Amplify CLI（Gen 2）がインストール済みであること  
   `npm install -g @aws-amplify/cli`
 
 ---
@@ -25,15 +25,14 @@ npm install
 
 ---
 
-## 2. Amplify バックエンドの構築
-
+## 2. Amplify バックエンドを構築
 AWS 公式ドキュメント「[Build a backend > Auth](https://docs.amplify.aws/react/build-a-backend/auth/)」に沿って、以下のコマンドを実行します。
 
 1. **Amplify プロジェクトを初期化**
    ```bash
    amplify init
    ```
-   - フレームワークは **JavaScript** / **React** を選択
+   - フレームワークは **JavaScript / React** を選択
    - 環境名は `dev` など任意で OK
 
 2. **認証機能を追加**
@@ -41,7 +40,7 @@ AWS 公式ドキュメント「[Build a backend > Auth](https://docs.amplify.aws
    amplify add auth
    ```
    - 「Default configuration」を選択すると Cognito ユーザープールが自動生成されます
-   - サインイン方法は `Email` または `Username` を選択（UI から後で変更可能）
+   - サインイン方法は `Email` または `Username` から選択（後から変更可能）
 
 3. **クラウドへデプロイ**
    ```bash
@@ -56,19 +55,18 @@ AWS 公式ドキュメント「[Build a backend > Auth](https://docs.amplify.aws
    - もしくは `amplify push` 後に表示される案内に従って pull してください
    - このコマンドが `amplify_outputs.json` を更新します
 
-> `amplify_outputs.json` をリポジトリにコミットしてよい運用であれば、そのまま管理してください。共有したくない場合は Amplify Hosting のビルドステップでファイルを注入するしくみ（Artifact や SSM パラメータなど）を別途用意します。
+> `amplify_outputs.json` をリポジトリにコミットしても構わない運用であれば、そのまま管理してください。秘匿したい場合は Amplify Hosting のビルドステップでファイルを注入する仕組み（Artifact ルールや SSM パラメータなど）を別途用意します。
 
 ---
 
 ## 3. ローカルでの動作確認
-
 ```bash
 npm run dev
 # http://localhost:3000 にアクセス
 ```
 
-- `/` に Amplify Auth のサインイン UI が表示され、ログイン成功後 `/dashboard` に遷移します
-- `/reservation` から送信した予約データはブラウザの `localStorage["manary-local-app-state"]` に保存されます
+- `/` に Amplify Auth のサインイン UI が表示され、ログイン成功で `/dashboard` に遷移します。
+- カルテはブラウザの `localStorage["manary-free-charts-state"]` に保存されます（端末やブラウザを跨いで共有されません）。
 
 ---
 
@@ -96,21 +94,21 @@ amplify publish          # Amplify Hosting (S3 + CloudFront) にアップロー�
 ## 5. よくある質問
 
 ### Q. データは Amplify に保存されますか？
-A. いいえ。予約データはすべてブラウザの `localStorage` に保存されます。端末やブラウザが変わると共有されません。
+A. いいえ。カルテはすべてブラウザの `localStorage` に保存されます。端末やブラウザが変わると共有されません。
 
 ### Q. ログインできない場合は？
 A. `amplify_outputs.json` の値が最新か確認してください。Amplify の環境を作り直した場合は `amplify pull` で再取得が必要です。また、ユーザーが Cognito ユーザープールに存在するか確認してください。
 
 ### Q. `amplify_outputs.json` を公開したくないのですが？
-A. GitHub にコミットしない場合は、Amplify Hosting のビルドステップで SSM パラメータや Secrets Manager からファイルを生成するスクリプトを追加してください。
+A. GitHub にコミットしない運用にする場合は、Amplify Hosting のビルドステップで SSM パラメータや Secrets Manager からファイルを生成するスクリプトを追加してください。
 
 ---
 
 ## 6. 運用メモ
 
-- 管理者（助産師）の追加・削除は Amplify Auth（Cognito ユーザープール）で行います
-- Dashboard で **Reset Data** をクリックすると `localStorage` が初期化されます
-- Amplify Hosting のログはコンソールの **Build details** から確認できます
+- 管理者（助産師／スタッフ）の追加・削除は Amplify Auth（Cognito ユーザープール）で行います。
+- カルテを初期化したい場合はブラウザの開発者ツールから `localStorage["manary-free-charts-state"]` を削除してください。
+- Amplify Hosting のビルドログはコンソールの **Build details** から確認できます。
 
 ---
 

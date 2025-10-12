@@ -9,7 +9,7 @@ import { RootProvider } from "@/components/providers/root-provider"
 
 export const metadata: Metadata = {
   title: "Manary",
-  description: "Midwife-focused reservation manager (local storage edition)",
+  description: "Midwife-focused chart manager (local storage edition)",
 }
 
 export default function RootLayout({

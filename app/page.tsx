@@ -1,6 +1,5 @@
 import { Suspense } from "react"
 import Image from "next/image"
-import Link from "next/link"
 
 import { LoginForm } from "@/components/login-form"
 
@@ -13,11 +12,6 @@ export default function Home() {
             <Image src="/manary-logo.png" alt="Manary Logo" width={60} height={60} />
             <h1 className="ml-2 text-xl font-bold text-[#f8a0a0]">Manary</h1>
           </div>
-          <div>
-            <Link href="/reservation" className="text-sm text-[#f8a0a0] hover:underline">
-              Reservation form
-            </Link>
-          </div>
         </div>
       </header>
 
@@ -26,13 +20,13 @@ export default function Home() {
           <section className="space-y-4 text-center">
             <h2 className="text-3xl font-bold text-[#f8a0a0]">Manary local-storage edition</h2>
             <p className="text-muted-foreground">
-              This edition keeps reservation and client data in the browser localStorage, so no external database is
-              required. Authentication is handled by Amplify Auth (Amazon Cognito under the hood), so any user that you
-              allow through Amplify can sign in.
+              This edition focuses on chart management for midwives. Breast-care and postpartum-care charts are stored
+              securely in the browser via localStorage—no external database required. Authentication is handled by
+              Amplify Auth (Amazon Cognito), so you decide who can sign in.
             </p>
             <p className="text-sm text-muted-foreground">
-              Anyone can submit the reservation form; submitted data becomes visible on the admin dashboard
-              immediately and can be updated from there.
+              Once signed in, access the dashboard to create, edit, and review charts. All data remains on the device,
+              making this build ideal for demonstrations or clinics that prefer offline-first workflows.
             </p>
           </section>
 
