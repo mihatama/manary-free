@@ -2,24 +2,74 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Authenticator } from "@aws-amplify/ui-react"
+import { Authenticator, ThemeProvider, createTheme } from "@aws-amplify/ui-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+const loginTheme = createTheme({
+  name: "manary-login",
+  tokens: {
+    colors: {
+      brand: {
+        primary: {
+          10: "#f0f9ff",
+          20: "#e0f2fe",
+          40: "#7dd3fc",
+          60: "#0ea5e9",
+          80: "#0284c7",
+          90: "#0369a1",
+          100: "#0f172a",
+        },
+      },
+      font: {
+        interactive: { value: "#0369a1" },
+        focus: { value: "#0f172a" },
+      },
+      border: {
+        focus: { value: "#0ea5e9" },
+      },
+    },
+  },
+  components: {
+    button: {
+      primary: {
+        backgroundColor: { value: "{colors.brand.primary.60}" },
+        borderColor: { value: "{colors.brand.primary.60}" },
+        color: { value: "#ffffff" },
+        _hover: {
+          backgroundColor: { value: "{colors.brand.primary.80}" },
+          borderColor: { value: "{colors.brand.primary.80}" },
+        },
+        _focus: {
+          boxShadow: { value: "0 0 0 3px rgba(14, 165, 233, 0.35)" },
+        },
+      },
+      link: {
+        color: { value: "{colors.brand.primary.80}" },
+        _hover: { color: { value: "{colors.brand.primary.60}" } },
+        _focus: {
+          outlineColor: { value: "{colors.brand.primary.60}" },
+        },
+      },
+    },
+  },
+})
 
 export function LoginForm() {
   return (
-    <Card className="w-full border-border shadow-md">
+    <Card className="w-full border border-slate-200 bg-white/95 shadow-lg">
       <CardHeader>
-        <CardTitle className="text-center text-xl text-foreground">Sign in</CardTitle>
-        <CardDescription className="text-center text-muted-foreground">
-          Use your Amplify Auth account to access the dashboard.
-        </CardDescription>
+        <CardTitle className="text-center text-xl font-semibold text-slate-900">Manary にサインイン</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Authenticator>
-          {({ signOut, user }) => <RedirectToDashboard signOut={signOut} userName={user?.signInDetails?.loginId ?? user?.username} />}
-        </Authenticator>
+        <ThemeProvider theme={loginTheme} colorMode="light">
+          <Authenticator>
+            {({ signOut, user }) => (
+              <RedirectToDashboard signOut={signOut} userName={user?.signInDetails?.loginId ?? user?.username} />
+            )}
+          </Authenticator>
+        </ThemeProvider>
       </CardContent>
     </Card>
   )
@@ -40,11 +90,11 @@ function RedirectToDashboard({ signOut, userName }: RedirectProps) {
   return (
     <div className="space-y-4 text-center">
       <p className="text-sm text-muted-foreground">
-        {userName ? `Hello ${userName}! Redirecting to the dashboard...` : "Redirecting to the dashboard..."}
+        {userName ? `${userName} さん、ダッシュボードへ移動します…` : "ダッシュボードへ移動します…"}
       </p>
       {signOut && (
         <Button variant="outline" className="w-full" onClick={() => void signOut()}>
-          Sign out
+          サインアウト
         </Button>
       )}
     </div>
