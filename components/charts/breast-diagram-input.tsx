@@ -95,14 +95,57 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
 
   const valueKey = useMemo(() => JSON.stringify(value ?? {}), [value])
   const normalizedValue = useMemo(() => normalizeDiagramValue(value as any), [valueKey])
+  const storageKey = useMemo(() => `breast-diagram-${side}`, [side])
+
+  const loadStoredImage = useCallback(() => {
+    if (typeof window === "undefined") {
+      return undefined
+    }
+    try {
+      return window.localStorage.getItem(storageKey) ?? undefined
+    } catch {
+      return undefined
+    }
+  }, [storageKey])
+
+  const writeStoredImage = useCallback(
+    (data?: string) => {
+      if (typeof window === "undefined") {
+        return
+      }
+      try {
+        if (!data) {
+          window.localStorage.removeItem(storageKey)
+        } else {
+          window.localStorage.setItem(storageKey, data)
+        }
+      } catch {
+        // ignore storage quota errors and private browsing limitations
+      }
+    },
+    [storageKey],
+  )
 
   useEffect(() => {
-    const nextImage = normalizedValue.imageData ?? undefined
-    setImageData((prev) => (prev === nextImage ? prev : nextImage))
-
     const nextMarkers = normalizedValue.markers ?? {}
     setMarkers((prev) => (markersEqual(prev, nextMarkers) ? prev : nextMarkers))
-  }, [normalizedValue])
+
+    if (readOnly) {
+      const readOnlyImage = normalizedValue.imageData ?? undefined
+      setImageData((prev) => (prev === readOnlyImage ? prev : readOnlyImage))
+      return
+    }
+
+    const storedImage = normalizedValue.imageData ?? loadStoredImage()
+    const nextImage = storedImage ?? undefined
+    setImageData((prev) => (prev === nextImage ? prev : nextImage))
+
+    if (normalizedValue.imageData) {
+      writeStoredImage(normalizedValue.imageData)
+    } else if (storedImage) {
+      onChange?.({ imageData: storedImage })
+    }
+  }, [loadStoredImage, normalizedValue, onChange, readOnly, writeStoredImage])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -186,12 +229,13 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
       const dataUrl = canvas.toDataURL("image/png")
       setImageData(dataUrl)
       const payload: BreastDiagram = { imageData: dataUrl }
+      writeStoredImage(dataUrl)
       onChange?.(payload)
       if (hasActiveMarkers(markers)) {
         setMarkers({})
       }
     })
-  }, [markers, onChange, readOnly])
+  }, [markers, onChange, readOnly, writeStoredImage])
 
   const finishDrawing = useCallback(
     (event?: React.PointerEvent<HTMLCanvasElement>) => {
@@ -337,26 +381,13 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
     setImageData(undefined)
     setMarkers({})
+    writeStoredImage(undefined)
     onChange?.({})
-  }, [getContext, onChange, readOnly])
+  }, [getContext, onChange, readOnly, writeStoredImage])
 
   const sideLabel = side === "right" ? "右" : "左"
   const showMarkers = !imageData && hasActiveMarkers(markers)
   const canClear = Boolean(imageData) || hasActiveMarkers(markers)
-  const canDownload = Boolean(imageData)
-
-  const handleDownload = useCallback(() => {
-    if (!canDownload) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const dataUrl = canvas.toDataURL("image/png")
-    const a = document.createElement("a")
-    a.href = dataUrl
-    a.download = `${sideLabel}_図.png`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-  }, [canDownload, sideLabel])
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -374,9 +405,6 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
             >
               {eraserOn ? "消しゴム" : "ペン"}
             </Toggle>
-            <Button type="button" variant="ghost" size="sm" onClick={handleDownload} disabled={!canDownload}>
-              保存
-            </Button>
             <Button type="button" variant="ghost" size="sm" onClick={handleClear} disabled={!canClear}>
               クリア
             </Button>
@@ -388,9 +416,9 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
           viewBox="0 0 100 100"
           className="pointer-events-none absolute inset-0 h-full w-full text-muted-foreground/40"
         >
-          <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="2" fill="white" />
-          <line x1="50" y1="6" x2="50" y2="94" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
-          <line x1="6" y1="50" x2="94" y2="50" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3" />
+          <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="2" fill="none" />
+          <circle cx="50" cy="50" r="22" stroke="currentColor" strokeWidth="1.5" fill="none" />
+          <circle cx="50" cy="50" r="7" fill="currentColor" fillOpacity="0.2" />
         </svg>
         <canvas
           ref={canvasRef}
@@ -422,7 +450,7 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
       </div>
       {!readOnly ? (
         <p className="text-xs leading-snug text-muted-foreground text-center">
-          指やマウスで赤い線を描けます。必要に応じて「クリア」でやり直してください。
+          指やマウスで赤い線を描けます。描画内容は自動的に保存されるので、必要に応じて「クリア」でリセットしてください。
         </p>
       ) : null}
     </div>
