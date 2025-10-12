@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 
 import "./globals.css"
 import "react-big-calendar/lib/css/react-big-calendar.css"
@@ -15,7 +15,6 @@ export const metadata: Metadata = {
   description: "Midwife-focused chart manager (local storage edition)",
   applicationName: "Manary",
   manifest: "/manifest.webmanifest",
-  themeColor: "#0ea5e9",
   appleWebApp: {
     capable: true,
     title: "Manary",
@@ -29,11 +28,13 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" }],
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
+}
+
+export const viewport: Viewport = {
+  themeColor: [{ color: "#0ea5e9" }],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({

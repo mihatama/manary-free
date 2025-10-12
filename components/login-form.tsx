@@ -30,26 +30,26 @@ const loginTheme = createTheme({
         focus: { value: "#0ea5e9" },
       },
     },
-  },
-  components: {
-    button: {
-      primary: {
-        backgroundColor: { value: "{colors.brand.primary.60}" },
-        borderColor: { value: "{colors.brand.primary.60}" },
-        color: { value: "#ffffff" },
-        _hover: {
-          backgroundColor: { value: "{colors.brand.primary.80}" },
-          borderColor: { value: "{colors.brand.primary.80}" },
+    components: {
+      button: {
+        primary: {
+          backgroundColor: { value: "{colors.brand.primary.60}" },
+          borderColor: { value: "{colors.brand.primary.60}" },
+          color: { value: "#ffffff" },
+          _hover: {
+            backgroundColor: { value: "{colors.brand.primary.80}" },
+            borderColor: { value: "{colors.brand.primary.80}" },
+          },
+          _focus: {
+            boxShadow: { value: "0 0 0 3px rgba(14, 165, 233, 0.35)" },
+          },
         },
-        _focus: {
-          boxShadow: { value: "0 0 0 3px rgba(14, 165, 233, 0.35)" },
-        },
-      },
-      link: {
-        color: { value: "{colors.brand.primary.80}" },
-        _hover: { color: { value: "{colors.brand.primary.60}" } },
-        _focus: {
-          outlineColor: { value: "{colors.brand.primary.60}" },
+        link: {
+          color: { value: "{colors.brand.primary.80}" },
+          _hover: { color: { value: "{colors.brand.primary.60}" } },
+          _focus: {
+            outlineColor: { value: "{colors.brand.primary.60}" },
+          },
         },
       },
     },
