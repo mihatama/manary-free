@@ -53,7 +53,7 @@ type SortKey = "patientName" | "visitDate" | "chartType" | "createdAt"
 const sortLabel: Record<SortKey, string> = {
   patientName: "患者名",
   visitDate: "来院日",
-  chartType: "カルテ種別",
+  chartType: "カルテ別",
   createdAt: "作成日",
 }
 
@@ -79,7 +79,7 @@ const breastTemplate: BreastCareChartRecord = {
   visitDate: new Date().toISOString().slice(0, 10),
   practitionerName: "佐藤 仁美",
   patientId: "SAMPLE-001",
-  memo: "テンプレート用サンプルです。",
+  memo: "テンプレート用サンプルです",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   data: {
@@ -94,14 +94,14 @@ const breastTemplate: BreastCareChartRecord = {
     formulaFeedsPerDay: 2,
     formulaVolumePerFeed: "40ml/回",
     weaningFeedsPerDay: 1,
-    weaningDetails: "10倍粥、にんじんペースト",
+    weaningDetails: "10倍粥、にんじんピューレ",
     stoolFrequency: 6,
-    stoolConsistency: "黄色・やわらかめ",
-    babyDevelopment: "首すわり良好。腹ばいを好む。",
-    weaningStatus: "初期。まだ少量ずつ。",
-    subjectiveNote: "乳房の張りが気になる。夜間授乳が辛い。",
-    planNote: "搾乳方法の確認と夜間授乳の姿勢ケア。",
-    breastShape: "円錐型",
+    stoolConsistency: "粘土状・やややわらかめ",
+    babyDevelopment: "首すわり良好。おしゃぶりを好む",
+    weaningStatus: "初期。まだ少量ずつ",
+    subjectiveNote: "乳房の張りが気になる。夜間授乳が辛い",
+    planNote: "搾乳方法の確認と夜間授乳の姿勢ケア",
+    breastShape: "円錐状",
     nippleShieldUsed: false,
     pumpingFrequency: "1日2回（手動）",
     pumpingMethod: "手動ポンプ",
@@ -111,12 +111,12 @@ const breastTemplate: BreastCareChartRecord = {
     familySupportStatus: "夫が夜間対応をサポート",
     breastDiagramRight: { markers: { "12": true } },
     breastDiagramLeft: { markers: { "3": true } },
-    concerns: "夜間の寝不足が続いている。",
-    leftBreastCondition: "しこりなし。柔らかさ保たれている。",
-    rightBreastCondition: "12時方向に軽い張り。",
-    careDetails: "ポジショニング指導・温罨法を実施。",
-    recommendations: "夜間授乳前の搾乳推奨。次回再評価。",
-    diagnosis: "乳腺の詰まり傾向。経過観察。",
+    concerns: "夜間の寝不足が続いている",
+    leftBreastCondition: "しこりなし。柔らかさ保たれている",
+    rightBreastCondition: "12時方向に軽い張り",
+    careDetails: "ポジショニング指導と温罨法を実施",
+    recommendations: "夜間授乳前の搾乳推奨。次回再評価",
+    diagnosis: "乳腺の詰まり傾向。経過観察",
     paymentMethod: "現金払い",
     initialConsultationFee: true,
     singleSessionFee: true,
@@ -135,27 +135,27 @@ const postpartumTemplate: PostpartumCareChartRecord = {
   visitDate: new Date().toISOString().slice(0, 10),
   practitionerName: "田中 由美",
   patientId: "SAMPLE-PP-01",
-  memo: "テンプレート用サンプルです。",
+  memo: "テンプレート用サンプルです",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   data: {
     weeksPostpartum: 4,
-    motherCondition: "バイタル正常、疲労感あり。",
-    lochiaStatus: "淡血色、量は減少傾向。",
-    episiotomyPain: "軽度の疼痛。傷は良好。",
-    constipationStatus: "便通は2日に1回。緩下剤による調整中。",
-    physicalCondition: "肩こりあり。睡眠不足。",
-    mentalCondition: "気分の波は少ないが、不安感あり。",
-    mentalState: "EPDS 6点。相談支援を継続。",
-    familySupport: "夫が夜間授乳をサポート。実母が週2回訪問。",
-    careProvided: "肩甲骨周りのストレッチと温罨法を実施。",
-    babyCondition: "体重の増え良好。発熱なし。",
-    jaundiceLevel: "自然消退済み。",
-    umbilicalCordStatus: "乾燥し落下済み。",
-    feedingStatus: "母乳中心。夜間2回ミルク補足。",
-    carePlan: "肩こり対策のセルフケア継続。夜間1回の休息確保。",
-    guidance: "授乳姿勢の再確認。休息時間の確保方法を提案。",
-    paymentDetails: "産後ケア利用券 1枚使用。",
+    motherCondition: "バイタル正常、疲労感あり",
+    lochiaStatus: "淡血色、量は減少傾向",
+    episiotomyPain: "軽度の疼痛。傷は良好",
+    constipationStatus: "便通は2日に1回。緩下剤による調整中",
+    physicalCondition: "肩こりあり。睡眠不足",
+    mentalCondition: "気分の波は少なめ。不安感あり",
+    mentalState: "EPDS 6点。相談支援を継続",
+    familySupport: "夫が夜間授乳をサポート。実母が週2回訪問",
+    careProvided: "肩甲骨周りのストレッチと温罨法を実施",
+    babyCondition: "体重の増え良好。発熱なし",
+    jaundiceLevel: "自然消退済み",
+    umbilicalCordStatus: "乾燥し落下済み",
+    feedingStatus: "母乳中心。夜間2回ミルク補足",
+    carePlan: "肩こり対策のセルフケア継続。夜間1回は休息を確保",
+    guidance: "授乳姿勢の再確認。休息時間の確保方法を提案",
+    paymentDetails: "産後ケア利用券 1枚使用",
   },
 }
 
@@ -218,28 +218,10 @@ export function ChartsManager() {
     return sorted
   }, [filteredCharts, sortConfig])
 
-  const toggleSort = useCallback(
-    (key: SortKey) => {
-      setSortConfig((prev) => {
-        if (prev.key === key) {
-          return { key, direction: prev.direction === "asc" ? "desc" : "asc" }
-        }
-        return { key, direction: key === "patientName" ? "asc" : "desc" }
-      })
-    },
-    [],
-  )
-
-  const openNewChart = (type: ChartType) => {
-    setEditorState({ open: true, chart: null, type })
-  }
-
-  const openEditChart = (chart: ChartRecord) => {
-    setEditorState({ open: true, chart, type: chart.chartType })
-  }
-
-  const closeEditor = () => {
-    setEditorState({ open: false, chart: null, type: null })
+  const toggleSort = (key: SortKey) => {
+    setSortConfig((prev) =>
+      prev.key === key ? { key, direction: prev.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" },
+    )
   }
 
   const openDetails = (chart: ChartRecord) => {
@@ -248,6 +230,18 @@ export function ChartsManager() {
 
   const closeDetails = () => {
     setDetailsState({ open: false, chart: null })
+  }
+
+  const openEditChart = (chart: ChartRecord) => {
+    setEditorState({ open: true, chart, type: chart.chartType })
+  }
+
+  const openNewChart = (type: ChartType) => {
+    setEditorState({ open: true, chart: null, type })
+  }
+
+  const closeEditor = () => {
+    setEditorState({ open: false, chart: null, type: null })
   }
 
   const handleSaveChart = useCallback(
@@ -272,7 +266,7 @@ export function ChartsManager() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>カルテ管理</CardTitle>
+          <CardTitle>カルテ読込中</CardTitle>
           <CardDescription>ローカルストレージの読み込み中です…</CardDescription>
         </CardHeader>
         <CardContent>
@@ -287,17 +281,17 @@ export function ChartsManager() {
       <Card>
         <CardHeader className="gap-4 md:flex md:items-center md:justify-between">
           <div>
-            <CardTitle>カルテ管理</CardTitle>
+            <CardTitle>カルテ一覧</CardTitle>
             <CardDescription>乳房ケア・産後ケアのカルテをローカルストレージで管理します。</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => openNewChart("breast")} className="bg-rose-500 text-white hover:bg-rose-400">
               <Plus className="mr-2 h-4 w-4" />
-              乳房ケアカルテ新規
+              乳房ケアカルテ作成
             </Button>
             <Button variant="secondary" onClick={() => openNewChart("postpartum")}>
               <Plus className="mr-2 h-4 w-4" />
-              産後ケアカルテ新規
+              産後ケアカルテ作成
             </Button>
             <Button variant="outline" onClick={() => setTemplateDialog("breast")}>
               フォーマット（乳房ケア）
@@ -348,7 +342,7 @@ export function ChartsManager() {
                 {sortedCharts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
-                      条件に一致するカルテがありません。
+                      条件に一致するカルテはありません。
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -414,9 +408,9 @@ export function ChartsManager() {
           <DialogHeader>
             <DialogTitle>
               {editorState.chart
-                ? `カルテを編集（${chartTypeLabel[editorState.chart.chartType]}）`
+                ? `カルテ編集 — ${chartTypeLabel[editorState.chart.chartType]}`
                 : editorState.type
-                  ? `${chartTypeLabel[editorState.type]}カルテを作成`
+                  ? `${chartTypeLabel[editorState.type]}カルテ作成`
                   : "カルテ"}
             </DialogTitle>
           </DialogHeader>
@@ -476,3 +470,4 @@ export function ChartsManager() {
     </>
   )
 }
+
