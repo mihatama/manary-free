@@ -23,14 +23,12 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
   const userDisplayName = user?.signInDetails?.loginId ?? user?.username ?? "Manary User"
 
   return (
-    <div className="min-h-screen bg-[#ffeaed]">
+    <div className="min-h-screen bg-accent">
       <header className="border-b border-slate-200 bg-white">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#f47b9a]">Manary カルテダッシュボード</h1>
-            <p className="text-sm text-muted-foreground">
-              乳房ケア・産後ケアカルテをブラウザのローカルストレージで安全に管理します。
-            </p>
+            <h1 className="text-2xl font-bold text-primary">Manary カルテダッシュボード</h1>
+            <p className="text-sm text-muted-foreground">乳房ケア・産後ケアのカルテをブラウザのローカルストレージで安全に管理できます。</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">{userDisplayName}</span>
@@ -52,3 +50,4 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
     </div>
   )
 }
+
