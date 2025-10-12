@@ -8,8 +8,32 @@ import "@aws-amplify/ui-react/styles.css"
 import { RootProvider } from "@/components/providers/root-provider"
 
 export const metadata: Metadata = {
-  title: "Manary",
+  title: {
+    default: "Manary",
+    template: "%s | Manary",
+  },
   description: "Midwife-focused chart manager (local storage edition)",
+  applicationName: "Manary",
+  manifest: "/manifest.webmanifest",
+  themeColor: "#0ea5e9",
+  appleWebApp: {
+    capable: true,
+    title: "Manary",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icons/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" }],
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
 }
 
 export default function RootLayout({
