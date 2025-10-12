@@ -62,7 +62,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle className="text-center text-xl font-semibold text-slate-900">Manary にサインイン</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 login-auth">
         <ThemeProvider theme={loginTheme} colorMode="light">
           <Authenticator>
             {({ signOut, user }) => (

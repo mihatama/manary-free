@@ -92,3 +92,21 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.login-auth [data-amplify-authenticator] {
+  --amplify-components-authenticator-container-width-max: 100%;
+  --amplify-components-authenticator-router-background-color: transparent;
+  --amplify-components-authenticator-router-box-shadow: none;
+  --amplify-components-authenticator-router-border-width: 0;
+  --amplify-components-authenticator-router-border-color: transparent;
+  --amplify-components-authenticator-form-padding: 0;
+  width: 100%;
+}
+
+.login-auth [data-amplify-authenticator] [data-amplify-container] {
+  width: 100%;
+}
+
+.login-auth [data-amplify-authenticator] [data-amplify-router] {
+  border-radius: var(--radius);
+}
