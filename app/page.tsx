@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -36,7 +37,9 @@ export default function Home() {
           </section>
 
           <div className="mx-auto w-full max-w-md">
-            <LoginForm />
+            <Suspense fallback={<div className="text-center text-muted-foreground">Loading sign-in…</div>}>
+              <LoginForm />
+            </Suspense>
           </div>
         </div>
       </main>
