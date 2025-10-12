@@ -9,6 +9,36 @@ import { TrialStatusBanner } from "@/components/subscription/trial-status-banner
 import { useSubscription } from "@/components/providers/subscription-provider"
 import { Button } from "@/components/ui/button"
 import { ChartsManager } from "@/components/charts/charts-manager"
+import type { SubscriptionStatus } from "@/lib/subscription"
+
+type DashboardContentProps = {
+  user?: AuthUser
+  onSignOut: () => void | Promise<void>
+}
+
+function describePlan(status: SubscriptionStatus, remainingDays: number, backendStatus?: string | null) {
+  const normalizedDays = Math.max(remainingDays, 0)
+
+  switch (status) {
+    case "paid": {
+      if (backendStatus === "past_due" || backendStatus === "unpaid") {
+        return "Paid plan (payment needs attention)"
+      }
+      if (backendStatus === "trialing") {
+        return "Paid plan (billing provider trial)"
+      }
+      return "Paid plan"
+    }
+    case "trial": {
+      if (normalizedDays <= 0) {
+        return "Free plan (ends today)"
+      }
+      return `Free plan (${normalizedDays} day${normalizedDays === 1 ? "" : "s"} remaining)`
+    }
+    default:
+      return "Free plan (expired)"
+  }
+}
 
 export default function DashboardPage() {
   return (
@@ -18,15 +48,18 @@ export default function DashboardPage() {
   )
 }
 
-type DashboardContentProps = {
-  user?: AuthUser
-  onSignOut: () => void | Promise<void>
-}
-
 function DashboardContent({ user, onSignOut }: DashboardContentProps) {
   const router = useRouter()
-  const { isReady: isSubscriptionReady, status, productPagePath } = useSubscription()
+  const {
+    isReady: isSubscriptionReady,
+    status,
+    productPagePath,
+    remainingTrialDays,
+    state,
+  } = useSubscription()
+
   const userDisplayName = user?.signInDetails?.loginId ?? user?.username ?? "Manary User"
+  const currentPlan = describePlan(status, remainingTrialDays, state?.backendStatus)
 
   useEffect(() => {
     if (!isSubscriptionReady) {
@@ -40,7 +73,7 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
   if (!isSubscriptionReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-accent">
-        <p className="text-sm text-muted-foreground">利用状況を確認しています…</p>
+        <p className="text-sm text-muted-foreground">Confirming subscription status...</p>
       </div>
     )
   }
@@ -48,7 +81,7 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
   if (status === "expired") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-accent">
-        <p className="text-sm text-muted-foreground">無料期間が終了したため、商品ページへ移動します…</p>
+        <p className="text-sm text-muted-foreground">Your free trial has ended. Redirecting to the plans page...</p>
       </div>
     )
   }
@@ -58,20 +91,23 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
       <header className="border-b border-slate-200 bg-white">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Manary カルテダッシュボード</h1>
+            <h1 className="text-2xl font-bold text-primary">Manary Dashboard</h1>
             <p className="text-sm text-muted-foreground">
-              乳房ケア・産後ケアのカルテをブラウザのローカルストレージで安全に管理できます。
+              Manage breast-care and postpartum-care charts with encrypted local storage.
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{userDisplayName}</span>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-end gap-1 text-right">
+              <span className="text-sm font-medium text-primary">{userDisplayName}</span>
+              <span className="text-xs text-muted-foreground">Current plan: {currentPlan}</span>
+            </div>
             <Button
               variant="outline"
               onClick={() => {
                 void onSignOut()
               }}
             >
-              サインアウト
+              Sign out
             </Button>
           </div>
         </div>
