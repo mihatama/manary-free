@@ -1,105 +1,134 @@
 # Manary - Amplify Local Storage Edition
 
-Manary は助産院向けの予約・顧客管理アプリケーションです。このリポジトリでは、Supabase などの外部データベースを使わず、ブラウザの Web Storage（localStorage）に情報を保存する無料プラン向け構成へ刷新しています。Next.js で構築されているため、AWS Amplify を使って簡単にホスティングできます。
+Manary is a reservation and client-management app tailored for midwifery clinics. This edition keeps all reservation data inside the browser via `localStorage`, while administrator authentication is delegated to Amazon Cognito. The front end is built with Next.js (App Router) and deploys cleanly to AWS Amplify Hosting.
 
-## 主な特徴
+## Highlights
 
-- **ローカルストレージ管理**: 予約や管理者情報はすべてブラウザの localStorage に保存されます。バックエンドやデータベースは不要です。
-- **管理ダッシュボード**: 管理者ログイン後に予約の一覧を閲覧し、ステータス（確認待ち・確定・キャンセル）を更新できます。
-- **公開予約フォーム**: 利用者が `/reservation` ページから予約を登録すると、即座にダッシュボードに反映されます。
-- **AWS Amplify でのデプロイを想定**: ビルドコマンドや環境変数を必要としないため、Amplify に接続するだけでデプロイできます。
+- **Cognito sign-in** - Administrators authenticate through the Cognito Hosted UI, powered by NextAuth.js.
+- **Local data storage** - Reservations and service definitions live in the browser under the `manary-local-app-state` key; no database or backend is required.
+- **Dashboard tooling** - `/dashboard` exposes counts, status changes, and deletion controls for every reservation.
+- **Public reservation form** - `/reservation` allows clients to submit bookings that instantly appear on the dashboard.
+- **Amplify friendly** - Static output (`out/`) is ready for Amplify Hosting with no extra build scripting.
 
-## 技術スタック
+## Tech Stack
 
-- [Next.js 15 (App Router)](https://nextjs.org/)
-- [React 19](https://react.dev/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [shadcn/ui](https://ui.shadcn.com/) をベースにしたコンポーネント
-- データ保存: ブラウザ localStorage（`manary-local-app-state` キー）
+- Next.js 15 (App Router) + React 19
+- NextAuth.js 5 beta with Cognito provider
+- Tailwind CSS + shadcn/ui
+- TypeScript 5
 
-## プロジェクト構成
+## Directory Layout
 
-```text
+```
 manary-free/
 ├── app/
-│   ├── dashboard/          # 管理ダッシュボード
-│   ├── reservation/        # 公開予約フォーム
-│   ├── layout.tsx          # ルートレイアウト（プロバイダーをラップ）
-│   └── page.tsx            # ログインページ
+│   ├── api/auth/[...nextauth]/   # NextAuth route handler (Cognito)
+│   ├── dashboard/                # Admin dashboard
+│   ├── reservation/              # Public reservation form
+│   ├── layout.tsx                # Root layout with providers
+│   └── page.tsx                  # Landing page + Cognito login CTA
 ├── components/
-│   ├── providers/          # localStorage を扱うアプリケーションステート
-│   ├── login-form.tsx
-│   └── ui/                 # UI コンポーネント
-├── lib/                    # ユーティリティ（必要に応じて拡張）
-└── public/                 # 画像などの静的アセット
+│   ├── providers/                # Session + local state providers
+│   ├── login-form.tsx            # Cognito sign-in card
+│   └── ui/                       # shadcn/ui components
+├── lib/
+│   ├── auth.ts                   # NextAuth options (Cognito)
+│   ├── csrf.ts                   # CSRF helpers (reserved for future APIs)
+│   └── utils.ts                  # Tailwind utility helpers
+└── public/                       # Static assets
 ```
 
-## セットアップ手順
+## Local Development
 
-1. リポジトリをクローン
+```bash
+pnpm install
+pnpm dev
+# visit http://localhost:3000
+```
+
+Create a `.env.local` with the variables listed below before starting the dev server.
+
+### Required Environment Variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `COGNITO_CLIENT_ID` | ✅ | Cognito user-pool app client ID |
+| `COGNITO_CLIENT_SECRET` | ✅ | Cognito app client secret |
+| `COGNITO_REGION` | ✅ | Region, for example `ap-northeast-1` |
+| `COGNITO_USER_POOL_ID` | ✅ | User pool ID, for example `ap-northeast-1_XXXXXXXXX` |
+| `COGNITO_DOMAIN` | Optional | Hosted UI domain such as `https://example.auth.ap-northeast-1.amazoncognito.com` or your custom domain |
+| `COGNITO_ISSUER` | Optional | Overrides the inferred issuer URL (`https://cognito-idp.<region>.amazonaws.com/<userPoolId>`) |
+| `NEXTAUTH_SECRET` | ✅ | Random string for session signing (`openssl rand -base64 32`) |
+| `NEXTAUTH_URL` | ✅ (prod) | Public site URL, e.g. `https://yourapp.amplifyapp.com` |
+
+> Tip: if you supply `COGNITO_DOMAIN`, the app derives the `.well-known/openid-configuration` endpoint automatically. When omitted, the issuer derived from region + user-pool ID is used.
+
+### Cognito Hosted UI Checklist
+
+1. **App client** – Create a web app client (secret enabled) in the Cognito user pool.
+2. **Callback URLs** – Add `http://localhost:3000/api/auth/callback/cognito` for local testing (and the Amplify URL for production).
+3. **Sign-out URLs** – Add `http://localhost:3000` (and your production URL).
+4. **OAuth flows / scopes** – Enable `code` flow, scopes `openid`, `email`, `profile`.
+5. **Domain** – Reserve an AWS-hosted or custom domain for the Hosted UI.
+
+### Sign-in Flow Summary
+
+1. `/` displays the Cognito CTA.
+2. Clicking the button calls `signIn("cognito")` and redirects to Hosted UI.
+3. After Cognito authentication, the user lands on `/dashboard`.
+4. Selecting “Sign out” triggers Cognito logout and returns to `/`.
+
+### Local Storage Schema
+
+Data lives under `localStorage["manary-local-app-state"]` and looks like:
+
+```json
+{
+  "reservations": [
+    {
+      "id": "uuid",
+      "patientName": "Jane Doe",
+      "patientEmail": "sample@example.com",
+      "serviceTypeId": "prenatal",
+      "status": "pending"
+    }
+  ],
+  "serviceTypes": [
+    { "id": "prenatal", "name": "Prenatal check-up", "durationMinutes": 60 }
+  ]
+}
+```
+
+Use your browser dev tools to clear this key or call the `resetState` helper inside the dashboard if you need to reset the demo data.
+
+## Amplify Hosting Deployment
+
+1. Connect the repository in Amplify Hosting (GitHub or manual).
+2. Build settings:
    ```bash
-   git clone https://github.com/your-username/manary-free.git
-   cd manary-free
-   pnpm install   # または npm install / yarn install
+   pnpm install
+   pnpm build
    ```
-2. ローカル開発サーバーを起動
-   ```bash
-   pnpm dev
-   ```
-3. ブラウザで `http://localhost:3000` を開く
+   Output directory: `out`
+3. Configure the environment variables above for every target branch.
+4. After deployment, update Cognito callback/sign-out URLs to match the Amplify domain.
 
-### 初期アカウント
-
-- メールアドレス: `admin@manary.local`
-- パスワード: `password123`
-
-ログインするとダッシュボードが開き、`/reservation` で登録された予約が表示されます。登録したデータはブラウザの localStorage に保存され、同じブラウザであれば再訪時にも利用できます。
-
-## localStorage に保存されるデータ
-
-`manary-local-app-state` というキーに JSON 形式で保存されます。主な内容:
-
-- `adminUsers`: 管理者アカウントの配列
-- `currentUserId`: ログイン中のユーザー ID
-- `reservations`: 予約データ（患者情報、サービス種別、日時、メモ、ステータス）
-- `serviceTypes`: 予約可能なサービス種別（初期値として妊婦健診・産後ケア・乳房ケアを定義）
-
-**リセットしたい場合**はブラウザのデベロッパーツールから localStorage の該当キーを削除するか、ダッシュボードのコードに用意されている `resetState` 関数を呼び出してください。
-
-## AWS Amplify へのデプロイ
-
-以下は概要です。詳細なスクリーンショット付き手順や運用時の注意点は [`AMPLIFY_SETUP.md`](./AMPLIFY_SETUP.md) を参照してください。
-
-1. **GitHub リポジトリを Amplify に接続**
-   - AWS コンソールで Amplify Hosting を開き、「Deploy without Git」または「Deploy from GitHub」を選択。
-   - GitHub 連携を有効化してリポジトリとブランチを選択します。
-2. **ビルド設定**
-   - Build コマンド: `pnpm install && pnpm build`
-   - Start コマンドは不要です（Amplify が自動で静的出力を配信）。
-   - 環境変数は不要です。
-3. **バックエンド設定**
-   - この構成ではデータベースを使用しないため、Amplify Backend Environment の追加は不要です。
-4. **カスタムドメインや HTTPS**
-   - Amplify の画面から任意で設定できます。
-
-### Amplify CLI を使ったデプロイの例
+### Manual Publish (Amplify CLI)
 
 ```bash
 npm install -g @aws-amplify/cli
-amplify configure           # 初回のみ。IAM ユーザーを作成して認証情報を設定
-amplify init                # プロジェクトの初期化（Hosting のみ選択）
-amplify add hosting         # Amplify Hosting を追加（Continuous deployment with GitHub 等）
-amplify publish             # ホスティングにデプロイ
+amplify configure
+amplify init            # choose Hosting: Manual deployment
+pnpm install && pnpm build
+amplify publish         # uploads the ./out directory
 ```
 
-※ localStorage を利用しているため、ブラウザごと・端末ごとに保存内容が異なります。Amplify へデプロイした後もデータはユーザーのブラウザにのみ保存され、クラウドには送信されません。
+## Troubleshooting
 
-## カスタマイズのヒント
+- **Configuration error at sign-in** – Confirm all Cognito env vars (`COGNITO_CLIENT_ID`, `COGNITO_CLIENT_SECRET`, `COGNITO_REGION`, `COGNITO_USER_POOL_ID`) plus `NEXTAUTH_SECRET` are set in Amplify, and that Cognito callback URLs match your site.
+- **Data missing after refresh** – Ensure your browser allows localStorage for the domain. Each browser/device stores an isolated copy of the reservations.
+- **Need more admins?** – Add users directly in the Cognito user pool; no code changes are required.
 
-- `components/providers/app-state-provider.tsx` を編集すると、localStorage に保存する内容や初期データを変更できます。
-- サービス種別の追加・削除は同ファイルの `defaultServiceTypes` を変更してください。
-- 管理者アカウントを初期状態で複数登録したい場合は `defaultAdmin` 配列を編集します。
+---
 
-## ライセンス
-
-このプロジェクトの元コンテンツは MIT ライセンスで公開されています。詳細は `LICENSE` を参照してください。
+Feel free to raise an issue if you spot a bug or need enhancements.

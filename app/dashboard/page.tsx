@@ -44,6 +44,8 @@ export default function DashboardPage() {
     }
   }, [isReady, currentUser, router])
 
+  const userDisplayName = currentUser?.name ?? currentUser?.email ?? "Cognito User"
+
   const summary = useMemo(() => {
     const total = reservations.length
     const confirmed = reservations.filter((reservation) => reservation.status === "confirmed").length
@@ -74,9 +76,14 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">ローカルストレージで稼働するシンプルな予約管理</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{currentUser.name}</span>
-            <Button variant="outline" onClick={() => { logout(); router.replace("/") }}>
-              ログアウト
+            <span className="text-sm text-muted-foreground">{userDisplayName}</span>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void logout()
+              }}
+            >
+              Sign out
             </Button>
           </div>
         </div>

@@ -1,6 +1,8 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { signOut, useSession } from "next-auth/react"
+import type { DefaultSession } from "next-auth"
 import { v4 as uuidv4 } from "uuid"
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled"
@@ -25,33 +27,17 @@ type ServiceType = {
   durationMinutes: number
 }
 
-type AdminUser = {
-  id: string
-  email: string
-  password: string
-  name: string
-  createdAt: string
-}
-
 type AppState = {
-  adminUsers: AdminUser[]
-  currentUserId?: string
   reservations: Reservation[]
   serviceTypes: ServiceType[]
 }
-
-type AuthResult =
-  | { success: true }
-  | { success: false; error: string }
 
 type AppStateContextValue = {
   isReady: boolean
-  currentUser?: AdminUser
+  currentUser?: DefaultSession["user"]
   reservations: Reservation[]
   serviceTypes: ServiceType[]
-  login: (email: string, password: string) => AuthResult
-  logout: () => void
-  registerAdmin: (user: Omit<AdminUser, "id" | "createdAt"> & { password: string }) => AdminUser
+  logout: () => Promise<void>
   createReservation: (reservation: Omit<Reservation, "id" | "status" | "createdAt">) => Reservation
   updateReservationStatus: (id: string, status: ReservationStatus) => void
   deleteReservation: (id: string) => void
@@ -66,17 +52,7 @@ const defaultServiceTypes: ServiceType[] = [
   { id: "breast", name: "乳房ケア", durationMinutes: 45 },
 ]
 
-const defaultAdmin: AdminUser = {
-  id: "default-admin",
-  email: "admin@manary.local",
-  password: "password123",
-  name: "Default Admin",
-  createdAt: new Date().toISOString(),
-}
-
 const defaultState: AppState = {
-  adminUsers: [defaultAdmin],
-  currentUserId: undefined,
   reservations: [],
   serviceTypes: defaultServiceTypes,
 }
@@ -94,17 +70,16 @@ function loadState(): AppState {
       return defaultState
     }
 
-    const parsed = JSON.parse(stored) as AppState
+    const parsed = JSON.parse(stored) as Partial<AppState>
 
-    if (!parsed.serviceTypes || parsed.serviceTypes.length === 0) {
-      parsed.serviceTypes = defaultServiceTypes
+    const reservations = Array.isArray(parsed.reservations) ? parsed.reservations : []
+    const serviceTypes =
+      parsed.serviceTypes && parsed.serviceTypes.length > 0 ? parsed.serviceTypes : defaultServiceTypes
+
+    return {
+      reservations,
+      serviceTypes,
     }
-
-    if (!parsed.adminUsers || parsed.adminUsers.length === 0) {
-      parsed.adminUsers = [defaultAdmin]
-    }
-
-    return parsed
   } catch (error) {
     console.error("Failed to load local state", error)
     return defaultState
@@ -125,57 +100,24 @@ function persistState(state: AppState) {
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(defaultState)
-  const [isReady, setIsReady] = useState(false)
+  const [isLocalReady, setIsLocalReady] = useState(false)
+  const { data: session, status } = useSession()
 
   useEffect(() => {
     const initialState = loadState()
     setState(initialState)
-    setIsReady(true)
+    setIsLocalReady(true)
   }, [])
 
   useEffect(() => {
-    if (isReady) {
+    if (isLocalReady) {
       persistState(state)
     }
-  }, [state, isReady])
+  }, [state, isLocalReady])
 
-  const login = useCallback<AppStateContextValue["login"]>((email, password) => {
-    const user = state.adminUsers.find((admin) => admin.email === email.trim().toLowerCase())
-    if (!user || user.password !== password) {
-      return { success: false, error: "メールアドレスまたはパスワードが正しくありません。" }
-    }
-
-    setState((prev) => ({ ...prev, currentUserId: user.id }))
-    return { success: true }
-  }, [state.adminUsers])
-
-  const logout = useCallback(() => {
-    setState((prev) => ({ ...prev, currentUserId: undefined }))
+  const logout = useCallback(async () => {
+    await signOut({ callbackUrl: "/" })
   }, [])
-
-  const registerAdmin = useCallback<AppStateContextValue["registerAdmin"]>(({ email, name, password }) => {
-    const normalizedEmail = email.trim().toLowerCase()
-
-    const existingUser = state.adminUsers.find((admin) => admin.email === normalizedEmail)
-    if (existingUser) {
-      throw new Error("同じメールアドレスの管理者が既に存在します。")
-    }
-
-    const newAdmin: AdminUser = {
-      id: uuidv4(),
-      email: normalizedEmail,
-      password,
-      name,
-      createdAt: new Date().toISOString(),
-    }
-
-    setState((prev) => ({
-      ...prev,
-      adminUsers: [...prev.adminUsers, newAdmin],
-    }))
-
-    return newAdmin
-  }, [state.adminUsers])
 
   const createReservation = useCallback<AppStateContextValue["createReservation"]>((reservation) => {
     const newReservation: Reservation = {
@@ -186,8 +128,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
 
     setState((prev) => ({
-      ...prev,
       reservations: [...prev.reservations, newReservation],
+      serviceTypes: prev.serviceTypes,
     }))
 
     return newReservation
@@ -195,43 +137,52 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const updateReservationStatus = useCallback<AppStateContextValue["updateReservationStatus"]>((id, status) => {
     setState((prev) => ({
-      ...prev,
       reservations: prev.reservations.map((reservation) =>
         reservation.id === id ? { ...reservation, status } : reservation,
       ),
+      serviceTypes: prev.serviceTypes,
     }))
   }, [])
 
   const deleteReservation = useCallback<AppStateContextValue["deleteReservation"]>((id) => {
     setState((prev) => ({
-      ...prev,
       reservations: prev.reservations.filter((reservation) => reservation.id !== id),
+      serviceTypes: prev.serviceTypes,
     }))
   }, [])
 
   const resetState = useCallback(() => {
-    setState(defaultState)
+    setState({
+      reservations: [],
+      serviceTypes: defaultServiceTypes,
+    })
   }, [])
 
-  const contextValue = useMemo<AppStateContextValue>(() => {
-    const currentUser = state.currentUserId
-      ? state.adminUsers.find((admin) => admin.id === state.currentUserId)
-      : undefined
+  const isReady = isLocalReady && status !== "loading"
 
+  const contextValue = useMemo<AppStateContextValue>(() => {
     return {
       isReady,
-      currentUser,
+      currentUser: session?.user,
       reservations: state.reservations,
       serviceTypes: state.serviceTypes,
-      login,
       logout,
-      registerAdmin,
       createReservation,
       updateReservationStatus,
       deleteReservation,
       resetState,
     }
-  }, [isReady, state, login, logout, registerAdmin, createReservation, updateReservationStatus, deleteReservation, resetState])
+  }, [
+    isReady,
+    session?.user,
+    state.reservations,
+    state.serviceTypes,
+    logout,
+    createReservation,
+    updateReservationStatus,
+    deleteReservation,
+    resetState,
+  ])
 
   return <AppStateContext.Provider value={contextValue}>{children}</AppStateContext.Provider>
 }
