@@ -26,7 +26,7 @@ type SubscriptionContextValue = {
   encryptionKey?: string
   productPagePath: string
   remainingTrialDays: number
-  markAsPaid: (unlockCode: string) => Promise<boolean>
+  markAsPaid: (unlockCode: string) => Promise<{ success: boolean; state?: SubscriptionState; error?: string }>
   isUnlocking: boolean
   refresh: () => Promise<void>
 }
@@ -78,9 +78,11 @@ export function SubscriptionProvider({ children }: PropsWithChildren) {
       if (result.success && result.state) {
         setState(result.state)
         setIsReady(true)
-        return true
+      } else if (!result.success && result.state) {
+        setState(result.state)
+        setIsReady(true)
       }
-      return false
+      return result
     } finally {
       setIsUnlocking(false)
     }

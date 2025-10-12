@@ -22,39 +22,39 @@ export function UnlockForm() {
 
     const trimmed = code.trim()
     if (!trimmed) {
-      setError("ライセンスキーを入力してください。")
+      setError("Enter the unlock code.")
       return
     }
 
     const result = await markAsPaid(trimmed)
-    if (result) {
+    if (result.success) {
       setSuccess(true)
       router.replace("/dashboard")
       return
     }
 
-    setError("ライセンスキーを確認してください。")
+    setError(result.error ?? "Unable to validate the unlock code. Please recheck and try again.")
   }
 
   return (
     <form className="space-y-4 rounded-lg border border-border bg-background p-6 shadow-sm" onSubmit={handleSubmit}>
       <div className="space-y-2">
-        <Label htmlFor="unlock-code">ライセンスキー</Label>
+        <Label htmlFor="unlock-code">Unlock code</Label>
         <Input
           id="unlock-code"
-          placeholder="例: MANARY-PAID-2024"
+          placeholder="e.g. MANARY-PAID-2024"
           value={code}
           onChange={(event) => setCode(event.target.value)}
           disabled={isUnlocking || success}
         />
-        <p className="text-xs text-muted-foreground">決済時に発行されたライセンスキーを入力するとロックが解除されます。</p>
+        <p className="text-xs text-muted-foreground">Use the code delivered after checkout to restore access.</p>
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {success ? <p className="text-sm text-emerald-600">ロックを解除しました。ダッシュボードへ移動します…</p> : null}
+      {success ? <p className="text-sm text-emerald-600">Unlocked successfully. Redirecting to the dashboard...</p> : null}
 
       <Button type="submit" className="w-full" disabled={isUnlocking || success}>
-        {isUnlocking ? "解除中…" : "ロックを解除する"}
+        {isUnlocking ? "Verifying..." : "Unlock now"}
       </Button>
     </form>
   )

@@ -1,115 +1,117 @@
-# AWS Amplify でのセットアップ手順
+﻿# AWS Amplify Setup Guide
 
-このドキュメントでは、`manary-free`（ローカルストレージ版）を Amplify Hosting にデプロイし、Amplify Auth（Cognito）で認証を構築するまでの流れをまとめます。外部データベースは不要で、カルテはブラウザの `localStorage` に保存されます。
-
----
-
-## 前提条件
-
-- AWS アカウントと Amplify Hosting の利用権限を保有していること
-- Node.js 18.18+ もしくは 20+ と npm がインストール済みであること
-- Amplify CLI（Gen 2）がインストール済みであること  
-  `npm install -g @aws-amplify/cli`
+This guide walks through deploying `manary-free` (the local-storage edition of Manary) to AWS Amplify Hosting and wiring Amplify Auth (Amazon Cognito) for administrator sign-in. No external database is required; charts remain in the user’s browser `localStorage` and are encrypted while a subscription is active.
 
 ---
 
-## 1. リポジトリの準備
+## Prerequisites
+- AWS account with permission to use Amplify Hosting and Cognito.
+- Node.js 18.18+ (or 20+) with npm installed.
+- Amplify CLI (Gen 2) installed globally:
+  ```bash
+  npm install -g @aws-amplify/cli
+  ```
 
+---
+
+## 1. Clone the repository
 ```bash
 git clone https://github.com/mihatama/manary-free.git
 cd manary-free
 npm install
 ```
 
-> 初回は `amplify_outputs.json` がプレースホルダーになっています。後述の `amplify pull` を実行して実際の値に置き換えてください。
+> The repo ships with a placeholder `amplify_outputs.json`. Replace it after you finish the Amplify setup below.
 
 ---
 
-## 2. Amplify バックエンドを構築
-AWS 公式ドキュメント「[Build a backend > Auth](https://docs.amplify.aws/react/build-a-backend/auth/)」に沿って、以下のコマンドを実行します。
+## 2. Provision the Amplify backend
+Follow [Build a backend > Auth](https://docs.amplify.aws/react/build-a-backend/auth/) and run the commands in this order:
 
-1. **Amplify プロジェクトを初期化**
+1. **Initialize Amplify**
    ```bash
    amplify init
    ```
-   - フレームワークは **JavaScript / React** を選択
-   - 環境名は `dev` など任意で OK
+   - Framework: **JavaScript / React**
+   - Environment name: choose anything (for example `dev`)
 
-2. **認証機能を追加**
+2. **Add authentication**
    ```bash
    amplify add auth
    ```
-   - 「Default configuration」を選択すると Cognito ユーザープールが自動生成されます
-   - サインイン方法は `Email` または `Username` から選択（後から変更可能）
+   - Choose **Default configuration** to create a Cognito User Pool automatically
+   - Pick `Email` or `Username` as the primary sign-in field (can be adjusted later)
 
-3. **クラウドへデプロイ**
+3. **Deploy the backend**
    ```bash
    amplify push
    ```
-   - Cognito ユーザープールとクライアントアプリが作成されます
+   - This provisions the Cognito User Pool and app clients
 
-4. **フロントエンド向けに設定を取得**
+4. **Pull generated outputs for the frontend**
    ```bash
-   amplify pull --appId <AmplifyアプリID> --envName <環境名>
+   amplify pull --appId <amplify-app-id> --envName <env>
    ```
-   - もしくは `amplify push` 後に表示される案内に従って pull してください
-   - このコマンドが `amplify_outputs.json` を更新します
+   - Alternatively accept the prompt shown after `amplify push`
+   - This refreshes `amplify_outputs.json` with the new resources
 
-> `amplify_outputs.json` をリポジトリにコミットしても構わない運用であれば、そのまま管理してください。秘匿したい場合は Amplify Hosting のビルドステップでファイルを注入する仕組み（Artifact ルールや SSM パラメータなど）を別途用意します。
+> If you can safely commit `amplify_outputs.json`, do so. Otherwise inject it in your CI/CD build (for example with SSM Parameter Store or Amplify Hosting environment variables).
 
 ---
 
-## 3. ローカルでの動作確認
+## 3. Configure environment variables
+Create `.env.local` (and matching production secrets) with at least:
+
 ```bash
-npm run dev
-# http://localhost:3000 にアクセス
+NEXT_PUBLIC_UNLOCK_CODE=PROD-UNLOCK-XYZ
+# Optional billing backend
+# BILLING_SERVICE_URL=https://billing.example.com/api
+# BILLING_SERVICE_API_KEY=sk_live_...
 ```
 
-- `/` に Amplify Auth のサインイン UI が表示され、ログイン成功で `/dashboard` に遷移します。
-- カルテはブラウザの `localStorage["manary-free-charts-state"]` に保存されます（端末やブラウザを跨いで共有されません）。
+- `NEXT_PUBLIC_UNLOCK_CODE` seals the client-side encryption key and unlocks the dashboard after payment.
+- If you supply `BILLING_SERVICE_URL`, the app will POST to `/subscriptions/verify` on that service; otherwise it uses the local fixture in `data/subscriptions-dev.json` (development only).
 
 ---
 
-## 4. Amplify Hosting へのデプロイ
+## 4. Run locally
+```bash
+npm run dev
+# open http://localhost:3000
+```
 
-1. Amplify コンソールで **Amplify Hosting** → **Deploy without Git** または **GitHub 連携** を選択
-2. ビルドコマンドを設定
+- `/` shows the Amplify Auth `Authenticator` UI. Signing in redirects to `/dashboard`.
+- Chart data is encrypted and stored in `localStorage["manary-free-charts-state"]`. When billing lapses the encryption key is discarded until payment resumes.
+
+---
+
+## 5. Deploy to Amplify Hosting
+
+### Git-connected workflow
+1. Connect the repository in Amplify Hosting.
+2. Set build commands:
    ```bash
    npm install
    npm run build
    ```
-   出力ディレクトリ: `out`
-3. ビルド前に `amplify_outputs.json` が正しい値に置き換わっていることを確認
-4. デプロイ後、発行された Amplify ドメインで動作を確認
+   Output directory: `out`
+3. Provide environment variables (`NEXT_PUBLIC_UNLOCK_CODE`, billing settings, etc.) and ensure `amplify_outputs.json` is present during build.
+4. Deploy and verify the generated domain.
 
-### Amplify CLI での手動デプロイ
-
+### Manual publish via Amplify CLI
 ```bash
-npm run build            # out/ に静的ファイルが生成される
-amplify publish          # Amplify Hosting (S3 + CloudFront) にアップロード
+npm run build            # generates ./out
+amplify publish          # uploads to Amplify Hosting (S3 + CloudFront)
 ```
 
 ---
 
-## 5. よくある質問
-
-### Q. データは Amplify に保存されますか？
-A. いいえ。カルテはすべてブラウザの `localStorage` に保存されます。端末やブラウザが変わると共有されません。
-
-### Q. ログインできない場合は？
-A. `amplify_outputs.json` の値が最新か確認してください。Amplify の環境を作り直した場合は `amplify pull` で再取得が必要です。また、ユーザーが Cognito ユーザープールに存在するか確認してください。
-
-### Q. `amplify_outputs.json` を公開したくないのですが？
-A. GitHub にコミットしない運用にする場合は、Amplify Hosting のビルドステップで SSM パラメータや Secrets Manager からファイルを生成するスクリプトを追加してください。
+## 6. Operations checklist
+- Manage administrators in the Cognito User Pool created by Amplify Auth.
+- To reset charts on a machine, delete `localStorage["manary-free-charts-state"]` and `localStorage["manary-free-subscription-state"]` in the browser dev tools.
+- Keep `NEXT_PUBLIC_UNLOCK_CODE` in sync with whatever code your billing backend issues to customers.
+- If you use the fallback fixture, remove or replace `data/subscriptions-dev.json` for production builds.
 
 ---
 
-## 6. 運用メモ
-
-- 管理者（助産師／スタッフ）の追加・削除は Amplify Auth（Cognito ユーザープール）で行います。
-- カルテを初期化したい場合はブラウザの開発者ツールから `localStorage["manary-free-charts-state"]` を削除してください。
-- Amplify Hosting のビルドログはコンソールの **Build details** から確認できます。
-
----
-
-Amplify Auth や UI カスタマイズの詳細は [Amplify UI ドキュメント](https://ui.docs.amplify.aws/react/connected-components/authenticator) を参照してください。質問や改善案があれば Issue からお知らせください。
+For UI customization details, visit the [Amplify UI Authenticator documentation](https://ui.docs.amplify.aws/react/connected-components/authenticator). Open an issue if you hit any snags or have improvement ideas.

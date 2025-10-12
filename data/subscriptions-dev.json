@@ -1,0 +1,10 @@
+﻿[
+  {
+    "unlockCode": "MANARY-UNLOCK-CODE",
+    "status": "active",
+    "trialEndsAt": "2025-11-10T00:00:00.000Z",
+    "currentPeriodEndsAt": "2099-12-31T00:00:00.000Z",
+    "lastPaymentStatus": "paid",
+    "message": "Using local billing fixture."
+  }
+]

@@ -23,19 +23,19 @@ function validate(fields: {
 
   const trimmedNumber = fields.cardNumber.replace(/\s+/g, "")
   if (!/^\d{13,19}$/.test(trimmedNumber)) {
-    errors.cardNumber = "カード番号を正しく入力してください。"
+    errors.cardNumber = "Please enter a valid card number."
   }
 
   if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(fields.expiry.trim())) {
-    errors.expiry = "有効期限は MM/YY 形式で入力してください。"
+    errors.expiry = "Use the MM/YY format for the expiry date."
   }
 
   if (!/^\d{3,4}$/.test(fields.cvc.trim())) {
-    errors.cvc = "CVC/CVV は 3〜4 桁で入力してください。"
+    errors.cvc = "CVC/CVV must be a 3-4 digit number."
   }
 
   if (fields.cardholder.trim().length === 0) {
-    errors.cardholder = "カード名義人を入力してください。"
+    errors.cardholder = "Enter the cardholder name."
   }
 
   return errors
@@ -65,7 +65,7 @@ export function CardPaymentForm() {
     }
 
     if (!AUTO_UNLOCK_CODE) {
-      setError("決済設定が完了していません。管理者にお問い合わせください。")
+      setError("Auto unlock code is not configured. Please contact an administrator.")
       return
     }
 
@@ -73,9 +73,9 @@ export function CardPaymentForm() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 1400))
 
-      const unlocked = await markAsPaid(AUTO_UNLOCK_CODE)
-      if (!unlocked) {
-        setError("決済結果の確認に失敗しました。もう一度お試しください。")
+      const result = await markAsPaid(AUTO_UNLOCK_CODE)
+      if (!result.success) {
+        setError(result.error ?? "Failed to confirm the billing status. Please try again.")
         return
       }
 
@@ -91,7 +91,7 @@ export function CardPaymentForm() {
   return (
     <form className="space-y-4 rounded-lg border border-border bg-background p-6 shadow-sm" onSubmit={handleSubmit}>
       <div className="space-y-2">
-        <Label htmlFor="card-number">カード番号</Label>
+        <Label htmlFor="card-number">Card number</Label>
         <Input
           id="card-number"
           inputMode="numeric"
@@ -105,7 +105,7 @@ export function CardPaymentForm() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="card-expiry">有効期限</Label>
+          <Label htmlFor="card-expiry">Expiry</Label>
           <Input
             id="card-expiry"
             placeholder="09/27"
@@ -130,10 +130,10 @@ export function CardPaymentForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="card-holder">カード名義人</Label>
+        <Label htmlFor="card-holder">Cardholder name</Label>
         <Input
           id="card-holder"
-          placeholder="山田 花子"
+          placeholder="Jane Smith"
           value={cardholder}
           onChange={(event) => setCardholder(event.target.value)}
           disabled={isUnlocking || isProcessing || success}
@@ -142,14 +142,14 @@ export function CardPaymentForm() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        入力内容はブラウザでのみ検証され、外部には送信されません。実際の決済サービスと連携する際は、該当サービスの推奨する SDK を組み込んでください。
+        These inputs simulate validation only. Real card data is never sent. Integrate your payment gateway SDK for production transactions.
       </p>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {success ? <p className="text-sm text-emerald-600">決済が完了しました。ダッシュボードへ移動します…</p> : null}
+      {success ? <p className="text-sm text-emerald-600">Payment confirmed. Redirecting to the dashboard...</p> : null}
 
       <Button type="submit" className="w-full" disabled={isUnlocking || isProcessing || success}>
-        {isProcessing || isUnlocking ? "決済処理中…" : "カードで決済する"}
+        {isProcessing || isUnlocking ? "Verifying..." : "Complete with card"}
       </Button>
     </form>
   )
