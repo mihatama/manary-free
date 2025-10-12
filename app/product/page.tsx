@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 
+import { CardPaymentForm } from "@/components/subscription/card-payment-form"
 import { UnlockForm } from "@/components/subscription/unlock-form"
 import { Button } from "@/components/ui/button"
 
@@ -26,6 +27,14 @@ export default function ProductPage() {
           </div>
         </section>
 
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">カードで今すぐアップグレード</h2>
+          <p className="text-sm text-muted-foreground">
+            決済が完了すると、自動的にロックが解除され、過去のカルテデータを含め継続利用できるようになります。
+          </p>
+          <CardPaymentForm />
+        </section>
+
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">製品の詳細を見る</h2>
           <p className="text-sm text-muted-foreground">
@@ -39,7 +48,7 @@ export default function ProductPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold">すでに購入済みの方</h2>
+          <h2 className="text-xl font-semibold">ライセンスキーをお持ちの方</h2>
           <p className="text-sm text-muted-foreground">
             決済時に付与されたライセンスキーを入力すると、暗号化されたカルテデータを復元しダッシュボードへ戻ります。
           </p>
