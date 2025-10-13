@@ -17,23 +17,42 @@ export interface ChartBase {
   memo?: string
 }
 
+export interface ChartFeeItem {
+  label: string
+  price?: number | null
+  selected?: boolean
+}
+
 export interface BreastCareChartData {
+  childName?: string
+  childBirthDate?: string
+  childAgeYears?: number | null
+  childAgeMonths?: number | null
+  childAgeDays?: number | null
   chartNumber?: string
   traineeName?: string
-  clinicLocation: string[]
+  clinicLocation?: string | null
   bodyWeight?: number | null
   weightGainPerDay?: number | null
   breastMilkInterval?: string
+  breastMilkIntervalDay?: string
+  breastMilkIntervalNight?: string
   milkVolumeDay?: string
   milkVolumeNight?: string
   formulaFeedsPerDay?: number | null
+  formulaFeedsDaytime?: number | null
+  formulaFeedsNighttime?: number | null
   formulaVolumePerFeed?: string
+  expressedMilkFrequency?: number | null
+  expressedMilkVolumePerFeed?: number | null
   weaningFeedsPerDay?: number | null
   weaningDetails?: string
   stoolFrequency?: number | null
+  urinationFrequency?: number | null
   stoolConsistency?: string
   babyDevelopment?: string
   weaningStatus?: string
+  weaningCompletionDay?: string
   subjectiveNote?: string
   planNote?: string
   breastShape?: string
@@ -53,13 +72,7 @@ export interface BreastCareChartData {
   recommendations?: string
   diagnosis?: string
   paymentMethod?: string
-  initialConsultationFee?: boolean
-  singleSessionFee?: boolean
-  ticketFee?: boolean
-  rentalTowelFee?: boolean
-  careTowelFee?: boolean
-  otherFee?: number | null
-  otherFeeDescription?: string | null
+  fees?: ChartFeeItem[]
 }
 
 export interface PostpartumCareChartData {

@@ -3,7 +3,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { v4 as uuidv4 } from "uuid"
 
-import type { ChartPayload, ChartRecord, BreastCareChartData, PostpartumCareChartData, BreastDiagram } from "@/lib/chart-types"
+import type {
+  ChartPayload,
+  ChartRecord,
+  BreastCareChartData,
+  PostpartumCareChartData,
+  BreastDiagram,
+  ChartFeeItem,
+} from "@/lib/chart-types"
 import { decryptToString, encryptString } from "@/lib/encryption"
 import { getEncryptedStateKey } from "@/lib/subscription"
 import { useSubscription } from "./subscription-provider"
@@ -71,6 +78,47 @@ function normalizeStringArray(value: unknown): string[] {
   return []
 }
 
+function normalizeFees(value: unknown): ChartFeeItem[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null
+      }
+      const record = item as Record<string, unknown>
+      const label = normalizeString(record.label)
+
+      let price: number | null | undefined
+      if (typeof record.price === "number" || record.price === null) {
+        price = normalizeNumber(record.price)
+      } else if (typeof record.price === "string") {
+        const trimmed = record.price.trim()
+        if (trimmed.length === 0) {
+          price = null
+        } else {
+          const parsed = Number(trimmed.replace(/,/g, ""))
+          price = Number.isFinite(parsed) ? parsed : undefined
+        }
+      }
+
+      const selected = typeof record.selected === "boolean" ? record.selected : undefined
+
+      if (!label && price === undefined) {
+        return null
+      }
+
+      return {
+        label: label ?? (price !== undefined && price !== null ? "" : "未設定"),
+        price: price ?? null,
+        selected,
+      }
+    })
+    .filter((item): item is ChartFeeItem => item !== null)
+}
+
 function normalizeDiagram(value: unknown): BreastDiagram {
   if (!value || typeof value !== "object") {
     return {}
@@ -111,32 +159,133 @@ function normalizeDiagram(value: unknown): BreastDiagram {
   return normalized
 }
 
+function calculateAgeParts(birthDate?: string | null, referenceDate?: string | null) {
+  if (!birthDate || !referenceDate) {
+    return null
+  }
+
+  const birth = new Date(`${birthDate.slice(0, 10)}T00:00:00`)
+  const reference = new Date(`${referenceDate.slice(0, 10)}T00:00:00`)
+
+  if (Number.isNaN(birth.getTime()) || Number.isNaN(reference.getTime()) || reference < birth) {
+    return null
+  }
+
+  let years = reference.getFullYear() - birth.getFullYear()
+  let months = reference.getMonth() - birth.getMonth()
+  let days = reference.getDate() - birth.getDate()
+
+  if (days < 0) {
+    months -= 1
+    const previousMonthLastDay = new Date(reference.getFullYear(), reference.getMonth(), 0).getDate()
+    days += previousMonthLastDay
+  }
+
+  if (months < 0) {
+    years -= 1
+    months += 12
+  }
+
+  if (years < 0) {
+    return null
+  }
+
+  return { years, months, days }
+}
+
 function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCareChartData {
+  const rawClinicLocation = (data as Record<string, unknown> | undefined)?.clinicLocation
+  let normalizedClinicLocation = normalizeString(rawClinicLocation)
+  if (!normalizedClinicLocation && Array.isArray(rawClinicLocation)) {
+    const joined = rawClinicLocation
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter((item) => item.length > 0)
+      .join("、")
+    normalizedClinicLocation = joined.length > 0 ? joined : undefined
+  }
+
+  const normalizedNippleAreola = normalizeStringArray((data as Record<string, unknown> | undefined)?.nippleAreolaCondition)
+  const normalizedPainLocation = normalizeStringArray((data as Record<string, unknown> | undefined)?.painLocation)
+  let normalizedFees = normalizeFees((data as Record<string, unknown> | undefined)?.fees)
+
+  if (
+    normalizedFees.length === 0 &&
+    (data as Record<string, unknown> | undefined)
+  ) {
+    const legacy: ChartFeeItem[] = []
+
+    const legacyMap: Array<{ key: string; label: string; price: number }> = [
+      { key: "initialConsultationFee", label: "初診料", price: 1000 },
+      { key: "singleSessionFee", label: "1回", price: 5500 },
+      { key: "ticketFee", label: "チケット", price: 14850 },
+      { key: "rentalTowelFee", label: "レンタルタオル", price: 350 },
+      { key: "careTowelFee", label: "ケアタオル", price: 250 },
+    ]
+
+    for (const item of legacyMap) {
+      const value = normalizeBoolean((data as Record<string, unknown>)[item.key])
+      if (value) {
+        legacy.push({
+          label: item.label,
+          price: item.price,
+          selected: true,
+        })
+      }
+    }
+
+    const otherFee = normalizeNumber((data as Record<string, unknown>).otherFee)
+    const otherLabel = normalizeString((data as Record<string, unknown>).otherFeeDescription)
+    if (otherFee !== undefined) {
+      legacy.push({
+        label: `その他${otherLabel ? `（${otherLabel}）` : ""}`,
+        price: otherFee,
+        selected: true,
+      })
+    }
+
+    if (legacy.length > 0) {
+      normalizedFees = legacy
+    }
+  }
+
   return {
+    childName: normalizeString((data as Record<string, unknown> | undefined)?.childName),
+    childBirthDate: normalizeString((data as Record<string, unknown> | undefined)?.childBirthDate),
+    childAgeYears: normalizeNumber((data as Record<string, unknown> | undefined)?.childAgeYears),
+    childAgeMonths: normalizeNumber((data as Record<string, unknown> | undefined)?.childAgeMonths),
+    childAgeDays: normalizeNumber((data as Record<string, unknown> | undefined)?.childAgeDays),
     chartNumber: normalizeString(data?.chartNumber),
     traineeName: normalizeString(data?.traineeName),
-    clinicLocation: normalizeStringArray(data?.clinicLocation),
+    clinicLocation: normalizedClinicLocation ?? null,
     bodyWeight: normalizeNumber(data?.bodyWeight),
     weightGainPerDay: normalizeNumber(data?.weightGainPerDay),
     breastMilkInterval: normalizeString(data?.breastMilkInterval),
+    breastMilkIntervalDay: normalizeString((data as Record<string, unknown> | undefined)?.breastMilkIntervalDay),
+    breastMilkIntervalNight: normalizeString((data as Record<string, unknown> | undefined)?.breastMilkIntervalNight),
     milkVolumeDay: normalizeString(data?.milkVolumeDay),
     milkVolumeNight: normalizeString(data?.milkVolumeNight),
     formulaFeedsPerDay: normalizeNumber(data?.formulaFeedsPerDay),
+    formulaFeedsDaytime: normalizeNumber((data as Record<string, unknown> | undefined)?.formulaFeedsDaytime),
+    formulaFeedsNighttime: normalizeNumber((data as Record<string, unknown> | undefined)?.formulaFeedsNighttime),
     formulaVolumePerFeed: normalizeString(data?.formulaVolumePerFeed),
+    expressedMilkFrequency: normalizeNumber((data as Record<string, unknown> | undefined)?.expressedMilkFrequency),
+    expressedMilkVolumePerFeed: normalizeNumber((data as Record<string, unknown> | undefined)?.expressedMilkVolumePerFeed),
     weaningFeedsPerDay: normalizeNumber(data?.weaningFeedsPerDay),
     weaningDetails: normalizeString(data?.weaningDetails),
     stoolFrequency: normalizeNumber(data?.stoolFrequency),
+    urinationFrequency: normalizeNumber((data as Record<string, unknown> | undefined)?.urinationFrequency),
     stoolConsistency: normalizeString(data?.stoolConsistency),
     babyDevelopment: normalizeString(data?.babyDevelopment),
     weaningStatus: normalizeString(data?.weaningStatus),
+    weaningCompletionDay: normalizeString((data as Record<string, unknown> | undefined)?.weaningCompletionDay),
     subjectiveNote: normalizeString(data?.subjectiveNote),
     planNote: normalizeString(data?.planNote),
     breastShape: normalizeString(data?.breastShape),
     nippleShieldUsed: normalizeBoolean(data?.nippleShieldUsed),
     pumpingFrequency: normalizeString(data?.pumpingFrequency),
     pumpingMethod: normalizeString(data?.pumpingMethod),
-    nippleAreolaCondition: normalizeStringArray(data?.nippleAreolaCondition),
-    painLocation: normalizeStringArray(data?.painLocation),
+    nippleAreolaCondition: normalizedNippleAreola,
+    painLocation: normalizedPainLocation,
     feedingPosition: normalizeString(data?.feedingPosition),
     familySupportStatus: normalizeString(data?.familySupportStatus),
     breastDiagramRight: normalizeDiagram(data?.breastDiagramRight),
@@ -148,13 +297,7 @@ function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCar
     recommendations: normalizeString(data?.recommendations),
     diagnosis: normalizeString(data?.diagnosis),
     paymentMethod: normalizeString(data?.paymentMethod),
-    initialConsultationFee: normalizeBoolean(data?.initialConsultationFee),
-    singleSessionFee: normalizeBoolean(data?.singleSessionFee),
-    ticketFee: normalizeBoolean(data?.ticketFee),
-    rentalTowelFee: normalizeBoolean(data?.rentalTowelFee),
-    careTowelFee: normalizeBoolean(data?.careTowelFee),
-    otherFee: normalizeNumber(data?.otherFee),
-    otherFeeDescription: normalizeString(data?.otherFeeDescription),
+    fees: normalizedFees,
   }
 }
 
@@ -282,6 +425,25 @@ function normalizeChartPayload(payload: ChartPayload, timestamp: string, existin
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
     data: chartType === "breast" ? normalizeBreastCareData(payload.data) : normalizePostpartumCareData(payload.data),
+  }
+
+  if (base.chartType === "breast") {
+    const age = calculateAgeParts(
+      (base.data as BreastCareChartData).childBirthDate,
+      base.visitDate,
+    )
+    if (age) {
+      const breastData = base.data as BreastCareChartData
+      if (breastData.childAgeYears === undefined || breastData.childAgeYears === null) {
+        breastData.childAgeYears = age.years
+      }
+      if (breastData.childAgeMonths === undefined || breastData.childAgeMonths === null) {
+        breastData.childAgeMonths = age.months
+      }
+      if (breastData.childAgeDays === undefined || breastData.childAgeDays === null) {
+        breastData.childAgeDays = age.days
+      }
+    }
   }
 
   return base

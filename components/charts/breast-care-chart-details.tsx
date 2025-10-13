@@ -29,6 +29,39 @@ const formatNumber = (value?: number | null, unit?: string) => {
   return `${value.toLocaleString()}${unit ?? ""}`
 }
 
+const formatDateValue = (value?: string | null) => {
+  if (!value) {
+    return <span className="text-muted-foreground">未入力</span>
+  }
+
+  const iso = value.length > 10 ? value : `${value}T00:00:00`
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleDateString("ja-JP")
+}
+
+const formatChildAge = (years?: number | null, months?: number | null, days?: number | null) => {
+  const parts: string[] = []
+  if (years !== null && years !== undefined && !Number.isNaN(years)) {
+    parts.push(`${years}歳`)
+  }
+  if (months !== null && months !== undefined && !Number.isNaN(months)) {
+    parts.push(`${months}か月`)
+  }
+  if (days !== null && days !== undefined && !Number.isNaN(days)) {
+    parts.push(`${days}日目`)
+  }
+
+  if (parts.length === 0) {
+    return <span className="text-muted-foreground">未入力</span>
+  }
+
+  return parts.join(" ")
+}
+
 export function BreastCareChartDetails({ chart }: { chart: BreastCareChartRecord }) {
   const data = chart.data
 
@@ -45,7 +78,10 @@ export function BreastCareChartDetails({ chart }: { chart: BreastCareChartRecord
           <DetailItem label="カルテ番号" value={data.chartNumber} />
           <DetailItem label="担当助産師" value={chart.practitionerName} />
           <DetailItem label="研修生" value={data.traineeName} />
-          <DetailItem label="場所" value={data.clinicLocation?.join("、")} />
+          <DetailItem label="お子様名前" value={data.childName} />
+          <DetailItem label="生年月日" value={formatDateValue(data.childBirthDate)} />
+          <DetailItem label="年齢（○歳○か月○日目）" value={formatChildAge(data.childAgeYears, data.childAgeMonths, data.childAgeDays)} />
+          <DetailItem label="場所" value={data.clinicLocation} />
           <DetailItem label="赤ちゃん体重" value={formatNumber(data.bodyWeight, "g")} />
           <DetailItem label="1日増加量" value={formatNumber(data.weightGainPerDay, "g")} />
           <DetailItem label="メモ" value={chart.memo} />
@@ -57,11 +93,17 @@ export function BreastCareChartDetails({ chart }: { chart: BreastCareChartRecord
           <CardTitle className="text-lg">授乳・栄養情報</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <DetailItem label="母乳間隔" value={data.breastMilkInterval} />
+          <DetailItem label="母乳間隔（備考）" value={data.breastMilkInterval} />
+          <DetailItem label="母乳間隔（日中）" value={data.breastMilkIntervalDay} />
+          <DetailItem label="母乳間隔（夜間）" value={data.breastMilkIntervalNight} />
+          <DetailItem label="搾乳回数 / 日" value={formatNumber(data.expressedMilkFrequency, "回")} />
+          <DetailItem label="搾乳量 / 回" value={formatNumber(data.expressedMilkVolumePerFeed, "ml")} />
           <DetailItem label="ミルク（日中）" value={data.milkVolumeDay} />
           <DetailItem label="ミルク（夜間）" value={data.milkVolumeNight} />
           <DetailItem label="搾母乳 / ミルク量" value={data.formulaVolumePerFeed} />
           <DetailItem label="ミルク回数 / 日" value={formatNumber(data.formulaFeedsPerDay, "回")} />
+          <DetailItem label="ミルク回数（日中）" value={formatNumber(data.formulaFeedsDaytime, "回")} />
+          <DetailItem label="ミルク回数（夜間）" value={formatNumber(data.formulaFeedsNighttime, "回")} />
           <DetailItem label="離乳食回数 / 日" value={formatNumber(data.weaningFeedsPerDay, "回")} />
           <DetailItem label="離乳食の内容" value={data.weaningDetails} />
         </CardContent>
@@ -73,9 +115,11 @@ export function BreastCareChartDetails({ chart }: { chart: BreastCareChartRecord
         </CardHeader>
         <CardContent className="space-y-2">
           <DetailItem label="排便回数 / 日" value={formatNumber(data.stoolFrequency, "回")} />
+          <DetailItem label="排尿回数 / 日" value={formatNumber(data.urinationFrequency, "回")} />
           <DetailItem label="便性状" value={data.stoolConsistency} />
           <DetailItem label="発達の様子" value={data.babyDevelopment} />
           <DetailItem label="離乳の進み具合" value={data.weaningStatus} />
+          <DetailItem label="卒乳 / 断乳 日目" value={data.weaningCompletionDay} />
         </CardContent>
       </Card>
 
@@ -136,28 +180,24 @@ export function BreastCareChartDetails({ chart }: { chart: BreastCareChartRecord
           <DetailItem label="会計方法" value={data.paymentMethod} />
           <div className="space-y-2">
             <Label className="text-sm font-semibold">会計項目</Label>
-            <div className="flex flex-wrap gap-3 text-sm">
-              <span className={!data.initialConsultationFee ? "text-muted-foreground line-through" : undefined}>
-                初診料 1,000円
-              </span>
-              <span className={!data.singleSessionFee ? "text-muted-foreground line-through" : undefined}>
-                1回 5,500円
-              </span>
-              <span className={!data.ticketFee ? "text-muted-foreground line-through" : undefined}>チケット 14,850円</span>
-              <span className={!data.rentalTowelFee ? "text-muted-foreground line-through" : undefined}>
-                レンタルタオル 350円
-              </span>
-              <span className={!data.careTowelFee ? "text-muted-foreground line-through" : undefined}>
-                ケアタオル 250円
-              </span>
-            </div>
+            {data.fees && data.fees.length > 0 ? (
+              <ul className="space-y-1 text-sm">
+                {data.fees.map((fee, index) => (
+                  <li key={`${fee.label ?? "fee"}-${index}`} className="flex items-center justify-between">
+                    <span className={fee.selected === false ? "text-muted-foreground line-through" : undefined}>
+                      {fee.label || `項目${index + 1}`}
+                    </span>
+                    <span className="ml-4 text-right">
+                      {fee.price !== undefined && fee.price !== null ? `${fee.price.toLocaleString()}円` : "金額未設定"}
+                      {fee.selected === false ? <span className="ml-2 text-xs">(適用なし)</span> : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="text-sm text-muted-foreground">会計項目は登録されていません。</span>
+            )}
           </div>
-          {data.otherFee !== undefined && data.otherFee !== null ? (
-            <DetailItem
-              label={`その他${data.otherFeeDescription ? `（${data.otherFeeDescription}）` : ""}`}
-              value={`${data.otherFee.toLocaleString()}円`}
-            />
-          ) : null}
         </CardContent>
       </Card>
     </div>
