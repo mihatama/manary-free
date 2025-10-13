@@ -324,7 +324,7 @@ function PaymentSummary({ formValues }: PaymentSummaryProps) {
   return (
     <div className="rounded-md border border-dashed p-3">
       <div className="text-xs font-semibold text-muted-foreground">会計サマリー</div>
-      <div className="mt-1 whitespace-pre-wrap text-sm">{items.length > 0 ? items.join("\n") : "未選抁E}</div>
+      <div className="mt-1 whitespace-pre-wrap text-sm">{items.length > 0 ? items.join("\n") : "未選択"}</div>
     </div>
   )
 }
