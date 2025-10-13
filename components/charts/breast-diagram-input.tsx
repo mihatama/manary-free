@@ -126,143 +126,127 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
     [storageKey],
   )
 
-  useEffect(() => {
-    const nextMarkers = normalizedValue.markers ?? {}
-    setMarkers((prev) => (markersEqual(prev, nextMarkers) ? prev : nextMarkers))
-
-    if (readOnly) {
-      const readOnlyImage = normalizedValue.imageData ?? undefined
-      setImageData((prev) => (prev === readOnlyImage ? prev : readOnlyImage))
-      return
-    }
-
-    const storedImage = normalizedValue.imageData ?? loadStoredImage()
-    const nextImage = storedImage ?? undefined
-    setImageData((prev) => (prev === nextImage ? prev : nextImage))
-
-    if (normalizedValue.imageData) {
-      writeStoredImage(normalizedValue.imageData)
-    } else if (storedImage) {
-      onChange?.({ imageData: storedImage })
-    }
-  }, [loadStoredImage, normalizedValue, onChange, readOnly, writeStoredImage])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) {
-      return
-    }
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = CANVAS_SIZE * dpr
-    canvas.height = CANVAS_SIZE * dpr
-    canvas.style.width = `${CANVAS_SIZE}px`
-    canvas.style.height = `${CANVAS_SIZE}px`
-  }, [])
-
   const getContext = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) {
+    if (!canvasRef.current) {
       return null
     }
-    const ctx = canvas.getContext("2d")
-    if (!ctx) {
+    const context = canvasRef.current.getContext("2d")
+    if (!context) {
       return null
     }
-    const dpr = window.devicePixelRatio || 1
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.lineCap = "round"
-    ctx.lineJoin = "round"
-    ctx.lineWidth = LINE_WIDTH
-    ctx.strokeStyle = LINE_COLOR
-    return ctx
+    context.lineCap = "round"
+    context.lineJoin = "round"
+    return context
   }, [])
+
+  const loadImage = useCallback(
+    async (data: string | undefined, id: number) => {
+      const canvas = canvasRef.current
+      if (!canvas) {
+        return
+      }
+      const ctx = getContext()
+      if (!ctx) {
+        return
+      }
+
+      ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+
+      if (!data) {
+        setImageData(undefined)
+        return
+      }
+
+      const image = new Image()
+      image.crossOrigin = "anonymous"
+      image.src = data
+      await new Promise((resolve) => {
+        image.onload = resolve
+        image.onerror = resolve
+      })
+
+      if (imageLoadIdRef.current !== id) {
+        return
+      }
+
+      ctx.drawImage(image, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
+      setImageData(data)
+    },
+    [getContext],
+  )
 
   useEffect(() => {
-    const ctx = getContext()
-    if (!ctx) {
+    const id = ++imageLoadIdRef.current
+    const stored = loadStoredImage()
+    const effectiveImage = normalizedValue.imageData ?? stored
+    void loadImage(effectiveImage, id)
+    setMarkers(normalizedValue.markers ?? {})
+    setEraserOn(false)
+  }, [loadImage, loadStoredImage, normalizedValue])
+
+  useEffect(() => {
+    if (!canvasRef.current) {
       return
     }
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
-
-    if (!imageData) {
-      return
-    }
-
-    const loadId = ++imageLoadIdRef.current
-    const img = new Image()
-    img.onload = () => {
-      if (imageLoadIdRef.current !== loadId) {
-        return
-      }
-      const drawCtx = getContext()
-      if (!drawCtx) {
-        return
-      }
-      drawCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
-      drawCtx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
-    }
-    img.src = imageData
-  }, [getContext, imageData])
-
-  const getCanvasPoint = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current
-    if (!canvas) {
-      return { x: 0, y: 0 }
-    }
-    const rect = canvas.getBoundingClientRect()
-    return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    }
+    canvasRef.current.width = CANVAS_SIZE
+    canvasRef.current.height = CANVAS_SIZE
   }, [])
 
-  const persistCanvas = useCallback(() => {
-    if (readOnly) {
-      return
-    }
-    const canvas = canvasRef.current
-    if (!canvas) {
-      return
-    }
-
-    requestAnimationFrame(() => {
-      const dataUrl = canvas.toDataURL("image/png")
-      setImageData(dataUrl)
-      const payload: BreastDiagram = { imageData: dataUrl }
-      writeStoredImage(dataUrl)
-      onChange?.(payload)
-      if (hasActiveMarkers(markers)) {
-        setMarkers({})
+  const startDrawing = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (readOnly || !canvasRef.current) {
+        return
       }
-    })
-  }, [markers, onChange, readOnly, writeStoredImage])
+      const rect = canvasRef.current.getBoundingClientRect()
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
+      const ctx = getContext()
+      if (!ctx) {
+        return
+      }
+
+      pointerIdRef.current = event.pointerId
+      canvasRef.current.setPointerCapture(event.pointerId)
+      isDrawingRef.current = true
+      lastPointRef.current = { x, y }
+
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineWidth = eraserOn ? ERASER_WIDTH : LINE_WIDTH
+      ctx.globalCompositeOperation = eraserOn ? "destination-out" : "source-over"
+      ctx.strokeStyle = eraserOn ? "rgba(0,0,0,1)" : LINE_COLOR
+      ctx.lineCap = "round"
+      ctx.lineJoin = "round"
+    },
+    [eraserOn, getContext, readOnly],
+  )
 
   const finishDrawing = useCallback(
-    (event?: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!isDrawingRef.current) {
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (!canvasRef.current || pointerIdRef.current !== event.pointerId) {
         return
       }
-
+      const ctx = getContext()
+      if (ctx) {
+        ctx.closePath()
+      }
       isDrawingRef.current = false
+      pointerIdRef.current = null
       lastPointRef.current = null
 
-      const canvas = canvasRef.current
-      if (canvas && pointerIdRef.current !== null && canvas.hasPointerCapture?.(pointerIdRef.current)) {
-        try {
-          canvas.releasePointerCapture(pointerIdRef.current)
-        } catch {
-          // noop
-        }
+      try {
+        const data = canvasRef.current.toDataURL("image/png", 0.9)
+        setImageData(data)
+        writeStoredImage(data)
+        onChange?.({
+          imageData: data,
+          markers,
+        })
+      } catch (error) {
+        console.error("Failed to save breast diagram", error)
       }
-      pointerIdRef.current = null
-
-      if (event) {
-        event.preventDefault()
-      }
-
-      persistCanvas()
     },
-    [persistCanvas],
+    [getContext, markers, onChange, writeStoredImage],
   )
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -270,71 +254,32 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
       return
     }
     event.preventDefault()
-
-    const ctx = getContext()
-    const canvas = canvasRef.current
-    if (!ctx || !canvas) {
-      return
-    }
-
-    // Apply current tool (pen or eraser)
-    ctx.globalCompositeOperation = eraserOn ? "destination-out" : "source-over"
-    ctx.strokeStyle = eraserOn ? "rgba(0,0,0,1)" : LINE_COLOR
-    ctx.lineWidth = eraserOn ? ERASER_WIDTH : LINE_WIDTH
-
-    const point = getCanvasPoint(event)
-    ctx.beginPath()
-    ctx.moveTo(point.x, point.y)
-    ctx.lineTo(point.x, point.y)
-    ctx.stroke()
-
-    lastPointRef.current = point
-    isDrawingRef.current = true
-    pointerIdRef.current = event.pointerId
-
-    if (canvas.setPointerCapture) {
-      try {
-        canvas.setPointerCapture(event.pointerId)
-      } catch {
-        // noop
-      }
-    }
+    startDrawing(event)
   }
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current || readOnly) {
+    if (readOnly || pointerIdRef.current !== event.pointerId || !canvasRef.current) {
       return
     }
     event.preventDefault()
-
+    const rect = canvasRef.current.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
     const ctx = getContext()
     if (!ctx) {
       return
     }
 
-    // Ensure tool settings stay applied while moving
-    ctx.globalCompositeOperation = eraserOn ? "destination-out" : "source-over"
-    ctx.strokeStyle = eraserOn ? "rgba(0,0,0,1)" : LINE_COLOR
-    ctx.lineWidth = eraserOn ? ERASER_WIDTH : LINE_WIDTH
-
-    const point = getCanvasPoint(event)
-    const lastPoint = lastPointRef.current
-    ctx.beginPath()
-    if (lastPoint) {
-      ctx.moveTo(lastPoint.x, lastPoint.y)
-    } else {
-      ctx.moveTo(point.x, point.y)
-    }
-    ctx.lineTo(point.x, point.y)
+    ctx.lineTo(x, y)
     ctx.stroke()
-    lastPointRef.current = point
+    ctx.beginPath()
+    ctx.moveTo(x, y)
   }
 
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (readOnly) {
       return
     }
-    // Reset composite to default after a stroke
     const ctx = getContext()
     if (ctx) {
       ctx.globalCompositeOperation = "source-over"
@@ -384,6 +329,49 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
     writeStoredImage(undefined)
     onChange?.({})
   }, [getContext, onChange, readOnly, writeStoredImage])
+
+  const toggleMarker = useCallback(
+    (position: (typeof POSITIONS)[number]) => {
+      if (readOnly) {
+        return
+      }
+
+      setMarkers((prev) => {
+        const next = { ...prev, [position]: !prev[position] }
+        if (!hasActiveMarkers(next)) {
+          return {}
+        }
+        return next
+      })
+    },
+    [readOnly],
+  )
+
+  useEffect(() => {
+    if (readOnly) {
+      return
+    }
+    if (!hasActiveMarkers(markers)) {
+      return
+    }
+    onChange?.({
+      imageData,
+      markers,
+    })
+  }, [imageData, markers, onChange, readOnly])
+
+  useEffect(() => {
+    if (!value) {
+      return
+    }
+    const normalizedMarkers = normalizedValue.markers ?? {}
+    setMarkers((prev) => {
+      if (markersEqual(prev, normalizedMarkers)) {
+        return prev
+      }
+      return normalizedMarkers
+    })
+  }, [normalizedValue.markers, value])
 
   const sideLabel = side === "right" ? "右" : "左"
   const showMarkers = !imageData && hasActiveMarkers(markers)

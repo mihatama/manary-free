@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useMemo, useState } from "react"
 import { useDebounce } from "use-debounce"
@@ -51,17 +51,17 @@ import { PostpartumCareChartForm } from "./postpartum-care-chart-form"
 type SortKey = "patientName" | "visitDate" | "chartType" | "createdAt"
 
 const sortLabel: Record<SortKey, string> = {
-  patientName: "謔｣閠・錐",
-  visitDate: "譚･髯｢譌･",
-  chartType: "繧ｫ繝ｫ繝・挨",
-  createdAt: "菴懈・譌･",
+  patientName: "患者名",
+  visitDate: "来院日",
+  chartType: "カルテ別",
+  createdAt: "作成日",
 }
 
 const sortableColumns: SortKey[] = ["patientName", "visitDate", "chartType", "createdAt"]
 
 const chartTypeLabel: Record<ChartType, string> = {
-  breast: "荵ｳ謌ｿ繧ｱ繧｢",
-  postpartum: "逕｣蠕後こ繧｢",
+  breast: "乳房ケア",
+  postpartum: "産後ケア",
 }
 
 const formatDateTime = (value: string) => {
@@ -75,272 +75,453 @@ const formatDateTime = (value: string) => {
 const breastTemplate: BreastCareChartRecord = {
   id: "template-breast",
   chartType: "breast",
-  patientName: "螻ｱ逕ｰ 闃ｱ蟄・,
+  patientName: "山田 花子",
   visitDate: new Date().toISOString().slice(0, 10),
-  practitionerName: "菴占陸 莉∫ｾ・,
+  practitionerName: "佐藤 仁美",
   patientId: "SAMPLE-001",
-  memo: "繝・Φ繝励Ξ繝ｼ繝育畑繧ｵ繝ｳ繝励Ν縺ｧ縺・,
+  memo: "テンプレート用サンプルです",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   data: {
     chartNumber: "BC-0001",
-    traineeName: "遐比ｿｮ逕蘗",
-    clinicLocation: "西宮",
+    traineeName: "研修生A",
+    clinicLocation: ["西宮"],
     bodyWeight: 3600,
     weightGainPerDay: 30,
-    breastMilkInterval: "3譎る俣縺斐→",
-    milkVolumeDay: "80ml ﾃ・5蝗・,
-    milkVolumeNight: "60ml ﾃ・2蝗・,
+    breastMilkInterval: "3時間ごと",
+    milkVolumeDay: "80ml × 5回",
+    milkVolumeNight: "60ml × 2回",
     formulaFeedsPerDay: 2,
-    formulaVolumePerFeed: "40ml/蝗・,
+    formulaVolumePerFeed: "40ml/回",
     weaningFeedsPerDay: 1,
-    weaningDetails: "10蛟咲ｲ･縲√↓繧薙§繧薙ヴ繝･繝ｼ繝ｬ",
+    weaningDetails: "10倍粥、にんじんピューレ",
     stoolFrequency: 6,
-    stoolConsistency: "邊伜悄迥ｶ繝ｻ繧・ｄ繧・ｏ繧峨°繧・,
-    babyDevelopment: "鬥悶☆繧上ｊ濶ｯ螂ｽ縲ゅ♀縺励ｃ縺ｶ繧翫ｒ螂ｽ繧",
-    weaningStatus: "蛻晄悄縲ゅ∪縺蟆鷹㍼縺壹▽",
-    subjectiveNote: "荵ｳ謌ｿ縺ｮ蠑ｵ繧翫′豌励↓縺ｪ繧九ょ､憺俣謗井ｹｳ縺瑚ｾ帙＞",
-    planNote: "謳ｾ荵ｳ譁ｹ豕輔・遒ｺ隱阪→螟憺俣謗井ｹｳ縺ｮ蟋ｿ蜍｢繧ｱ繧｢",
-    breastShape: "蜀・倹迥ｶ",
+    stoolConsistency: "粘土状・やややわらかめ",
+    babyDevelopment: "首すわり良好。おしゃぶりを好む",
+    weaningStatus: "初期。まだ少量ずつ",
+    subjectiveNote: "乳房の張りが気になる。夜間授乳が辛い",
+    planNote: "搾乳方法の確認と夜間授乳の姿勢ケア",
+    breastShape: "円錐状",
     nippleShieldUsed: false,
-    pumpingFrequency: "1譌･2蝗橸ｼ域焔蜍包ｼ・,
-    pumpingMethod: "謇句虚繝昴Φ繝・,
-    nippleAreolaCondition: ["霆ｽ蠎ｦ縺ｮ莠陬・, "荵ｾ辯･豌怜袖"],
-    painLocation: ["蜿ｳ荵ｳ霈ｪ荳企Κ"],
-    feedingPosition: "繝輔ャ繝医・繝ｼ繝ｫ謚ｱ縺・,
-    familySupportStatus: "螟ｫ縺悟､憺俣蟇ｾ蠢懊ｒ繧ｵ繝昴・繝・,
+    pumpingFrequency: "1日2回（手動）",
+    pumpingMethod: "手動ポンプ",
+    nippleAreolaCondition: ["軽度の亀裂", "乾燥気味"],
+    painLocation: ["右乳輪上部"],
+    feedingPosition: "フットボール抱き",
+    familySupportStatus: "夫が夜間対応をサポート",
     breastDiagramRight: { markers: { "12": true } },
     breastDiagramLeft: { markers: { "3": true } },
-    concerns: "螟憺俣縺ｮ蟇昜ｸ崎ｶｳ縺檎ｶ壹＞縺ｦ縺・ｋ",
-    leftBreastCondition: "縺励％繧翫↑縺励よ沐繧峨°縺穂ｿ昴◆繧後※縺・ｋ",
-    rightBreastCondition: "12譎よ婿蜷代↓霆ｽ縺・ｼｵ繧・,
-    careDetails: "繝昴ず繧ｷ繝ｧ繝九Φ繧ｰ謖・ｰ弱→貂ｩ鄂ｨ豕輔ｒ螳滓命",
-    recommendations: "螟憺俣謗井ｹｳ蜑阪・謳ｾ荵ｳ謗ｨ螂ｨ縲よｬ｡蝗槫・隧穂ｾ｡",
-    diagnosis: "荵ｳ閻ｺ縺ｮ隧ｰ縺ｾ繧雁だ蜷代らｵ碁℃隕ｳ蟇・,
-    paymentMethod: "迴ｾ驥第鴛縺・,
-    paymentMethod: "現金 / PayPay",
-    fees: [
-      { label: "初診料", price: 1000, selected: true },
-      { label: "1回", price: 5500, selected: true },
-      { label: "チケット", price: 14850, selected: false },
-      { label: "レンタルタオル", price: 350, selected: true },
-      { label: "ケアタオル", price: 250, selected: true },
-    ],
+    concerns: "夜間の寝不足が続いている",
+    leftBreastCondition: "しこりなし。柔らかさ保たれている",
+    rightBreastCondition: "12時方向に軽い張り",
+    careDetails: "ポジショニング指導と温罨法を実施",
+    recommendations: "夜間授乳前の搾乳推奨。次回再評価",
+    diagnosis: "乳腺の詰まり傾向。経過観察",
+    paymentMethod: "現金払い",
+    initialConsultationFee: true,
+    singleSessionFee: true,
+    ticketFee: false,
+    rentalTowelFee: true,
+    careTowelFee: true,
+    otherFee: 1500,
+    otherFeeDescription: "物販（母乳パッド）",
   },
 }
 
 const postpartumTemplate: PostpartumCareChartRecord = {
   id: "template-postpartum",
   chartType: "postpartum",
-  patientName: "菴占陸 逵溽炊",
+  patientName: "山田 花子",
   visitDate: new Date().toISOString().slice(0, 10),
-  practitionerName: "逕ｰ荳ｭ 逕ｱ鄒・,
-  patientId: "SAMPLE-PP-01",
-  memo: "繝・Φ繝励Ξ繝ｼ繝育畑繧ｵ繝ｳ繝励Ν縺ｧ縺・,
+  practitionerName: "佐藤 仁美",
+  patientId: "SAMPLE-002",
+  memo: "産後ケアテンプレートのサンプルです",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   data: {
-    weeksPostpartum: 4,
-    motherCondition: "繝舌う繧ｿ繝ｫ豁｣蟶ｸ縲∫夢蜉ｴ諢溘≠繧・,
-    lochiaStatus: "豺｡陦濶ｲ縲・㍼縺ｯ貂帛ｰ大だ蜷・,
-    episiotomyPain: "霆ｽ蠎ｦ縺ｮ逍ｼ逞帙ょす縺ｯ濶ｯ螂ｽ",
-    constipationStatus: "萓ｿ騾壹・2譌･縺ｫ1蝗槭らｷｩ荳句王縺ｫ繧医ｋ隱ｿ謨ｴ荳ｭ",
-    physicalCondition: "閧ｩ縺薙ｊ縺ゅｊ縲ら擅逵荳崎ｶｳ",
-    mentalCondition: "豌怜・縺ｮ豕｢縺ｯ蟆代↑繧√ゆｸ榊ｮ画─縺ゅｊ",
-    mentalState: "EPDS 6轤ｹ縲ら嶌隲・髪謠ｴ繧堤ｶ咏ｶ・,
-    familySupport: "螟ｫ縺悟､憺俣謗井ｹｳ繧偵し繝昴・繝医ょｮ滓ｯ阪′騾ｱ2蝗櫁ｨｪ蝠・,
-    careProvided: "閧ｩ逕ｲ鬪ｨ蜻ｨ繧翫・繧ｹ繝医Ξ繝・メ縺ｨ貂ｩ鄂ｨ豕輔ｒ螳滓命",
-    babyCondition: "菴馴㍾縺ｮ蠅励∴濶ｯ螂ｽ縲ら匱辭ｱ縺ｪ縺・,
-    jaundiceLevel: "閾ｪ辟ｶ豸磯貂医∩",
-    umbilicalCordStatus: "荵ｾ辯･縺苓誠荳区ｸ医∩",
-    feedingStatus: "豈堺ｹｳ荳ｭ蠢・ょ､憺俣2蝗槭Α繝ｫ繧ｯ陬懆ｶｳ",
-    carePlan: "閧ｩ縺薙ｊ蟇ｾ遲悶・繧ｻ繝ｫ繝輔こ繧｢邯咏ｶ壹ょ､憺俣1蝗槭・莨第・繧堤｢ｺ菫・,
-    guidance: "謗井ｹｳ蟋ｿ蜍｢縺ｮ蜀咲｢ｺ隱阪ゆｼ第・譎る俣縺ｮ遒ｺ菫晄婿豕輔ｒ謠先｡・,
-    paymentDetails: "逕｣蠕後こ繧｢蛻ｩ逕ｨ蛻ｸ 1譫壻ｽｿ逕ｨ",
+    chartNumber: "PP-0001",
+    clinicLocation: ["西宮"],
+    homeCareSupport: ["訪問助産師"],
+    postpartumDay: 7,
+    deliveryDate: new Date().toISOString().slice(0, 10),
+    familyStructure: ["夫", "第一子（3歳）"],
+    childcareExperience: "第一子あり",
+    livingWithExtendedFamily: false,
+    babyCondition: "体重 3100g。黄疸なし",
+    motherCondition: "疲労蓄積。肩こりあり",
+    sleepStatus: "夜間覚醒 2-3回。授乳後の寝付き悪い",
+    appetite: "朝食は軽め。昼と夜は普通",
+    bowelCondition: "便秘気味。下剤使用中",
+    lochia: "減少傾向。悪臭なし",
+    uterineInvolution: "臍下1横指。痛み軽度。",
+    postpartumComplications: ["乳腺炎リスク", "会陰部痛"],
+    breastfeedingStatus: "混合授乳。昼間はほぼ母乳",
+    babyFeedingAmount: "母乳左右各10分＋ミルク40ml",
+    lactationStatus: "搾乳で1回80ml確保",
+    breastSymptoms: ["乳房の張り", "乳頭痛"],
+    mentalState: "不安：夜間授乳。疲労感",
+    familySupport: "夫が夜間対応。祖母が週2回訪問",
+    householdTasks: ["洗濯", "簡単な掃除"],
+    outingRestrictions: "買い物のみ。長時間外出なし",
+    contraception: "検討中。次回健診で相談予定",
+    supplementUse: ["鉄剤", "ビタミンD"],
+    stretchingStatus: "肩・腰回りの柔軟不足",
+    reflection: "授乳姿勢の課題を感じている",
+    issuesToAddress: ["授乳姿勢改善", "肩こり軽減"],
+    healingState: "会陰部縫合部は良好。多少の突っ張り感あり",
+    lochiaState: "赤色から褐色へ移行中",
+    uterusState: "硬さ良好。収縮も順調",
+    ovarianState: "特記なし",
+    breastState: "乳房は張り気味。しこりなし",
+    nippleState: "軽度の亀裂。保湿ケア中",
+    massageDetails: "腰背部〜肩、頸部のリリース。会陰部周囲のドレナージ",
+    carePlan: "授乳姿勢の指導とナイトサポート体制の調整",
+    careDetails: "肩甲骨周囲のストレッチ指導。呼吸法の練習",
+    evaluation: "姿勢矯正で肩こり改善。睡眠時間確保が課題",
+    homework: ["肩甲骨ストレッチ1日3回", "授乳前の深呼吸3回"],
+    nextSchedule: "来週同じ時間にフォローアップ",
+    paymentMethod: "現金払い",
+    initialConsultationFee: false,
+    singleSessionFee: true,
+    ticketFee: false,
+    rentalTowelFee: true,
+    careTowelFee: true,
+    otherFee: null,
+    otherFeeDescription: undefined,
   },
 }
 
-export function ChartsManager() {
-  const { charts, saveChart, deleteChart, isReady } = useAppState()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300)
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" }>({
-    key: "createdAt",
-    direction: "desc",
-  })
-  const [detailsState, setDetailsState] = useState<{ open: boolean; chart: ChartRecord | null }>({
-    open: false,
-    chart: null,
-  })
-  const [editorState, setEditorState] = useState<{
-    open: boolean
-    chart: ChartRecord | null
-    type: ChartType | null
-  }>({ open: false, chart: null, type: null })
-  const [deleteTarget, setDeleteTarget] = useState<ChartRecord | null>(null)
-  const [templateDialog, setTemplateDialog] = useState<ChartType | null>(null)
+type EditorState =
+  | {
+      open: false
+      type: "breast" | "postpartum" | null
+      chart: ChartRecord | null
+    }
+  | {
+      open: true
+      type: "breast" | "postpartum"
+      chart: ChartRecord | null
+    }
+
+type DetailState =
+  | {
+      open: false
+      chart: ChartRecord | null
+    }
+  | {
+      open: true
+      chart: ChartRecord
+    }
+
+const initialEditorState: EditorState = {
+  open: false,
+  type: null,
+  chart: null,
+}
+
+const initialDetailState: DetailState = {
+  open: false,
+  chart: null,
+}
+
+function useChartsManagerState() {
+  const { charts, saveChart, deleteChart } = useAppState()
+  const [search, setSearch] = useState("")
+  const [sortKey, setSortKey] = useState<SortKey>("createdAt")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
+  const [debouncedSearch] = useDebounce(search, 300)
+  const [editorState, setEditorState] = useState<EditorState>(initialEditorState)
+  const [detailsState, setDetailsState] = useState<DetailState>(initialDetailState)
+  const [templateDialog, setTemplateDialog] = useState<"breast" | "postpartum" | null>(null)
+
+  const resetState = useCallback(() => {
+    setEditorState(initialEditorState)
+    setDetailsState(initialDetailState)
+  }, [])
 
   const filteredCharts = useMemo(() => {
-    const term = debouncedSearchTerm.trim().toLowerCase()
-    if (!term) {
+    const normalized = debouncedSearch.trim().toLowerCase()
+    if (!normalized) {
       return charts
     }
     return charts.filter((chart) => {
-      const haystack = [
-        chart.patientName,
-        chart.patientId ?? "",
-        chartTypeLabel[chart.chartType],
-        chart.visitDate,
-        chart.practitionerName ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
-      return haystack.includes(term)
+      const patientName = chart.patientName?.toLowerCase() ?? ""
+      const practitionerName = chart.practitionerName?.toLowerCase() ?? ""
+      const memo = chart.memo?.toLowerCase() ?? ""
+      const patientId = chart.patientId?.toLowerCase() ?? ""
+      return (
+        patientName.includes(normalized) ||
+        practitionerName.includes(normalized) ||
+        memo.includes(normalized) ||
+        patientId.includes(normalized)
+      )
     })
-  }, [charts, debouncedSearchTerm])
+  }, [charts, debouncedSearch])
 
   const sortedCharts = useMemo(() => {
-    const sorted = [...filteredCharts]
-    sorted.sort((a, b) => {
-      const { key } = sortConfig
-      let result = 0
-      if (key === "patientName") {
-        result = a.patientName.localeCompare(b.patientName, "ja")
-      } else if (key === "chartType") {
-        result = chartTypeLabel[a.chartType].localeCompare(chartTypeLabel[b.chartType], "ja")
-      } else if (key === "visitDate") {
-        result = a.visitDate.localeCompare(b.visitDate)
-      } else if (key === "createdAt") {
-        result = a.createdAt.localeCompare(b.createdAt)
+    const factor = sortDirection === "asc" ? 1 : -1
+    return [...filteredCharts].sort((a, b) => {
+      const left = a[sortKey]
+      const right = b[sortKey]
+      if (typeof left === "string" && typeof right === "string") {
+        return left.localeCompare(right) * factor
       }
-
-      return sortConfig.direction === "asc" ? result : -result
+      if (typeof left === "number" && typeof right === "number") {
+        return (left - right) * factor
+      }
+      if (left instanceof Date && right instanceof Date) {
+        return (left.getTime() - right.getTime()) * factor
+      }
+      return factor
     })
-    return sorted
-  }, [filteredCharts, sortConfig])
+  }, [filteredCharts, sortDirection, sortKey])
 
-  const toggleSort = (key: SortKey) => {
-    setSortConfig((prev) =>
-      prev.key === key ? { key, direction: prev.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" },
-    )
-  }
-
-  const openDetails = (chart: ChartRecord) => {
-    setDetailsState({ open: true, chart })
-  }
-
-  const closeDetails = () => {
-    setDetailsState({ open: false, chart: null })
-  }
-
-  const openEditChart = (chart: ChartRecord) => {
-    setEditorState({ open: true, chart, type: chart.chartType })
-  }
-
-  const openNewChart = (type: ChartType) => {
-    setEditorState({ open: true, chart: null, type })
-  }
-
-  const closeEditor = () => {
-    setEditorState({ open: false, chart: null, type: null })
-  }
-
-  const handleSaveChart = useCallback(
-    (payload: Parameters<typeof saveChart>[0]) => {
-      const saved = saveChart(payload)
-      toast.success(`繧ｫ繝ｫ繝・ｒ菫晏ｭ倥＠縺ｾ縺励◆: ${saved.patientName}`)
-      closeEditor()
+  const toggleSort = useCallback(
+    (key: SortKey) => {
+      if (sortKey === key) {
+        setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+      } else {
+        setSortKey(key)
+        setSortDirection("asc")
+      }
     },
-    [saveChart],
+    [sortKey],
   )
 
-  const handleDelete = () => {
-    if (!deleteTarget) {
-      return
-    }
-    deleteChart(deleteTarget.id)
-    toast.success(`繧ｫ繝ｫ繝・ｒ蜑企勁縺励∪縺励◆: ${deleteTarget.patientName}`)
-    setDeleteTarget(null)
-  }
+  const openDetails = useCallback((chart: ChartRecord) => {
+    setDetailsState({ open: true, chart })
+  }, [])
 
-  if (!isReady) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>繧ｫ繝ｫ繝・ｪｭ霎ｼ荳ｭ</CardTitle>
-          <CardDescription>繝ｭ繝ｼ繧ｫ繝ｫ繧ｹ繝医Ξ繝ｼ繧ｸ縺ｮ隱ｭ縺ｿ霎ｼ縺ｿ荳ｭ縺ｧ縺吮ｦ</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">縺励・繧峨￥縺雁ｾ・■縺上□縺輔＞縲・/p>
-        </CardContent>
-      </Card>
-    )
+  const closeDetails = useCallback(() => {
+    setDetailsState(initialDetailState)
+  }, [])
+
+  const openEditor = useCallback((type: "breast" | "postpartum", chart: ChartRecord | null = null) => {
+    setEditorState({ open: true, type, chart })
+  }, [])
+
+  const closeEditor = useCallback(() => {
+    setEditorState(initialEditorState)
+  }, [])
+
+  const handleSaveChart = useCallback(
+    (payload: ChartRecord) => {
+      const isNew = !payload.id || !charts.some((chart) => chart.id === payload.id)
+      const saved = saveChart(payload)
+      toast.success(isNew ? "カルテを作成しました" : "カルテを更新しました")
+      resetState()
+      return saved
+    },
+    [charts, resetState, saveChart],
+  )
+
+  const handleDelete = useCallback(
+    (chart: ChartRecord) => {
+      deleteChart(chart.id)
+      toast.success("カルテを削除しました")
+      resetState()
+    },
+    [deleteChart, resetState],
+  )
+
+  const exportCharts = useCallback(() => {
+    const payload = JSON.stringify(charts, null, 2)
+    const blob = new Blob([payload], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `charts-${new Date().toISOString()}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success("カルテデータをエクスポートしました")
+  }, [charts])
+
+  return {
+    charts,
+    sortLabel,
+    sortableColumns,
+    chartTypeLabel,
+    search,
+    setSearch,
+    sortKey,
+    setSortKey,
+    sortDirection,
+    setSortDirection,
+    debouncedSearch,
+    editorState,
+    setEditorState,
+    detailsState,
+    setDetailsState,
+    templateDialog,
+    setTemplateDialog,
+    filteredCharts,
+    sortedCharts,
+    toggleSort,
+    openDetails,
+    closeDetails,
+    openEditor,
+    closeEditor,
+    handleSaveChart,
+    handleDelete,
+    exportCharts,
   }
+}
+
+export function ChartsManager() {
+  const {
+    charts,
+    sortLabel,
+    sortableColumns,
+    chartTypeLabel,
+    search,
+    setSearch,
+    sortKey,
+    sortDirection,
+    debouncedSearch,
+    editorState,
+    detailsState,
+    templateDialog,
+    filteredCharts,
+    sortedCharts,
+    toggleSort,
+    openDetails,
+    closeDetails,
+    openEditor,
+    closeEditor,
+    handleSaveChart,
+    handleDelete,
+    exportCharts,
+    setTemplateDialog,
+  } = useChartsManagerState()
+
+  const createNewChart = useCallback(
+    (type: ChartType) => {
+      if (type === "breast") {
+        openEditor("breast", null)
+      } else {
+        openEditor("postpartum", null)
+      }
+    },
+    [openEditor],
+  )
+
+  const handleImport = useCallback(async () => {
+    try {
+      const [fileHandle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [
+          {
+            description: "カルテデータ（JSON）",
+            accept: {
+              "application/json": [".json"],
+            },
+          },
+        ],
+      })
+
+      const file = await fileHandle.getFile()
+      const text = await file.text()
+      const data = JSON.parse(text) as ChartRecord[]
+
+      for (const chart of data) {
+        handleSaveChart(chart)
+      }
+
+      toast.success("カルテデータをインポートしました")
+    } catch (error) {
+      console.error(error)
+      toast.error("カルテデータのインポートに失敗しました")
+    }
+  }, [handleSaveChart])
+
+  const showBreastTemplate = useCallback(() => {
+    setTemplateDialog("breast")
+  }, [])
+
+  const showPostpartumTemplate = useCallback(() => {
+    setTemplateDialog("postpartum")
+  }, [])
 
   return (
     <>
       <Card>
-        <CardHeader className="gap-4 md:flex md:items-center md:justify-between">
+        <CardHeader className="flex flex-wrap items-center gap-4">
           <div>
-            <CardTitle>繧ｫ繝ｫ繝・ｸ隕ｧ</CardTitle>
-            <CardDescription>荵ｳ謌ｿ繧ｱ繧｢繝ｻ逕｣蠕後こ繧｢縺ｮ繧ｫ繝ｫ繝・ｒ繝ｭ繝ｼ繧ｫ繝ｫ繧ｹ繝医Ξ繝ｼ繧ｸ縺ｧ邂｡逅・＠縺ｾ縺吶・/CardDescription>
+            <CardTitle>カルテ管理</CardTitle>
+            <CardDescription>カルテデータの閲覧・作成・編集ができます。</CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => openNewChart("breast")} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="mr-2 h-4 w-4" />
-              荵ｳ謌ｿ繧ｱ繧｢繧ｫ繝ｫ繝・ｽ懈・
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" onClick={exportCharts}>
+              エクスポート
             </Button>
-            <Button variant="secondary" onClick={() => openNewChart("postpartum")}>
-              <Plus className="mr-2 h-4 w-4" />
-              逕｣蠕後こ繧｢繧ｫ繝ｫ繝・ｽ懈・
+            <Button variant="outline" onClick={handleImport}>
+              インポート
             </Button>
-            <Button variant="outline" onClick={() => setTemplateDialog("breast")}>
-              繝輔か繝ｼ繝槭ャ繝茨ｼ井ｹｳ謌ｿ繧ｱ繧｢・・            </Button>
-            <Button variant="outline" onClick={() => setTemplateDialog("postpartum")}>
-              繝輔か繝ｼ繝槭ャ繝茨ｼ育肇蠕後こ繧｢・・            </Button>
+            <Button variant="outline" onClick={showBreastTemplate}>
+              乳房ケア用テンプレート
+            </Button>
+            <Button variant="outline" onClick={showPostpartumTemplate}>
+              産後ケア用テンプレート
+            </Button>
+            <Button onClick={() => createNewChart("breast")}>
+              <Plus className="mr-2 h-4 w-4" />
+              乳房ケアカルテを作成
+            </Button>
+            <Button onClick={() => createNewChart("postpartum")}>
+              <Plus className="mr-2 h-4 w-4" />
+              産後ケアカルテを作成
+            </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="relative md:max-w-sm">
+        <CardContent>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="relative w-full md:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="謔｣閠・錐 / ID / 遞ｮ蛻･縺ｧ讀懃ｴ｢"
-                className="pl-9"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="患者名やメモで検索"
+                className="pl-8"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              {sortedCharts.length} 莉ｶ陦ｨ遉ｺ・育ｷ乗焚 {charts.length} 莉ｶ・・            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => createNewChart("breast")}>
+                <PenLine className="mr-2 h-4 w-4" />
+                乳房ケアカルテを作成
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => createNewChart("postpartum")}>
+                <PenLine className="mr-2 h-4 w-4" />
+                産後ケアカルテを作成
+              </Button>
+            </div>
           </div>
-
-          <div className="overflow-hidden rounded-md border">
+          <div className="mt-4 overflow-hidden rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   {sortableColumns.map((key) => (
                     <TableHead key={key}>
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        className="flex w-full items-center justify-between px-0 text-left font-semibold"
                         onClick={() => toggleSort(key)}
-                        className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"
                       >
                         {sortLabel[key]}
-                        <ArrowUpDown
-                          className={`h-4 w-4 ${sortConfig.key === key ? "opacity-100" : "opacity-40"}`}
-                        />
-                      </button>
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      </Button>
                     </TableHead>
                   ))}
-                  <TableHead className="text-right">繧｢繧ｯ繧ｷ繝ｧ繝ｳ</TableHead>
+                  <TableHead className="w-32 text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedCharts.length === 0 ? (
+                {filteredCharts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
-                      譚｡莉ｶ縺ｫ荳閾ｴ縺吶ｋ繧ｫ繝ｫ繝・・縺ゅｊ縺ｾ縺帙ｓ縲・                    </TableCell>
+                    <TableCell colSpan={sortableColumns.length + 1} className="h-24 text-center text-muted-foreground">
+                      条件に一致するカルテはありません。
+                    </TableCell>
                   </TableRow>
                 ) : (
                   sortedCharts.map((chart) => (
@@ -348,7 +529,7 @@ export function ChartsManager() {
                       <TableCell>
                         <div className="font-medium">{chart.patientName}</div>
                         <div className="text-xs text-muted-foreground">
-                          {chart.patientId ? `ID: ${chart.patientId}` : "ID譛ｪ逋ｻ骭ｲ"}
+                          {chart.patientId ? `ID: ${chart.patientId}` : "ID未登録"}
                         </div>
                       </TableCell>
                       <TableCell>{chart.visitDate}</TableCell>
@@ -360,11 +541,12 @@ export function ChartsManager() {
                       <TableCell>{formatDateTime(chart.createdAt)}</TableCell>
                       <TableCell className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => openDetails(chart)}>
-                          隧ｳ邏ｰ
+                          詳細
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => openEditChart(chart)}>
                           <PenLine className="mr-1 h-4 w-4" />
-                          邱ｨ髮・                        </Button>
+                          編集
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -372,7 +554,7 @@ export function ChartsManager() {
                           onClick={() => setDeleteTarget(chart)}
                         >
                           <Trash2 className="mr-1 h-4 w-4" />
-                          蜑企勁
+                          削除
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -387,7 +569,7 @@ export function ChartsManager() {
       <Dialog open={detailsState.open} onOpenChange={(open) => (!open ? closeDetails() : undefined)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>繧ｫ繝ｫ繝・ｩｳ邏ｰ</DialogTitle>
+            <DialogTitle>カルテ詳細</DialogTitle>
           </DialogHeader>
           {detailsState.chart ? (
             detailsState.chart.chartType === "breast" ? (
@@ -404,10 +586,10 @@ export function ChartsManager() {
           <DialogHeader>
             <DialogTitle>
               {editorState.chart
-                ? `繧ｫ繝ｫ繝・ｷｨ髮・窶・${chartTypeLabel[editorState.chart.chartType]}`
+                ? `カルテ編集 — ${chartTypeLabel[editorState.chart.chartType]}`
                 : editorState.type
-                  ? `${chartTypeLabel[editorState.type]}繧ｫ繝ｫ繝・ｽ懈・`
-                  : "繧ｫ繝ｫ繝・}
+                  ? `${chartTypeLabel[editorState.type]}カルテ作成`
+                  : "カルテ"}
             </DialogTitle>
           </DialogHeader>
           {editorState.type === "breast" ? (
@@ -429,7 +611,7 @@ export function ChartsManager() {
       <Dialog open={templateDialog === "breast"} onOpenChange={(open) => (!open ? setTemplateDialog(null) : undefined)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>荵ｳ謌ｿ繧ｱ繧｢繧ｫ繝ｫ繝・繝輔か繝ｼ繝槭ャ繝・/DialogTitle>
+            <DialogTitle>乳房ケアカルテ フォーマット</DialogTitle>
           </DialogHeader>
           <BreastCareChartDetails chart={breastTemplate} />
         </DialogContent>
@@ -441,7 +623,7 @@ export function ChartsManager() {
       >
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>逕｣蠕後こ繧｢繧ｫ繝ｫ繝・繝輔か繝ｼ繝槭ャ繝・/DialogTitle>
+            <DialogTitle>産後ケアカルテ フォーマット</DialogTitle>
           </DialogHeader>
           <PostpartumCareChartDetails chart={postpartumTemplate} />
         </DialogContent>
@@ -450,14 +632,15 @@ export function ChartsManager() {
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => (!open ? setDeleteTarget(null) : undefined)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>繧ｫ繝ｫ繝・ｒ蜑企勁縺励∪縺吶°・・/AlertDialogTitle>
+            <AlertDialogTitle>カルテを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              縺薙・謫堺ｽ懊・蜿悶ｊ豸医○縺ｾ縺帙ｓ縲ゅき繝ｫ繝・鶏deleteTarget?.patientName ?? ""}縲阪ｒ蜑企勁縺吶ｋ縺ｨ縲√ヶ繝ｩ繧ｦ繧ｶ縺ｫ菫晏ｭ倥＆繧後◆繝・・繧ｿ縺九ｉ繧ょｮ悟・縺ｫ蜑企勁縺輔ｌ縺ｾ縺吶・            </AlertDialogDescription>
+              この操作は取り消せません。カルテ「{deleteTarget?.patientName ?? ""}」を削除すると、ブラウザに保存されたデータからも完全に削除されます。
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>繧ｭ繝｣繝ｳ繧ｻ繝ｫ</AlertDialogCancel>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDelete}>
-              蜑企勁縺吶ｋ
+              削除する
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -465,5 +648,3 @@ export function ChartsManager() {
     </>
   )
 }
-
-

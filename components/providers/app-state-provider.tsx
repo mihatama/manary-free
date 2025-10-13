@@ -1,16 +1,9 @@
-﻿"use client"
+"use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { v4 as uuidv4 } from "uuid"
 
-import type {
-  ChartPayload,
-  ChartRecord,
-  BreastCareChartData,
-  PostpartumCareChartData,
-  BreastDiagram,
-  ChartFeeItem,
-} from "@/lib/chart-types"
+import type { ChartPayload, ChartRecord, BreastCareChartData, PostpartumCareChartData, BreastDiagram } from "@/lib/chart-types"
 import { decryptToString, encryptString } from "@/lib/encryption"
 import { getEncryptedStateKey } from "@/lib/subscription"
 import { useSubscription } from "./subscription-provider"
@@ -78,49 +71,6 @@ function normalizeStringArray(value: unknown): string[] {
   return []
 }
 
-function normalizeFees(value: unknown): ChartFeeItem[] {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value
-    .map((item) => {
-      if (!item || typeof item !== "object") {
-        return null
-      }
-      const record = item as Record<string, unknown>
-      const labelValue = normalizeString(record.label)
-
-      let price: number | null | undefined
-      if (typeof record.price === "number" || record.price === null) {
-        price = normalizeNumber(record.price)
-      } else if (typeof record.price === "string") {
-        const trimmed = record.price.trim()
-        if (trimmed.length === 0) {
-          price = null
-        } else {
-          const parsed = Number(trimmed.replace(/,/g, ""))
-          price = Number.isFinite(parsed) ? parsed : undefined
-        }
-      } else {
-        price = undefined
-      }
-
-      const selected = typeof record.selected === "boolean" ? record.selected : false
-
-      if (!labelValue && price === undefined) {
-        return null
-      }
-
-      return {
-        label: labelValue ?? (price !== undefined && price !== null ? "" : "未設定"),
-        price: price ?? null,
-        selected,
-      }
-    })
-    .filter((item): item is ChartFeeItem => item !== null)
-}
-
 function normalizeDiagram(value: unknown): BreastDiagram {
   if (!value || typeof value !== "object") {
     return {}
@@ -160,11 +110,12 @@ function normalizeDiagram(value: unknown): BreastDiagram {
 
   return normalized
 }
+
 function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCareChartData {
   return {
     chartNumber: normalizeString(data?.chartNumber),
     traineeName: normalizeString(data?.traineeName),
-    clinicLocation: Array.isArray(data?.clinicLocation) ? normalizeStringArray(data?.clinicLocation).join(" / ") : normalizeString(data?.clinicLocation),
+    clinicLocation: normalizeStringArray(data?.clinicLocation),
     bodyWeight: normalizeNumber(data?.bodyWeight),
     weightGainPerDay: normalizeNumber(data?.weightGainPerDay),
     breastMilkInterval: normalizeString(data?.breastMilkInterval),
@@ -181,7 +132,7 @@ function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCar
     subjectiveNote: normalizeString(data?.subjectiveNote),
     planNote: normalizeString(data?.planNote),
     breastShape: normalizeString(data?.breastShape),
-    nippleShieldUsed: normalizeBoolean(data?.nippleShieldUsed) ?? false,
+    nippleShieldUsed: normalizeBoolean(data?.nippleShieldUsed),
     pumpingFrequency: normalizeString(data?.pumpingFrequency),
     pumpingMethod: normalizeString(data?.pumpingMethod),
     nippleAreolaCondition: normalizeStringArray(data?.nippleAreolaCondition),
@@ -197,132 +148,143 @@ function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCar
     recommendations: normalizeString(data?.recommendations),
     diagnosis: normalizeString(data?.diagnosis),
     paymentMethod: normalizeString(data?.paymentMethod),
-    fees: normalizeFees(data?.fees),
-  };
+    initialConsultationFee: normalizeBoolean(data?.initialConsultationFee),
+    singleSessionFee: normalizeBoolean(data?.singleSessionFee),
+    ticketFee: normalizeBoolean(data?.ticketFee),
+    rentalTowelFee: normalizeBoolean(data?.rentalTowelFee),
+    careTowelFee: normalizeBoolean(data?.careTowelFee),
+    otherFee: normalizeNumber(data?.otherFee),
+    otherFeeDescription: normalizeString(data?.otherFeeDescription),
+  }
 }
 
-function normalizePostpartumData(data?: Partial<PostpartumCareChartData>): PostpartumCareChartData {
+function normalizePostpartumCareData(data?: Partial<PostpartumCareChartData>): PostpartumCareChartData {
   return {
+    chartNumber: normalizeString(data?.chartNumber),
+    clinicLocation: normalizeStringArray(data?.clinicLocation),
+    homeCareSupport: normalizeStringArray(data?.homeCareSupport),
+    postpartumDay: normalizeNumber(data?.postpartumDay),
+    deliveryDate: normalizeString(data?.deliveryDate),
+    familyStructure: normalizeStringArray(data?.familyStructure),
+    childcareExperience: normalizeString(data?.childcareExperience),
+    livingWithExtendedFamily: normalizeBoolean(data?.livingWithExtendedFamily),
+    babyCondition: normalizeString(data?.babyCondition),
     motherCondition: normalizeString(data?.motherCondition),
-    lochiaStatus: normalizeString(data?.lochiaStatus),
-    episiotomyPain: normalizeString(data?.episiotomyPain),
-    constipationStatus: normalizeString(data?.constipationStatus),
+    sleepStatus: normalizeString(data?.sleepStatus),
+    appetite: normalizeString(data?.appetite),
+    bowelCondition: normalizeString(data?.bowelCondition),
+    lochia: normalizeString(data?.lochia),
+    uterineInvolution: normalizeString(data?.uterineInvolution),
+    postpartumComplications: normalizeStringArray(data?.postpartumComplications),
+    breastfeedingStatus: normalizeString(data?.breastfeedingStatus),
+    babyFeedingAmount: normalizeString(data?.babyFeedingAmount),
+    lactationStatus: normalizeString(data?.lactationStatus),
+    breastSymptoms: normalizeStringArray(data?.breastSymptoms),
     mentalState: normalizeString(data?.mentalState),
     familySupport: normalizeString(data?.familySupport),
-    babyCondition: normalizeString(data?.babyCondition),
-    jaundiceLevel: normalizeString(data?.jaundiceLevel),
-    umbilicalCordStatus: normalizeString(data?.umbilicalCordStatus),
-    feedingStatus: normalizeString(data?.feedingStatus),
+    householdTasks: normalizeStringArray(data?.householdTasks),
+    outingRestrictions: normalizeString(data?.outingRestrictions),
+    contraception: normalizeString(data?.contraception),
+    supplementUse: normalizeStringArray(data?.supplementUse),
+    stretchingStatus: normalizeString(data?.stretchingStatus),
+    reflection: normalizeString(data?.reflection),
+    issuesToAddress: normalizeStringArray(data?.issuesToAddress),
+    healingState: normalizeString(data?.healingState),
+    lochiaState: normalizeString(data?.lochiaState),
+    uterusState: normalizeString(data?.uterusState),
+    ovarianState: normalizeString(data?.ovarianState),
+    breastState: normalizeString(data?.breastState),
+    nippleState: normalizeString(data?.nippleState),
+    massageDetails: normalizeString(data?.massageDetails),
     carePlan: normalizeString(data?.carePlan),
-    guidance: normalizeString(data?.guidance),
-    paymentDetails: normalizeString(data?.paymentDetails),
-    weeksPostpartum: normalizeNumber(data?.weeksPostpartum),
-    physicalCondition: normalizeString(data?.physicalCondition),
-    mentalCondition: normalizeString(data?.mentalCondition),
-    careProvided: normalizeString(data?.careProvided),
+    careDetails: normalizeString(data?.careDetails),
+    evaluation: normalizeString(data?.evaluation),
+    homework: normalizeStringArray(data?.homework),
+    nextSchedule: normalizeString(data?.nextSchedule),
+    paymentMethod: normalizeString(data?.paymentMethod),
+    initialConsultationFee: normalizeBoolean(data?.initialConsultationFee),
+    singleSessionFee: normalizeBoolean(data?.singleSessionFee),
+    ticketFee: normalizeBoolean(data?.ticketFee),
+    rentalTowelFee: normalizeBoolean(data?.rentalTowelFee),
+    careTowelFee: normalizeBoolean(data?.careTowelFee),
+    otherFee: normalizeNumber(data?.otherFee),
+    otherFeeDescription: normalizeString(data?.otherFeeDescription),
   }
 }
 
-function normalizeChartPayload(
-  payload: ChartPayload,
-  timestamp: string,
-  existing?: ChartRecord,
-  createdAtOverride?: string,
-): ChartRecord {
-  const createdAt = existing?.createdAt ?? createdAtOverride ?? timestamp
-
-  const base = {
-    id: payload.id ?? uuidv4(),
-    chartType: payload.chartType,
-    patientName: payload.patientName.trim(),
-    patientId: normalizeString(payload.patientId),
-    visitDate: payload.visitDate,
-    practitionerName: normalizeString(payload.practitionerName),
-    memo: normalizeString(payload.memo),
-    createdAt,
-    updatedAt: timestamp,
+function sanitizeChartRecord(record?: Partial<ChartRecord> | null): ChartRecord | null {
+  if (!record) {
+    return null
   }
 
-  if (payload.chartType === "breast") {
+  const id = normalizeString(record.id) ?? uuidv4()
+  const chartType = normalizeString(record.chartType)
+  const createdAt = normalizeString(record.createdAt)
+  const updatedAt = normalizeString(record.updatedAt) ?? createdAt
+  const patientName = normalizeString(record.patientName)
+  const visitDate = normalizeString(record.visitDate)
+
+  if (!chartType || !createdAt) {
+    return null
+  }
+
+  if (chartType !== "breast" && chartType !== "postpartum") {
+    return null
+  }
+
+  const common = {
+    id,
+    chartType,
+    createdAt,
+    updatedAt,
+    patientName,
+    patientId: normalizeString(record.patientId),
+    practitionerName: normalizeString(record.practitionerName),
+    visitDate,
+    memo: normalizeString(record.memo),
+  }
+
+  if (chartType === "breast") {
     return {
-      ...base,
+      ...common,
       chartType: "breast",
-      data: normalizeBreastCareData(payload.data),
+      data: normalizeBreastCareData(record.data as Partial<BreastCareChartData> | undefined),
     }
   }
 
   return {
-    ...base,
+    ...common,
     chartType: "postpartum",
-    data: normalizePostpartumData(payload.data),
+    data: normalizePostpartumCareData(record.data as Partial<PostpartumCareChartData> | undefined),
   }
 }
 
-function sanitizeCharts(value: unknown): ChartRecord[] {
-  if (!Array.isArray(value)) {
+function sanitizeCharts(charts: unknown): ChartRecord[] {
+  if (!Array.isArray(charts)) {
     return []
   }
 
-  return value
-    .map((raw) => {
-      if (!raw || typeof raw !== "object") {
-        return null
-      }
-      const chartType = (raw as { chartType?: string }).chartType === "postpartum" ? "postpartum" : "breast"
-      const id = typeof (raw as { id?: string }).id === "string" ? (raw as { id?: string }).id : uuidv4()
-      const patientName =
-        typeof (raw as { patientName?: string }).patientName === "string"
-          ? (raw as { patientName?: string }).patientName
-          : ""
-      const visitDate =
-        typeof (raw as { visitDate?: string }).visitDate === "string"
-          ? (raw as { visitDate?: string }).visitDate
-          : new Date().toISOString().slice(0, 10)
-      const practitionerName =
-        typeof (raw as { practitionerName?: string }).practitionerName === "string"
-          ? (raw as { practitionerName?: string }).practitionerName
-          : undefined
-      const memo =
-        typeof (raw as { memo?: string }).memo === "string" ? (raw as { memo?: string }).memo : undefined
-      const createdAt =
-        typeof (raw as { createdAt?: string }).createdAt === "string"
-          ? (raw as { createdAt?: string }).createdAt
-          : new Date().toISOString()
-      const updatedAt =
-        typeof (raw as { updatedAt?: string }).updatedAt === "string"
-          ? (raw as { updatedAt?: string }).updatedAt
-          : createdAt
-      const patientId =
-        typeof (raw as { patientId?: string }).patientId === "string"
-          ? (raw as { patientId?: string }).patientId
-          : undefined
+  return charts
+    .map((item) => sanitizeChartRecord(item as Partial<ChartRecord>))
+    .filter((item): item is ChartRecord => item !== null)
+}
 
-      const payload: ChartPayload =
-        chartType === "breast"
-          ? {
-              id,
-              chartType,
-              patientName,
-              patientId,
-              visitDate,
-              practitionerName,
-              memo,
-              data: (raw as { data?: Partial<BreastCareChartData> }).data ?? {},
-            }
-          : {
-              id,
-              chartType,
-              patientName,
-              patientId,
-              visitDate,
-              practitionerName,
-              memo,
-              data: (raw as { data?: Partial<PostpartumCareChartData> }).data ?? {},
-            }
+function normalizeChartPayload(payload: ChartPayload, timestamp: string, existing?: ChartRecord) {
+  const chartType = payload.chartType ?? existing?.chartType ?? "breast"
+  const base: ChartRecord = {
+    id: payload.id ?? existing?.id ?? uuidv4(),
+    chartType,
+    patientName: normalizeString(payload.patientName) ?? existing?.patientName,
+    patientId: normalizeString(payload.patientId) ?? existing?.patientId,
+    visitDate: normalizeString(payload.visitDate) ?? existing?.visitDate,
+    practitionerName: normalizeString(payload.practitionerName) ?? existing?.practitionerName,
+    memo: normalizeString(payload.memo) ?? existing?.memo,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+    data: chartType === "breast" ? normalizeBreastCareData(payload.data) : normalizePostpartumCareData(payload.data),
+  }
 
-      return normalizeChartPayload(payload, updatedAt, undefined, createdAt)
-    })
-    .filter((chart): chart is ChartRecord => chart !== null && chart.patientName.length > 0)
+  return base
 }
 
 async function loadState(encryptionKey?: string | null): Promise<AppState> {
@@ -330,38 +292,19 @@ async function loadState(encryptionKey?: string | null): Promise<AppState> {
     return defaultState
   }
 
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (!stored) {
-    return defaultState
-  }
-
   try {
-    const parsed = JSON.parse(stored) as
-      | { version: number; payload?: unknown }
-      | { charts?: unknown }
-      | null
-
-    if (parsed && typeof parsed === "object" && "version" in parsed && parsed?.version === STORAGE_VERSION) {
-      if (!("payload" in parsed) || typeof parsed.payload !== "object" || !parsed.payload || !encryptionKey) {
-        return defaultState
-      }
-      const payload = parsed.payload as { iv?: string; ciphertext?: string }
-      if (typeof payload.iv !== "string" || typeof payload.ciphertext !== "string") {
-        return defaultState
-      }
-      const decrypted = await decryptToString(
-        {
-          iv: payload.iv,
-          ciphertext: payload.ciphertext,
-        },
-        encryptionKey,
-      )
-      const raw = JSON.parse(decrypted) as Partial<AppState>
-      const charts = sanitizeCharts(raw?.charts)
-      return { charts }
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) {
+      return defaultState
     }
 
-    if (!encryptionKey) {
+    const parsed = JSON.parse(raw) as { version: number; payload?: string }
+    if (!parsed || parsed.version !== STORAGE_VERSION || !parsed.payload || !encryptionKey) {
+      return defaultState
+    }
+
+    const payloadString = await decryptToString(parsed.payload, encryptionKey)
+    if (!payloadString) {
       return defaultState
     }
 
@@ -429,7 +372,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const saveChart = useCallback<AppStateContextValue["saveChart"]>((payload) => {
     if (!encryptionKey) {
-      throw new Error("迴ｾ蝨ｨ縺ｮ繧｢繧ｫ繧ｦ繝ｳ繝育憾諷九〒縺ｯ繝・・繧ｿ繧堤ｷｨ髮・〒縺阪∪縺帙ｓ縲ゅし繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ繧呈怏蜉ｹ蛹悶＠縺ｦ縺上□縺輔＞縲・)
+      throw new Error("現在のアカウント状態ではデータを編集できません。サブスクリプションを有効化してください。")
     }
     const timestamp = new Date().toISOString()
     let savedChart: ChartRecord | null = null
@@ -454,7 +397,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const deleteChart = useCallback<AppStateContextValue["deleteChart"]>((id) => {
     if (!encryptionKey) {
-      throw new Error("迴ｾ蝨ｨ縺ｮ繧｢繧ｫ繧ｦ繝ｳ繝育憾諷九〒縺ｯ繝・・繧ｿ繧貞炎髯､縺ｧ縺阪∪縺帙ｓ縲ゅし繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ繧呈怏蜉ｹ蛹悶＠縺ｦ縺上□縺輔＞縲・)
+      throw new Error("現在のアカウント状態ではデータを削除できません。サブスクリプションを有効化してください。")
     }
     setState((prev) => ({
       charts: prev.charts.filter((chart) => chart.id !== id),
@@ -463,7 +406,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const resetCharts = useCallback<AppStateContextValue["resetCharts"]>(() => {
     if (!encryptionKey) {
-      throw new Error("迴ｾ蝨ｨ縺ｮ繧｢繧ｫ繧ｦ繝ｳ繝育憾諷九〒縺ｯ繝・・繧ｿ繧貞・譛溷喧縺ｧ縺阪∪縺帙ｓ縲ゅし繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ繧呈怏蜉ｹ蛹悶＠縺ｦ縺上□縺輔＞縲・)
+      throw new Error("現在のアカウント状態ではデータを初期化できません。サブスクリプションを有効化してください。")
     }
     setState(defaultState)
   }, [encryptionKey])
@@ -490,5 +433,3 @@ export function useAppState() {
   }
   return context
 }
-
-

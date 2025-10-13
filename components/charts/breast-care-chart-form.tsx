@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo } from "react"
-import { Controller, useFieldArray, useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 
@@ -16,25 +16,21 @@ import type { BreastCareChartRecord, BreastDiagram, ChartPayload } from "@/lib/c
 
 import { BreastDiagramInput } from "./breast-diagram-input"
 
-type FeeFormItem = {
-  label: string
-  price?: number
-  selected?: boolean
-}
+const clinicLocationOptions = [
+  { value: "西宮", label: "西宮" },
+  { value: "宝塚", label: "宝塚" },
+  { value: "日本橋", label: "日本橋" },
+  { value: "愛知", label: "愛知" },
+  { value: "訪問", label: "訪問" },
+] as const
 
-const DEFAULT_FEE_ITEMS: FeeFormItem[] = [
-  { label: "\u521d\u8a3a\u6599", price: 1000, selected: false },
-  { label: "1\u56de", price: 5500, selected: false },
-  { label: "\u30c1\u30b1\u30c3\u30c8", price: 14850, selected: false },
-  { label: "\u30ec\u30f3\u30bf\u30eb\u30bf\u30aa\u30eb", price: 350, selected: false },
-  { label: "\u30b1\u30a2\u30bf\u30aa\u30eb", price: 250, selected: false },
-]
-
-const feeItemSchema = z.object({
-  label: z.string().min(1, "\u9805\u76ee\u540d\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044"),
-  price: z.union([z.string(), z.number()]).optional(),
-  selected: z.boolean().optional().default(false),
-})
+const feeOptions = [
+  { name: "initialConsultationFee", label: "初診料 1,000円" },
+  { name: "singleSessionFee", label: "1回 5,500円" },
+  { name: "ticketFee", label: "チケット 14,850円" },
+  { name: "rentalTowelFee", label: "レンタルタオル 350円" },
+  { name: "careTowelFee", label: "ケアタオル 250円" },
+] as const
 
 const breastDiagramFieldSchema = z
   .union([
@@ -56,7 +52,7 @@ const formSchema = z.object({
   memo: z.string().optional(),
   bodyWeight: z.union([z.string(), z.number()]).optional(),
   weightGainPerDay: z.union([z.string(), z.number()]).optional(),
-  clinicLocation: z.string().optional(),
+  clinicLocation: z.array(z.string()).default([]),
   breastMilkInterval: z.string().optional(),
   milkVolumeDay: z.string().optional(),
   milkVolumeNight: z.string().optional(),
@@ -87,7 +83,13 @@ const formSchema = z.object({
   breastDiagramLeft: breastDiagramFieldSchema,
   diagnosis: z.string().optional(),
   paymentMethod: z.string().optional(),
-  fees: z.array(feeItemSchema).default([]),
+  initialConsultationFee: z.boolean().optional().default(false),
+  singleSessionFee: z.boolean().optional().default(false),
+  ticketFee: z.boolean().optional().default(false),
+  rentalTowelFee: z.boolean().optional().default(false),
+  careTowelFee: z.boolean().optional().default(false),
+  otherFee: z.union([z.string(), z.number()]).optional(),
+  otherFeeDescription: z.string().optional(),
 })
 
 type DiagramFieldValue = z.infer<typeof breastDiagramFieldSchema>
@@ -120,6 +122,23 @@ const parseNumeric = (value: string | number | undefined): number | undefined =>
   return Number.isNaN(parsed) ? undefined : parsed
 }
 
+const parseCurrency = (value: FormValues["otherFee"]): number | null | undefined => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined
+  }
+
+  const text = value?.trim()
+  if (!text) {
+    return null
+  }
+
+  const normalized = Number(text.replace(/,/g, ""))
+  if (Number.isNaN(normalized)) {
+    return undefined
+  }
+  return normalized
+}
+
 const normalizeDiagramField = (value: DiagramFieldValue | undefined): BreastDiagram => {
   if (!value || typeof value !== "object") {
     return {}
@@ -128,527 +147,532 @@ const normalizeDiagramField = (value: DiagramFieldValue | undefined): BreastDiag
   const record = value as Record<string, unknown>
   const normalized: BreastDiagram = {}
 
-  const rawImage = record.imageData
-  if (typeof rawImage === "string" && rawImage.trim().length > 0 && rawImage.startsWith("data:image/")) {
-    normalized.imageData = rawImage
+  if (typeof record.imageData === "string" && record.imageData.startsWith("data:image/")) {
+    normalized.imageData = record.imageData
   }
 
-  let markerSource: Record<string, unknown> | undefined
-  if (record.markers && typeof record.markers === "object" && !Array.isArray(record.markers)) {
-    markerSource = record.markers as Record<string, unknown>
-  } else {
-    markerSource = record
-  }
-
-  if (markerSource) {
-    const markerEntries = Object.entries(markerSource).filter(
-      ([key, val]) =>
-        key !== "imageData" &&
-        key !== "markers" &&
-        typeof key === "string" &&
-        typeof val === "boolean" &&
-        val === true,
-    ) as Array<[string, true]>
-
-    if (markerEntries.length > 0) {
-      normalized.markers = Object.fromEntries(markerEntries)
-    }
+  const markers = record.markers
+  if (markers && typeof markers === "object" && !Array.isArray(markers)) {
+    normalized.markers = Object.entries(markers)
+      .filter((entry): entry is [string, boolean] => typeof entry[0] === "string" && typeof entry[1] === "boolean")
+      .reduce<Record<string, boolean>>((acc, [key, val]) => {
+        if (val) {
+          acc[key] = true
+        }
+        return acc
+      }, {})
   }
 
   return normalized
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+const normalizeClinicLocation = (value: FormValues["clinicLocation"] | string | undefined): string[] => {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === "string" && item.trim().length > 0)
+  }
+  if (typeof value === "string") {
+    return splitToList(value)
+  }
+  return []
+}
+
+const normalizeBoolean = (value: unknown) => (typeof value === "boolean" ? value : false)
+
+type PaymentSummaryProps = {
+  formValues: FormValues
+}
+
+function PaymentSummary({ formValues }: PaymentSummaryProps) {
+  const {
+    initialConsultationFee,
+    singleSessionFee,
+    ticketFee,
+    rentalTowelFee,
+    careTowelFee,
+    otherFee,
+    otherFeeDescription,
+  } = formValues
+
+  const entry = useMemo(() => {
+    const items = []
+    if (initialConsultationFee) {
+      items.push("初診料 1,000円")
+    }
+    if (singleSessionFee) {
+      items.push("1回 5,500円")
+    }
+    if (ticketFee) {
+      items.push("チケット 14,850円")
+    }
+    if (rentalTowelFee) {
+      items.push("レンタルタオル 350円")
+    }
+    if (careTowelFee) {
+      items.push("ケアタオル 250円")
+    }
+    if (typeof otherFee === "number" && Number.isFinite(otherFee)) {
+      const description = otherFeeDescription?.trim()
+      items.push(`その他 ${description ? `（${description}）` : ""}${otherFee.toLocaleString()}円`)
+    }
+    return items.join("\n")
+  }, [
+    careTowelFee,
+    initialConsultationFee,
+    otherFee,
+    otherFeeDescription,
+    rentalTowelFee,
+    singleSessionFee,
+    ticketFee,
+  ])
+
+  return (
+    <div className="rounded-md border border-dashed p-3">
+      <div className="text-xs font-semibold text-muted-foreground">会計サマリー</div>
+      <div className="mt-1 whitespace-pre-wrap text-sm">{entry || "未選択"}</div>
+    </div>
+  )
+}
+
+function normalizeFormValues(values: FormValues, existing?: BreastCareChartRecord) {
+  const chart: BreastCareChartRecord = {
+    id: existing?.id ?? values.chartNumber ?? "",
+    chartType: "breast",
+    patientName: values.patientName,
+    patientId: values.patientId?.trim() || undefined,
+    visitDate: values.visitDate,
+    practitionerName: values.practitionerName?.trim() || undefined,
+    chartNumber: values.chartNumber?.trim() || undefined,
+    memo: values.memo?.trim() || undefined,
+    data: {
+      traineeName: values.traineeName?.trim() || undefined,
+      clinicLocation: normalizeClinicLocation(values.clinicLocation),
+      bodyWeight: parseNumeric(values.bodyWeight),
+      weightGainPerDay: parseNumeric(values.weightGainPerDay),
+      breastMilkInterval: values.breastMilkInterval?.trim() || undefined,
+      milkVolumeDay: values.milkVolumeDay?.trim() || undefined,
+      milkVolumeNight: values.milkVolumeNight?.trim() || undefined,
+      formulaFeedsPerDay: parseNumeric(values.formulaFeedsPerDay),
+      formulaVolumePerFeed: values.formulaVolumePerFeed?.trim() || undefined,
+      weaningFeedsPerDay: parseNumeric(values.weaningFeedsPerDay),
+      weaningDetails: values.weaningDetails?.trim() || undefined,
+      stoolFrequency: parseNumeric(values.stoolFrequency),
+      stoolConsistency: values.stoolConsistency?.trim() || undefined,
+      babyDevelopment: values.babyDevelopment?.trim() || undefined,
+      weaningStatus: values.weaningStatus?.trim() || undefined,
+      subjectiveNote: values.subjectiveNote?.trim() || undefined,
+      planNote: values.planNote?.trim() || undefined,
+      breastShape: values.breastShape?.trim() || undefined,
+      nippleShieldUsed: normalizeBoolean(values.nippleShieldUsed),
+      pumpingFrequency: values.pumpingFrequency?.trim() || undefined,
+      pumpingMethod: values.pumpingMethod?.trim() || undefined,
+      nippleAreolaCondition: splitToList(values.nippleAreolaConditionText),
+      painLocation: splitToList(values.painLocationText),
+      feedingPosition: values.feedingPosition?.trim() || undefined,
+      familySupportStatus: values.familySupportStatus?.trim() || undefined,
+      concerns: values.concerns?.trim() || undefined,
+      leftBreastCondition: values.leftBreastCondition?.trim() || undefined,
+      rightBreastCondition: values.rightBreastCondition?.trim() || undefined,
+      careDetails: values.careDetails?.trim() || undefined,
+      recommendations: values.recommendations?.trim() || undefined,
+      breastDiagramRight: normalizeDiagramField(values.breastDiagramRight),
+      breastDiagramLeft: normalizeDiagramField(values.breastDiagramLeft),
+      diagnosis: values.diagnosis?.trim() || undefined,
+      paymentMethod: values.paymentMethod?.trim() || undefined,
+      initialConsultationFee: normalizeBoolean(values.initialConsultationFee),
+      singleSessionFee: normalizeBoolean(values.singleSessionFee),
+      ticketFee: normalizeBoolean(values.ticketFee),
+      rentalTowelFee: normalizeBoolean(values.rentalTowelFee),
+      careTowelFee: normalizeBoolean(values.careTowelFee),
+      otherFee: parseCurrency(values.otherFee),
+      otherFeeDescription: values.otherFeeDescription?.trim() || undefined,
+    },
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  return chart
+}
+
+type FieldProps = {
+  label: string
+  description?: string
+  error?: string
+  children: React.ReactNode
+}
+
+function FieldWrapper({ label, description, error, children }: FieldProps) {
+  return (
+    <div className="grid gap-2">
+      <Label className="text-sm font-semibold text-foreground">{label}</Label>
+      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      {children}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  )
+}
 
 export function BreastCareChartForm({
   chart,
   onSubmit,
   onCancel,
-  submitLabel = "カルテを保存",
+  submitLabel = "保存する",
 }: BreastCareChartFormProps) {
-  const defaultValues = useMemo<FormValues>(
-    () => ({
-      patientName: chart?.patientName ?? "",
-      patientId: chart?.patientId ?? "",
-      visitDate: chart?.visitDate ?? today(),
-      practitionerName: chart?.practitionerName ?? "",
-      traineeName: chart?.data.traineeName ?? "",
-      chartNumber: chart?.data.chartNumber ?? "",
-      memo: chart?.memo ?? "",
-      bodyWeight:
-        chart?.data.bodyWeight !== undefined && chart?.data.bodyWeight !== null
-          ? String(chart.data.bodyWeight)
-          : "",
-      weightGainPerDay:
-        chart?.data.weightGainPerDay !== undefined && chart?.data.weightGainPerDay !== null
-          ? String(chart.data.weightGainPerDay)
-          : "",
-      clinicLocation: chart?.data.clinicLocation ?? "",
-      breastMilkInterval: chart?.data.breastMilkInterval ?? "",
-      milkVolumeDay: chart?.data.milkVolumeDay ?? "",
-      milkVolumeNight: chart?.data.milkVolumeNight ?? "",
-      formulaFeedsPerDay:
-        chart?.data.formulaFeedsPerDay !== undefined && chart?.data.formulaFeedsPerDay !== null
-          ? String(chart.data.formulaFeedsPerDay)
-          : "",
-      formulaVolumePerFeed: chart?.data.formulaVolumePerFeed ?? "",
-      weaningFeedsPerDay:
-        chart?.data.weaningFeedsPerDay !== undefined && chart?.data.weaningFeedsPerDay !== null
-          ? String(chart.data.weaningFeedsPerDay)
-          : "",
-      weaningDetails: chart?.data.weaningDetails ?? "",
-      stoolFrequency:
-        chart?.data.stoolFrequency !== undefined && chart?.data.stoolFrequency !== null
-          ? String(chart.data.stoolFrequency)
-          : "",
-      stoolConsistency: chart?.data.stoolConsistency ?? "",
-      babyDevelopment: chart?.data.babyDevelopment ?? "",
-      weaningStatus: chart?.data.weaningStatus ?? "",
-      subjectiveNote: chart?.data.subjectiveNote ?? "",
-      planNote: chart?.data.planNote ?? "",
-      breastShape: chart?.data.breastShape ?? "",
-      nippleShieldUsed: chart?.data.nippleShieldUsed ?? false,
-      pumpingFrequency: chart?.data.pumpingFrequency ?? "",
-      pumpingMethod: chart?.data.pumpingMethod ?? "",
-      nippleAreolaConditionText: listToMultiline(chart?.data.nippleAreolaCondition ?? []),
-      painLocationText: listToMultiline(chart?.data.painLocation ?? []),
-      feedingPosition: chart?.data.feedingPosition ?? "",
-      familySupportStatus: chart?.data.familySupportStatus ?? "",
-      concerns: chart?.data.concerns ?? "",
-      leftBreastCondition: chart?.data.leftBreastCondition ?? "",
-      rightBreastCondition: chart?.data.rightBreastCondition ?? "",
-      careDetails: chart?.data.careDetails ?? "",
-      recommendations: chart?.data.recommendations ?? "",
-      breastDiagramRight: chart?.data.breastDiagramRight ?? {},
-      breastDiagramLeft: chart?.data.breastDiagramLeft ?? {},
-      diagnosis: chart?.data.diagnosis ?? "",
-      paymentMethod: chart?.data.paymentMethod ?? "",
-      fees:
-        chart?.data.fees && chart.data.fees.length > 0
-          ? chart.data.fees.map((fee) => ({
-              label: fee.label ?? "",
-              price:
-                fee.price !== undefined && fee.price !== null && Number.isFinite(Number(fee.price))
-                  ? String(fee.price)
-                  : "",
-              selected: fee.selected ?? false,
-            }))
-          : DEFAULT_FEE_ITEMS.map((fee) => ({
-              label: fee.label,
-              price: fee.price !== undefined && fee.price !== null ? String(fee.price) : "",
-              selected: fee.selected ?? false,
-            })),
-    }),
-    [chart],
-  )
-
-const {
-  register,
-  control,
-  handleSubmit,
-  reset,
-  watch,
-  formState: { errors, isSubmitting },
-} = useForm<FormValues>({
-  resolver: zodResolver(formSchema),
-  defaultValues,
-})
-
-const { fields: feeFields, append: appendFee, remove: removeFee } = useFieldArray({
-  control,
-  name: "fees",
-})
-
-const [
-  breastShapeValue,
-  nippleShieldUsedValue,
-  pumpingFrequencyValue,
-  pumpingMethodValue,
-  nippleAreolaConditionTextValue,
-  painLocationTextValue,
-  feedingPositionValue,
-  familySupportStatusValue,
-] = watch([
-  "breastShape",
-  "nippleShieldUsed",
-  "pumpingFrequency",
-  "pumpingMethod",
-  "nippleAreolaConditionText",
-  "painLocationText",
-  "feedingPosition",
-  "familySupportStatus",
-]) as [
-  string | undefined,
-  boolean | undefined,
-  string | undefined,
-  string | undefined,
-  string | undefined,
-  string | undefined,
-  string | undefined,
-  string | undefined,
-]
-
-const formatInputValue = (value?: string) => {
-  const text = value?.trim()
-  return text && text.length > 0 ? text : "未入力"
-}
-
-  useEffect(() => {
-    reset(defaultValues)
-  }, [defaultValues, reset])
-
-  const submitHandler = handleSubmit((values) => {
-    const payload: ChartPayload & { chartType: "breast" } = {
-      id: chart?.id,
-      chartType: "breast",
-      patientName: values.patientName,
-      patientId: values.patientId?.trim() || undefined,
-      visitDate: values.visitDate,
-      practitionerName: values.practitionerName?.trim() || undefined,
-      memo: values.memo?.trim() || undefined,
-      data: {
-        chartNumber: values.chartNumber?.trim() || undefined,
-        traineeName: values.traineeName?.trim() || undefined,
-        clinicLocation: values.clinicLocation ?? [],
-        bodyWeight: parseNumeric(values.bodyWeight),
-        weightGainPerDay: parseNumeric(values.weightGainPerDay),
-        breastMilkInterval: values.breastMilkInterval?.trim() || undefined,
-        milkVolumeDay: values.milkVolumeDay?.trim() || undefined,
-        milkVolumeNight: values.milkVolumeNight?.trim() || undefined,
-        formulaFeedsPerDay: parseNumeric(values.formulaFeedsPerDay),
-        formulaVolumePerFeed: values.formulaVolumePerFeed?.trim() || undefined,
-        weaningFeedsPerDay: parseNumeric(values.weaningFeedsPerDay),
-        weaningDetails: values.weaningDetails?.trim() || undefined,
-        stoolFrequency: parseNumeric(values.stoolFrequency),
-        stoolConsistency: values.stoolConsistency?.trim() || undefined,
-        babyDevelopment: values.babyDevelopment?.trim() || undefined,
-        weaningStatus: values.weaningStatus?.trim() || undefined,
-        subjectiveNote: values.subjectiveNote?.trim() || undefined,
-        planNote: values.planNote?.trim() || undefined,
-        breastShape: values.breastShape?.trim() || undefined,
-        nippleShieldUsed: values.nippleShieldUsed ?? false,
-        pumpingFrequency: values.pumpingFrequency?.trim() || undefined,
-        pumpingMethod: values.pumpingMethod?.trim() || undefined,
-        nippleAreolaCondition: splitToList(values.nippleAreolaConditionText),
-        painLocation: splitToList(values.painLocationText),
-        feedingPosition: values.feedingPosition?.trim() || undefined,
-        familySupportStatus: values.familySupportStatus?.trim() || undefined,
-        concerns: values.concerns?.trim() || undefined,
-        leftBreastCondition: values.leftBreastCondition?.trim() || undefined,
-        rightBreastCondition: values.rightBreastCondition?.trim() || undefined,
-        careDetails: values.careDetails?.trim() || undefined,
-        recommendations: values.recommendations?.trim() || undefined,
-        breastDiagramRight: normalizeDiagramField(values.breastDiagramRight),
-        breastDiagramLeft: normalizeDiagramField(values.breastDiagramLeft),
-        diagnosis: values.diagnosis?.trim() || undefined,
-        paymentMethod: values.paymentMethod?.trim() || undefined,
-        fees:
-          values.fees
-            ?.map((fee) => {
-              const label = fee.label?.trim() ?? ""
-              const price = parseNumeric(fee.price as string | number | undefined)
-              const selected = fee.selected ?? false
-              if (!label && price === undefined) {
-                return null
-              }
-              return {
-                label,
-                price: price ?? null,
-                selected,
-              }
-            })
-            .filter((item): item is { label: string; price: number | null; selected: boolean } => item !== null) ?? [],
-      },
-    }
-
-    onSubmit(payload)
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: chart
+      ? {
+          patientName: chart.patientName,
+          patientId: chart.patientId ?? "",
+          visitDate: chart.visitDate,
+          practitionerName: chart.practitionerName ?? "",
+          traineeName: chart.data.traineeName ?? "",
+          chartNumber: chart.data.chartNumber ?? "",
+          memo: chart.memo ?? "",
+          bodyWeight: chart.data.bodyWeight ?? undefined,
+          weightGainPerDay: chart.data.weightGainPerDay ?? undefined,
+          clinicLocation: chart.data.clinicLocation ?? [],
+          breastMilkInterval: chart.data.breastMilkInterval ?? "",
+          milkVolumeDay: chart.data.milkVolumeDay ?? "",
+          milkVolumeNight: chart.data.milkVolumeNight ?? "",
+          formulaFeedsPerDay: chart.data.formulaFeedsPerDay ?? undefined,
+          formulaVolumePerFeed: chart.data.formulaVolumePerFeed ?? "",
+          weaningFeedsPerDay: chart.data.weaningFeedsPerDay ?? undefined,
+          weaningDetails: chart.data.weaningDetails ?? "",
+          stoolFrequency: chart.data.stoolFrequency ?? undefined,
+          stoolConsistency: chart.data.stoolConsistency ?? "",
+          babyDevelopment: chart.data.babyDevelopment ?? "",
+          weaningStatus: chart.data.weaningStatus ?? "",
+          subjectiveNote: chart.data.subjectiveNote ?? "",
+          planNote: chart.data.planNote ?? "",
+          breastShape: chart.data.breastShape ?? "",
+          nippleShieldUsed: chart.data.nippleShieldUsed ?? false,
+          pumpingFrequency: chart.data.pumpingFrequency ?? "",
+          pumpingMethod: chart.data.pumpingMethod ?? "",
+          nippleAreolaConditionText: listToMultiline(chart.data.nippleAreolaCondition ?? []),
+          painLocationText: listToMultiline(chart.data.painLocation ?? []),
+          feedingPosition: chart.data.feedingPosition ?? "",
+          familySupportStatus: chart.data.familySupportStatus ?? "",
+          concerns: chart.data.concerns ?? "",
+          leftBreastCondition: chart.data.leftBreastCondition ?? "",
+          rightBreastCondition: chart.data.rightBreastCondition ?? "",
+          careDetails: chart.data.careDetails ?? "",
+          recommendations: chart.data.recommendations ?? "",
+          breastDiagramRight: chart.data.breastDiagramRight ?? {},
+          breastDiagramLeft: chart.data.breastDiagramLeft ?? {},
+          diagnosis: chart.data.diagnosis ?? "",
+          paymentMethod: chart.data.paymentMethod ?? "",
+          initialConsultationFee: chart.data.initialConsultationFee ?? false,
+          singleSessionFee: chart.data.singleSessionFee ?? false,
+          ticketFee: chart.data.ticketFee ?? false,
+          rentalTowelFee: chart.data.rentalTowelFee ?? false,
+          careTowelFee: chart.data.careTowelFee ?? false,
+          otherFee: chart.data.otherFee ?? undefined,
+          otherFeeDescription: chart.data.otherFeeDescription ?? "",
+        }
+      : {
+          visitDate: new Date().toISOString().slice(0, 10),
+          clinicLocation: [],
+          initialConsultationFee: true,
+          singleSessionFee: true,
+          rentalTowelFee: true,
+          careTowelFee: true,
+        },
   })
 
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    resetField,
+    formState: { errors, isSubmitting },
+  } = form
+
+  const clinicLocationValue = watch("clinicLocation")
+  const nippleShieldUsedValue = watch("nippleShieldUsed")
+  const pumpingFrequencyValue = watch("pumpingFrequency")
+  const pumpingMethodValue = watch("pumpingMethod")
+  const nippleAreolaConditionTextValue = watch("nippleAreolaConditionText")
+  const painLocationTextValue = watch("painLocationText")
+  const feedingPositionValue = watch("feedingPosition")
+  const familySupportStatusValue = watch("familySupportStatus")
+
+  const paymentSummary = useMemo(() => <PaymentSummary formValues={form.getValues()} />, [form])
+
+  useEffect(() => {
+    if (!chart) {
+      return
+    }
+
+    if (!chart.data.breastDiagramRight) {
+      resetField("breastDiagramRight", { defaultValue: {} })
+    }
+    if (!chart.data.breastDiagramLeft) {
+      resetField("breastDiagramLeft", { defaultValue: {} })
+    }
+  }, [chart, resetField])
+
+  const submit = handleSubmit((values) => {
+    const normalized = normalizeFormValues(values, chart)
+    onSubmit({
+      ...normalized,
+      chartType: "breast",
+    })
+  })
+
+  const formatInputValue = (value?: string) => (value && value.trim().length > 0 ? value : "未入力")
+
   return (
-    <form onSubmit={submitHandler} className="space-y-6">
+    <form onSubmit={submit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">基本情報</CardTitle>
+          <CardTitle className="text-xl">{chart ? "乳房ケアカルテを編集" : "乳房ケアカルテを作成"}</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="patientName">患者名 *</Label>
-            <Input id="patientName" {...register("patientName")} placeholder="例: 山田 花子" />
-            {errors.patientName && <p className="text-sm text-destructive">{errors.patientName.message}</p>}
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="患者名" error={errors.patientName?.message}>
+              <Input {...register("patientName")} placeholder="例: 山田 花子" />
+            </FieldWrapper>
+            <FieldWrapper label="ID">
+              <Input {...register("patientId")} placeholder="例: PATIENT-001" />
+            </FieldWrapper>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="patientId">患者ID</Label>
-            <Input id="patientId" {...register("patientId")} placeholder="カルテID・内部IDなど" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="visitDate">来院日 *</Label>
-            <Input id="visitDate" type="date" {...register("visitDate")} />
-            {errors.visitDate && <p className="text-sm text-destructive">{errors.visitDate.message}</p>}
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="chartNumber">カルテ番号</Label>
-            <Input id="chartNumber" {...register("chartNumber")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="practitionerName">担当助産師</Label>
-            <Input id="practitionerName" {...register("practitionerName")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="traineeName">研修生</Label>
-            <Input id="traineeName" {...register("traineeName")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="bodyWeight">赤ちゃん体重 (g)</Label>
-            <Input id="bodyWeight" type="number" inputMode="numeric" {...register("bodyWeight")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="weightGainPerDay">1日増加量 (g)</Label>
-            <Input id="weightGainPerDay" type="number" inputMode="numeric" {...register("weightGainPerDay")} />
-          </div>
-          <div className="grid gap-2 md:col-span-2">
-            <Label htmlFor="clinicLocation">\u5834\u6240</Label>
-            <Input
-              id="clinicLocation"
-              {...register("clinicLocation")}
-              placeholder="\u4f8b: \u897f\u5bae / \u8a2a\u554f \u306a\u3069"
-            />
-          </div>
-          <div className="grid gap-2 md:col-span-2">
-            <Label htmlFor="memo">メモ</Label>
-            <Textarea id="memo" rows={2} {...register("memo")} placeholder="カルテ全体に関する補足など" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">授乳・栄養情報</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="breastMilkInterval">母乳間隔</Label>
-            <Input id="breastMilkInterval" {...register("breastMilkInterval")} placeholder="例: 3時間おき" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="milkVolumeDay">ミルク（日中）</Label>
-            <Input id="milkVolumeDay" {...register("milkVolumeDay")} placeholder="例: 80ml × 5回" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="milkVolumeNight">ミルク（夜間）</Label>
-            <Input id="milkVolumeNight" {...register("milkVolumeNight")} placeholder="例: 60ml × 2回" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="formulaFeedsPerDay">1日のミルク回数</Label>
-            <Input id="formulaFeedsPerDay" type="number" inputMode="numeric" {...register("formulaFeedsPerDay")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="formulaVolumePerFeed">搾母乳 / ミルク量</Label>
-            <Input id="formulaVolumePerFeed" {...register("formulaVolumePerFeed")} placeholder="例: 50ml/回" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="weaningFeedsPerDay">離乳食回数</Label>
-            <Input id="weaningFeedsPerDay" type="number" inputMode="numeric" {...register("weaningFeedsPerDay")} />
-          </div>
-          <div className="grid gap-2 md:col-span-2">
-            <Label htmlFor="weaningDetails">離乳食の内容</Label>
-            <Textarea id="weaningDetails" rows={2} {...register("weaningDetails")} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">排泄・発達状況</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="stoolFrequency">排便回数/日</Label>
-            <Input id="stoolFrequency" type="number" inputMode="numeric" {...register("stoolFrequency")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="stoolConsistency">便性状</Label>
-            <Input id="stoolConsistency" {...register("stoolConsistency")} placeholder="例: 黄色・やわらかい" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="babyDevelopment">発達の様子</Label>
-            <Textarea id="babyDevelopment" rows={3} {...register("babyDevelopment")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="weaningStatus">離乳の進み具合</Label>
-            <Textarea id="weaningStatus" rows={3} {...register("weaningStatus")} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">S) 主観的情報</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            <Textarea
-              id="subjectiveNote"
-              rows={6}
-              {...register("subjectiveNote")}
-              placeholder="主観的訴え・生活背景などを記録します"
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">P) 計画</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            <Textarea
-              id="planNote"
-              rows={6}
-              {...register("planNote")}
-              placeholder="ケアの計画・指導予定などを記録します"
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">乳房の状態・ケア</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="grid gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="breastShape">乳房の形</Label>
-                <Input id="breastShape" {...register("breastShape")} />
-              </div>
-              <div className="flex items-center gap-2">
-                <Controller
-                  name="nippleShieldUsed"
-                  control={control}
-                  render={({ field }) => (
-                    <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(Boolean(checked))} />
-                  )}
-                />
-                <Label htmlFor="nippleShieldUsed">ニップルシールド使用</Label>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="pumpingFrequency">搾乳頻度</Label>
-                <Input id="pumpingFrequency" {...register("pumpingFrequency")} placeholder="例: 1日3回（手動）" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="pumpingMethod">搾乳方法</Label>
-                <Input id="pumpingMethod" {...register("pumpingMethod")} placeholder="例: 電動ポンプ" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="nippleAreolaConditionText">乳頭・乳輪の状態</Label>
-                <Textarea
-                  id="nippleAreolaConditionText"
-                  rows={3}
-                  {...register("nippleAreolaConditionText")}
-                  placeholder="1行につき1項目で入力してください"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="painLocationText">疼痛部位</Label>
-                <Textarea
-                  id="painLocationText"
-                  rows={3}
-                  {...register("painLocationText")}
-                  placeholder="1行につき1部位で入力してください"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="feedingPosition">授乳姿勢</Label>
-                <Input id="feedingPosition" {...register("feedingPosition")} placeholder="例: フットボール抱き" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="familySupportStatus">家族などのサポート状況</Label>
-                <Textarea id="familySupportStatus" rows={2} {...register("familySupportStatus")} />
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-xs text-muted-foreground text-center md:text-sm">
-                添付図に赤い線で部位やメモを書き込めます。左右それぞれ必要に応じて描画してください。
-              </p>
-              <div className="flex flex-col items-center gap-6 md:flex-row md:gap-10">
-                <Controller
-                  name="breastDiagramRight"
-                  control={control}
-                  render={({ field }) => (
-                    <BreastDiagramInput side="right" value={field.value} onChange={field.onChange} />
-                  )}
-                />
-                <Controller
-                  name="breastDiagramLeft"
-                  control={control}
-                  render={({ field }) => (
-                <BreastDiagramInput side="left" value={field.value} onChange={field.onChange} />
-              )}
-            />
-          </div>
-          <div className="w-full max-w-md rounded-lg border border-dashed border-muted-foreground/40 bg-muted/10 p-4 text-xs text-muted-foreground md:text-sm">
-            <p className="text-sm font-semibold text-foreground">\u8a18\u9332\u30e1\u30e2</p>
-            <ul className="mt-2 space-y-1 leading-relaxed">
-              <li>
-                <span className="font-semibold text-foreground">\u4e73\u623f\u306e\u5f62\uff1a</span>
-                <span>{formatInputValue(breastShapeValue)}</span>
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">\u30cb\u30c3\u30d7\u30eb\u30b7\u30fc\u30eb\u30c9\uff1a</span>
-                <span>{nippleShieldUsedValue ? "\u4f7f\u7528\u3042\u308a" : "\u4f7f\u7528\u306a\u3057"}</span>
-              </li>
-              <li className="space-y-0.5">
-                <div>
-                  <span className="font-semibold text-foreground">\u643e\u4e73\uff1a</span>
-                  <span>{formatInputValue(pumpingFrequencyValue)}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-foreground">\u643e\u4e73\u5668\uff1a</span>
-                  <span>{formatInputValue(pumpingMethodValue)}</span>
-                </div>
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">\u4e73\u982d\u30fb\u4e73\u8f2a\u306e\u72b6\u614b\uff1a</span>
-                <span className="whitespace-pre-wrap">{formatInputValue(nippleAreolaConditionTextValue)}</span>
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">\u75bc\u75db\uff1a</span>
-                <span className="whitespace-pre-wrap">{formatInputValue(painLocationTextValue)}</span>
-              </li>
-              <li>
-                <span className="font-semibold text-foreground">\u6388\u4e73\u59ff\u52e2\uff1a</span>
-                <span>{formatInputValue(feedingPositionValue)}</span>
-              </li>
-            </ul>
-            <div className="mt-2 leading-relaxed">
-              <span className="font-semibold text-foreground">\u3010\u5bb6\u65cf\u306a\u3069\u306e\u30b5\u30dd\u30fc\u30c8\u72b6\u6cc1\u3011</span>
-              <span className="ml-1 whitespace-pre-wrap">{formatInputValue(familySupportStatusValue)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="concerns">気になる点・相談内容</Label>
-              <Textarea id="concerns" rows={3} {...register("concerns")} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="careDetails">ケア内容</Label>
-              <Textarea id="careDetails" rows={3} {...register("careDetails")} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="leftBreastCondition">左乳房の状態</Label>
-              <Textarea id="leftBreastCondition" rows={3} {...register("leftBreastCondition")} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="rightBreastCondition">右乳房の状態</Label>
-              <Textarea id="rightBreastCondition" rows={3} {...register("rightBreastCondition")} />
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="recommendations">助言・次回までの課題</Label>
-              <Textarea id="recommendations" rows={3} {...register("recommendations")} />
-            </div>
+            <FieldWrapper label="来院日" error={errors.visitDate?.message}>
+              <Input type="date" {...register("visitDate")} />
+            </FieldWrapper>
+            <FieldWrapper label="担当助産師">
+              <Input {...register("practitionerName")} placeholder="例: 佐藤 仁美" />
+            </FieldWrapper>
           </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="研修生">
+              <Input {...register("traineeName")} placeholder="例: 研修生A" />
+            </FieldWrapper>
+            <FieldWrapper label="カルテ番号">
+              <Input {...register("chartNumber")} placeholder="例: BC-401" />
+            </FieldWrapper>
+          </div>
+
+          <FieldWrapper label="メモ">
+            <Textarea rows={3} {...register("memo")} placeholder="メモを入力してください" />
+          </FieldWrapper>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">授乳・栄養</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="母乳間隔">
+              <Input {...register("breastMilkInterval")} placeholder="例: 3時間ごと" />
+            </FieldWrapper>
+            <FieldWrapper label="ミルク（日中）">
+              <Input {...register("milkVolumeDay")} placeholder="例: 80ml × 5回" />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="ミルク（夜間）">
+              <Input {...register("milkVolumeNight")} placeholder="例: 60ml × 2回" />
+            </FieldWrapper>
+            <FieldWrapper label="搾母乳 / ミルク量">
+              <Input {...register("formulaVolumePerFeed")} placeholder="例: 40ml/回" />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="ミルク回数 / 日">
+              <Input {...register("formulaFeedsPerDay")} placeholder="例: 2" inputMode="numeric" />
+            </FieldWrapper>
+            <FieldWrapper label="離乳食回数 / 日">
+              <Input {...register("weaningFeedsPerDay")} placeholder="例: 1" inputMode="numeric" />
+            </FieldWrapper>
+          </div>
+
+          <FieldWrapper label="離乳食の内容">
+            <Textarea rows={3} {...register("weaningDetails")} placeholder="例: 10倍粥、にんじんピューレ" />
+          </FieldWrapper>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">赤ちゃん情報</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="体重(g)">
+              <Input {...register("bodyWeight")} placeholder="例: 3600" inputMode="numeric" />
+            </FieldWrapper>
+            <FieldWrapper label="1日増加量(g)">
+              <Input {...register("weightGainPerDay")} placeholder="例: 30" inputMode="numeric" />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="便の回数 / 日">
+              <Input {...register("stoolFrequency")} placeholder="例: 5" inputMode="numeric" />
+            </FieldWrapper>
+            <FieldWrapper label="便の性状">
+              <Input {...register("stoolConsistency")} placeholder="例: 粘土状・やわらかめ" />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="発達の様子">
+              <Textarea rows={3} {...register("babyDevelopment")} placeholder="例: 首すわり良好。おしゃぶりを好む" />
+            </FieldWrapper>
+            <FieldWrapper label="離乳の進み具合">
+              <Textarea rows={3} {...register("weaningStatus")} placeholder="例: 初期。まだ少量ずつ" />
+            </FieldWrapper>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">乳房ケア情報</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="乳房の形">
+              <Input {...register("breastShape")} placeholder="例: 円錐状" />
+            </FieldWrapper>
+            <FieldWrapper label="ニップルシールド使用">
+              <div className="flex items-center gap-2">
+                <Checkbox checked={nippleShieldUsedValue} onCheckedChange={(checked) => form.setValue("nippleShieldUsed", Boolean(checked))} />
+                <span>使用している</span>
+              </div>
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="搾乳頻度">
+              <Input {...register("pumpingFrequency")} placeholder="例: 1日2回（手動）" />
+            </FieldWrapper>
+            <FieldWrapper label="搾乳方法">
+              <Input {...register("pumpingMethod")} placeholder="例: 手動ポンプ" />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="乳頭・乳輪の状態">
+              <Textarea
+                rows={3}
+                {...register("nippleAreolaConditionText")}
+                placeholder="1行につき1項目を入力してください"
+              />
+            </FieldWrapper>
+            <FieldWrapper label="疼痛部位">
+              <Textarea rows={3} {...register("painLocationText")} placeholder="1行につき1部位を入力してください" />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="授乳姿勢">
+              <Input {...register("feedingPosition")} placeholder="例: フットボール抱き" />
+            </FieldWrapper>
+            <FieldWrapper label="家族などのサポート状況">
+              <Textarea rows={2} {...register("familySupportStatus")} placeholder="例: 夫が夜間対応をサポート" />
+            </FieldWrapper>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">乳房図</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="乳頭・乳輪の状態（入力欄）">
+              <p className="text-sm text-muted-foreground">
+                下記の入力欄でまとめた内容が自動で反映されます。手入力したい場合はチェックを外してください。
+              </p>
+            </FieldWrapper>
+            <FieldWrapper label="テキスト入力">
+              <Textarea
+                rows={3}
+                {...register("nippleAreolaConditionText")}
+                placeholder="カンマや改行で区切って入力してください例: 軽度の亀裂, 乾燥気味"
+              />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="疼痛部位（入力欄）">
+              <p className="text-sm text-muted-foreground">
+                1行につき1項目を入力してください。例: 右乳輪上部
+              </p>
+            </FieldWrapper>
+            <FieldWrapper label="テキスト入力">
+              <Textarea rows={3} {...register("painLocationText")} placeholder="例: 右乳輪上部" />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="授乳姿勢">
+              <Input {...register("feedingPosition")} placeholder="例: フットボール抱き" />
+            </FieldWrapper>
+            <FieldWrapper label="家族などのサポート状況">
+              <Textarea rows={2} {...register("familySupportStatus")} />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="乳房図（右）">
+              <Controller
+                name="breastDiagramRight"
+                control={control}
+                render={({ field }) => (
+                  <BreastDiagramInput side="right" value={field.value} onChange={field.onChange} />
+                )}
+              />
+            </FieldWrapper>
+            <FieldWrapper label="乳房図（左）">
+              <Controller
+                name="breastDiagramLeft"
+                control={control}
+                render={({ field }) => (
+                  <BreastDiagramInput side="left" value={field.value} onChange={field.onChange} />
+                )}
+              />
+            </FieldWrapper>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">相談・ケア内容</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="気になる点・相談内容">
+              <Textarea rows={3} {...register("concerns")} />
+            </FieldWrapper>
+            <FieldWrapper label="ケア内容">
+              <Textarea rows={3} {...register("careDetails")} />
+            </FieldWrapper>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldWrapper label="左乳房の状態">
+              <Textarea rows={3} {...register("leftBreastCondition")} />
+            </FieldWrapper>
+            <FieldWrapper label="右乳房の状態">
+              <Textarea rows={3} {...register("rightBreastCondition")} />
+            </FieldWrapper>
+          </div>
+
+          <FieldWrapper label="助言・次回までの課題">
+            <Textarea rows={3} {...register("recommendations")} />
+          </FieldWrapper>
         </CardContent>
       </Card>
 
@@ -657,14 +681,12 @@ const formatInputValue = (value?: string) => {
           <CardTitle className="text-xl">診断・会計</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-2">
-            <Label htmlFor="diagnosis">診断</Label>
-            <Textarea id="diagnosis" rows={4} {...register("diagnosis")} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="paymentMethod">会計方法</Label>
-            <Input id="paymentMethod" {...register("paymentMethod")} placeholder="例: 現金 / クレジット" />
-          </div>
+          <FieldWrapper label="診断">
+            <Textarea rows={4} {...register("diagnosis")} />
+          </FieldWrapper>
+          <FieldWrapper label="会計方法">
+            <Input {...register("paymentMethod")} placeholder="例: 現金 / クレジット" />
+          </FieldWrapper>
           <div className="flex flex-wrap gap-4">
             {feeOptions.map((option) => (
               <Controller
@@ -680,16 +702,15 @@ const formatInputValue = (value?: string) => {
               />
             ))}
           </div>
-          <div className="grid gap-2 md:grid-cols-[2fr,1fr] md:items-center">
-            <div className="grid gap-2">
-              <Label htmlFor="otherFeeDescription">その他（内容）</Label>
-              <Input id="otherFeeDescription" {...register("otherFeeDescription")} placeholder="例: 物販" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="otherFee">金額</Label>
-              <Input id="otherFee" type="number" inputMode="numeric" {...register("otherFee")} placeholder="例: 1500" />
-            </div>
+          <div className="grid gap-4 md:grid-cols-[2fr,1fr] md:items-center">
+            <FieldWrapper label="その他（内容）">
+              <Input {...register("otherFeeDescription")} placeholder="例: 物販" />
+            </FieldWrapper>
+            <FieldWrapper label="金額">
+              <Input type="number" inputMode="numeric" {...register("otherFee")} placeholder="例: 1500" />
+            </FieldWrapper>
           </div>
+          {paymentSummary}
         </CardContent>
         <CardFooter className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={onCancel}>
