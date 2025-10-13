@@ -7,7 +7,7 @@ import { CardPaymentForm } from "@/components/subscription/card-payment-form"
 import { UnlockForm } from "@/components/subscription/unlock-form"
 import { Button } from "@/components/ui/button"
 
-const PRODUCT_INFO_URL = process.env.NEXT_PUBLIC_PRODUCT_INFO_URL ?? "https://www.manary.jp/"
+const PRODUCT_INFO_URL = process.env.NEXT_PUBLIC_PRODUCT_INFO_URL ?? "https://manary.care/"
 
 function formatTrialEnd(date?: Date | null) {
   if (!date) {
