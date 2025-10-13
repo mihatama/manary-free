@@ -17,7 +17,7 @@ export default function Home() {
 
       <main className="container mx-auto flex flex-col items-center px-4 py-12">
         <div className="w-full max-w-4xl space-y-10">
-          <section className="space-y-4 rounded-lg border border-slate-200 bg-white/95 p-8 text-center shadow-sm">
+          <section className="mx-auto w-full max-w-xl space-y-4 rounded-lg border border-slate-200 bg-white/95 p-8 text-center shadow-sm">
             <h2 className="text-3xl font-bold text-primary">無料ローカル保存エディション</h2>
             <p className="text-muted-foreground">
               このエディションは30日間無料でご利用いただけます。カルテ情報は暗号化された状態でブラウザのローカルストレージに保存され、外部サーバーには送信されません。
@@ -27,7 +27,7 @@ export default function Home() {
             </p>
           </section>
 
-          <div className="mx-auto w-full max-w-md">
+          <div className="mx-auto w-full max-w-xl">
             <Suspense fallback={<div className="text-center text-muted-foreground">サインイン画面を読み込み中です…</div>}>
               <LoginForm />
             </Suspense>

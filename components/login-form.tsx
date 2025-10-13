@@ -57,7 +57,7 @@ const loginTheme = createTheme({
 
 export function LoginForm() {
   return (
-    <section className="w-full max-w-md rounded-3xl bg-white/95 p-10 shadow-xl shadow-rose-100 ring-1 ring-rose-50 backdrop-blur">
+    <section className="w-full max-w-xl rounded-3xl bg-white/95 p-10 shadow-xl shadow-rose-100 ring-1 ring-rose-50 backdrop-blur">
       <div className="mb-8 space-y-3 text-center">
         <p className="text-xs font-semibold uppercase tracking-widest text-rose-500">初月無料ローカル保存エディション</p>
         <h1 className="text-2xl font-bold text-rose-600">Manary にサインイン</h1>
