@@ -333,7 +333,7 @@ export function BreastCareChartForm({
   chart,
   onSubmit,
   onCancel,
-  submitLabel = "保存すめE,
+  submitLabel = "保存する",
 }: BreastCareChartFormProps) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -495,12 +495,12 @@ export function BreastCareChartForm({
     <form onSubmit={submit} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">{chart ? "乳房ケアカルチE��編雁E : "乳房ケアカルチE��作�E"}</CardTitle>
+          <CardTitle className="text-xl">{chart ? "乳房ケアカルテ編集" : "乳房ケアカルテ作成"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <FieldWrapper label="患者" error={errors.patientName?.message}>
-              <Input {...register("patientName")} placeholder="例: 山田 花孁E />
+              <Input {...register("patientName")} placeholder="例: 山田 花子" />
             </FieldWrapper>
             <FieldWrapper label="ID">
               <Input {...register("patientId")} placeholder="例: PATIENT-001" />
@@ -511,11 +511,11 @@ export function BreastCareChartForm({
               <Input type="date" {...register("visitDate")} />
             </FieldWrapper>
             <FieldWrapper label="担��助産師">
-              <Input {...register("practitionerName")} placeholder="例: 佐藤 仁羁E />
+              <Input {...register("practitionerName")} placeholder="例: 佐藤 仁美" />
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="研修者>
+            <FieldWrapper label="研修者">
               <Input {...register("traineeName")} placeholder="例: 研修生A" />
             </FieldWrapper>
             <FieldWrapper label="カルテ番号">
@@ -523,14 +523,14 @@ export function BreastCareChartForm({
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="お子様の氏名>
-              <Input {...register("childName")} placeholder="例: 山田 太郁E />
+            <FieldWrapper label="お子様の氏名">
+              <Input {...register("childName")} placeholder="例: 山田 太郎" />
             </FieldWrapper>
             <FieldWrapper label="お子様の生年月日">
               <Input type="date" {...register("childBirthDate")} />
             </FieldWrapper>
           </div>
-          <FieldWrapper label="年齢（歳・か月・日目）>
+          <FieldWrapper label="年齢（歳・か月・日目）">
             <div className="grid grid-cols-3 gap-2">
               <Input
                 {...register("childAgeYears")}
@@ -566,51 +566,51 @@ export function BreastCareChartForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">授乳・栁E��E/CardTitle>
+          <CardTitle className="text-xl">授乳・栄養</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="授乳間隔�E�備老E��E>
+            <FieldWrapper label="授乳間隔（備考）">
               <Input {...register("breastMilkInterval")} placeholder="例: 3時間ごと" />
             </FieldWrapper>
-            <FieldWrapper label="授乳間隔�E�日中�E�E>
-              <Input {...register("breastMilkIntervalDay")} placeholder="例: 2、E時間 / 8回 />
+            <FieldWrapper label="授乳間隔（日中）">
+              <Input {...register("breastMilkIntervalDay")} placeholder="例: 2〜3時間 / 8回" />
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="授乳間隔�E�夜間�E�E>
-              <Input {...register("breastMilkIntervalNight")} placeholder="例: 3、E時間 / 3回 />
+            <FieldWrapper label="授乳間隔（夜間）">
+              <Input {...register("breastMilkIntervalNight")} placeholder="例: 3〜4時間 / 3回" />
             </FieldWrapper>
             <FieldWrapper label="搾乳回数 / 日">
               <Input {...register("expressedMilkFrequency")} inputMode="numeric" placeholder="例: 2" />
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="搾乳量 / 回 (ml)>
+            <FieldWrapper label="搾乳量 / 回 (ml)">
               <Input {...register("expressedMilkVolumePerFeed")} inputMode="numeric" placeholder="例: 80" />
             </FieldWrapper>
-            <FieldWrapper label="搾母乳 / ミルク釁E>
-              <Input {...register("formulaVolumePerFeed")} placeholder="例: 40ml/回 />
+            <FieldWrapper label="調乳 / ミルク量">
+              <Input {...register("formulaVolumePerFeed")} placeholder="例: 40ml/回" />
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="ミルク量（日中）>
-              <Input {...register("milkVolumeDay")} placeholder="例: 80ml ÁE5回 />
+            <FieldWrapper label="ミルク量（日中）">
+              <Input {...register("milkVolumeDay")} placeholder="例: 80ml × 5回" />
             </FieldWrapper>
-            <FieldWrapper label="ミルク量（夜間）>
-              <Input {...register("milkVolumeNight")} placeholder="例: 60ml ÁE2回 />
+            <FieldWrapper label="ミルク量（夜間）">
+              <Input {...register("milkVolumeNight")} placeholder="例: 60ml × 2回" />
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <FieldWrapper label="ミルク回数 / 日">
               <Input {...register("formulaFeedsPerDay")} inputMode="numeric" placeholder="例: 7" />
             </FieldWrapper>
-            <FieldWrapper label="ミルク回数（日中）>
+            <FieldWrapper label="ミルク回数（日中）">
               <Input {...register("formulaFeedsDaytime")} inputMode="numeric" placeholder="例: 5" />
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="ミルク回数（夜間）>
+            <FieldWrapper label="ミルク回数（夜間）">
               <Input {...register("formulaFeedsNighttime")} inputMode="numeric" placeholder="例: 2" />
             </FieldWrapper>
             <FieldWrapper label="離乳食回数 / 日">
@@ -646,17 +646,17 @@ export function BreastCareChartForm({
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <FieldWrapper label="便性状">
-              <Input {...register("stoolConsistency")} placeholder="例: 粘土状・めE��めE��らかめE />
+              <Input {...register("stoolConsistency")} placeholder="例: 粘土状〜やわらかめ" />
             </FieldWrapper>
             <FieldWrapper label="卒乳 / 断乳 日目">
               <Input {...register("weaningCompletionDay")} placeholder="例: 産征E0日目" />
             </FieldWrapper>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="発達�E様孁E>
+            <FieldWrapper label="発達状況">
               <Textarea rows={3} {...register("babyDevelopment")} placeholder="例: 首すわり良好。おしゃぶりを好む" />
             </FieldWrapper>
-            <FieldWrapper label="離乳の進み具吁E>
+            <FieldWrapper label="離乳の進み具合">
               <Textarea rows={3} {...register("weaningStatus")} placeholder="例: 初期。まだ少量ずつ" />
             </FieldWrapper>
           </div>
@@ -682,44 +682,44 @@ export function BreastCareChartForm({
 
           <div className="grid gap-4 md:grid-cols-2">
             <FieldWrapper label="搾乳頻度">
-              <Input {...register("pumpingFrequency")} placeholder="例: 1日2回（手動！E />
+              <Input {...register("pumpingFrequency")} placeholder="例: 1日2回（手動）" />
             </FieldWrapper>
-            <FieldWrapper label="搾乳方況E>
-              <Input {...register("pumpingMethod")} placeholder="例: 手動ポンチE />
+            <FieldWrapper label="搾乳方法">
+              <Input {...register("pumpingMethod")} placeholder="例: 手動ポンプ" />
             </FieldWrapper>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="乳頭・乳輪の状慁E>
+            <FieldWrapper label="乳頭・乳輪の状態">
               <Textarea
                 rows={3}
                 {...register("nippleAreolaConditionText")}
-                placeholder="1行につぁE頁E��で入力してください�E�例: 軽度の亀裂！E
+                placeholder="1行につき1項目で入力してください。例: 軽度の亀裂 など"
               />
             </FieldWrapper>
-            <FieldWrapper label="疼痛部佁E>
+            <FieldWrapper label="痛み部位">
               <Textarea rows={3} {...register("painLocationText")} placeholder="例: 右乳輪上部" />
             </FieldWrapper>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <FieldWrapper label="授乳姿勢">
-              <Input {...register("feedingPosition")} placeholder="例: フット�Eール抱ぁE />
+              <Input {...register("feedingPosition")} placeholder="例: フットボール抱き" />
             </FieldWrapper>
-            <FieldWrapper label="家族などのサポート状況>
-              <Textarea rows={2} {...register("familySupportStatus")} placeholder="例: 夫が夜間対応をサポ�EチE />
+            <FieldWrapper label="家族などのサポート状況">
+              <Textarea rows={2} {...register("familySupportStatus")} placeholder="例: 夫が夜間対応をサポート" />
             </FieldWrapper>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="乳房図（右）>
+            <FieldWrapper label="乳房図（右）">
               <Controller
                 name="breastDiagramRight"
                 control={control}
                 render={({ field }) => <BreastDiagramInput side="right" value={field.value} onChange={field.onChange} />}
               />
             </FieldWrapper>
-            <FieldWrapper label="乳房図（左）>
+            <FieldWrapper label="乳房図（左）">
               <Controller
                 name="breastDiagramLeft"
                 control={control}
@@ -738,15 +738,15 @@ export function BreastCareChartForm({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="左乳房の状慁E>
+            <FieldWrapper label="左乳房の状態">
               <Textarea rows={3} {...register("leftBreastCondition")} />
             </FieldWrapper>
-            <FieldWrapper label="右乳房の状慁E>
+            <FieldWrapper label="右乳房の状態">
               <Textarea rows={3} {...register("rightBreastCondition")} />
             </FieldWrapper>
           </div>
 
-          <FieldWrapper label="助言・次回までの課顁E>
+          <FieldWrapper label="助言・次回までの課題">
             <Textarea rows={3} {...register("recommendations")} />
           </FieldWrapper>
         </CardContent>
@@ -775,7 +775,7 @@ export function BreastCareChartForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">診断・会訁E/CardTitle>
+          <CardTitle className="text-xl">診断・会計</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-2">
@@ -783,8 +783,8 @@ export function BreastCareChartForm({
             <Textarea id="diagnosis" rows={4} {...register("diagnosis")} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="paymentMethod">会計方況E/Label>
-            <Input id="paymentMethod" {...register("paymentMethod")} placeholder="例: 現釁E/ カーチE/ PayPay" />
+            <Label htmlFor="paymentMethod">会計方法</Label>
+            <Input id="paymentMethod" {...register("paymentMethod")} placeholder="例: 現金 / カード / PayPay" />
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -799,14 +799,14 @@ export function BreastCareChartForm({
               </Button>
             </div>
             {feeFields.length === 0 ? (
-              <p className="text-sm text-muted-foreground">会計項目は未登録です。必須に応じて追加してください、E/p>
+              <p className="text-sm text-muted-foreground">会計項目は未登録です。必要に応じて追加してください。</p>
             ) : (
               feeFields.map((field, index) => (
                 <div key={field.id} className="grid gap-2 md:grid-cols-[2fr,1fr,auto] md:items-center">
                   <div>
                     <Input
                       {...register(`fees.${index}.label` as const)}
-                      placeholder="項目名
+                      placeholder="項目名"
                     />
                     {errors.fees?.[index]?.label ? (
                       <p className="text-xs text-destructive">{errors.fees[index]?.label?.message}</p>
@@ -815,7 +815,7 @@ export function BreastCareChartForm({
                   <Input
                     {...register(`fees.${index}.price` as const)}
                     inputMode="numeric"
-                    placeholder="金額（円）
+                    placeholder="金額（円）"
                   />
                   <div className="flex items-center gap-2">
                     <Controller
