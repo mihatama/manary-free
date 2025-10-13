@@ -1,6 +1,5 @@
-const CACHE_NAME = "manary-pwa-v1"
+const CACHE_NAME = "manary-pwa-v2"
 const STATIC_ASSETS = [
-  "/",
   "/offline.html",
   "/manifest.webmanifest",
   "/favicon.ico",
