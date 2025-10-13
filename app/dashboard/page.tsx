@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import { useEffect } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import type { AuthUser } from "aws-amplify/auth"
 import { Authenticator } from "@aws-amplify/ui-react"
@@ -90,9 +91,21 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
     <div className="min-h-screen bg-accent">
       <header className="border-b border-slate-200 bg-white">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div>
-            <h1 className="text-2xl font-bold text-primary">Manary ダッシュボード</h1>
-            <p className="text-sm text-muted-foreground">乳房ケアと産後ケアのカルテを暗号化されたローカル保存で管理します。</p>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/manary-logo.png"
+              alt="Manary"
+              width={42}
+              height={42}
+              className="h-10 w-10 rounded-full border border-primary/20 bg-white object-cover"
+              priority
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-primary">Manary ダッシュボード</h1>
+              <p className="text-sm text-muted-foreground">
+                乳房ケアと産後ケアのカルテを暗号化されたローカル保存で管理します。
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-end gap-1 text-right">
