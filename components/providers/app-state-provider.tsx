@@ -1,9 +1,16 @@
-"use client"
+﻿"use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { v4 as uuidv4 } from "uuid"
 
-import type { ChartPayload, ChartRecord, BreastCareChartData, PostpartumCareChartData, BreastDiagram } from "@/lib/chart-types"
+import type {
+  ChartPayload,
+  ChartRecord,
+  BreastCareChartData,
+  PostpartumCareChartData,
+  BreastDiagram,
+  ChartFeeItem,
+} from "@/lib/chart-types"
 import { decryptToString, encryptString } from "@/lib/encryption"
 import { getEncryptedStateKey } from "@/lib/subscription"
 import { useSubscription } from "./subscription-provider"
@@ -71,6 +78,49 @@ function normalizeStringArray(value: unknown): string[] {
   return []
 }
 
+function normalizeFees(value: unknown): ChartFeeItem[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null
+      }
+      const record = item as Record<string, unknown>
+      const labelValue = normalizeString(record.label)
+
+      let price: number | null | undefined
+      if (typeof record.price === "number" || record.price === null) {
+        price = normalizeNumber(record.price)
+      } else if (typeof record.price === "string") {
+        const trimmed = record.price.trim()
+        if (trimmed.length === 0) {
+          price = null
+        } else {
+          const parsed = Number(trimmed.replace(/,/g, ""))
+          price = Number.isFinite(parsed) ? parsed : undefined
+        }
+      } else {
+        price = undefined
+      }
+
+      const selected = typeof record.selected === "boolean" ? record.selected : false
+
+      if (!labelValue && price === undefined) {
+        return null
+      }
+
+      return {
+        label: labelValue ?? (price !== undefined && price !== null ? "" : "未設定"),
+        price: price ?? null,
+        selected,
+      }
+    })
+    .filter((item): item is ChartFeeItem => item !== null)
+}
+
 function normalizeDiagram(value: unknown): BreastDiagram {
   if (!value || typeof value !== "object") {
     return {}
@@ -110,12 +160,11 @@ function normalizeDiagram(value: unknown): BreastDiagram {
 
   return normalized
 }
-
 function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCareChartData {
   return {
     chartNumber: normalizeString(data?.chartNumber),
     traineeName: normalizeString(data?.traineeName),
-    clinicLocation: normalizeStringArray(data?.clinicLocation),
+    clinicLocation: Array.isArray(data?.clinicLocation) ? normalizeStringArray(data?.clinicLocation).join(" / ") : normalizeString(data?.clinicLocation),
     bodyWeight: normalizeNumber(data?.bodyWeight),
     weightGainPerDay: normalizeNumber(data?.weightGainPerDay),
     breastMilkInterval: normalizeString(data?.breastMilkInterval),
@@ -148,14 +197,8 @@ function normalizeBreastCareData(data?: Partial<BreastCareChartData>): BreastCar
     recommendations: normalizeString(data?.recommendations),
     diagnosis: normalizeString(data?.diagnosis),
     paymentMethod: normalizeString(data?.paymentMethod),
-    initialConsultationFee: normalizeBoolean(data?.initialConsultationFee) ?? false,
-    singleSessionFee: normalizeBoolean(data?.singleSessionFee) ?? false,
-    ticketFee: normalizeBoolean(data?.ticketFee) ?? false,
-    rentalTowelFee: normalizeBoolean(data?.rentalTowelFee) ?? false,
-    careTowelFee: normalizeBoolean(data?.careTowelFee) ?? false,
-    otherFee: normalizeNumber(data?.otherFee),
-    otherFeeDescription: normalizeString(data?.otherFeeDescription) ?? null,
-  }
+    fees: normalizeFees(data?.fees),
+  };
 }
 
 function normalizePostpartumData(data?: Partial<PostpartumCareChartData>): PostpartumCareChartData {
@@ -386,7 +429,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const saveChart = useCallback<AppStateContextValue["saveChart"]>((payload) => {
     if (!encryptionKey) {
-      throw new Error("現在のアカウント状態ではデータを編集できません。サブスクリプションを有効化してください。")
+      throw new Error("迴ｾ蝨ｨ縺ｮ繧｢繧ｫ繧ｦ繝ｳ繝育憾諷九〒縺ｯ繝・・繧ｿ繧堤ｷｨ髮・〒縺阪∪縺帙ｓ縲ゅし繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ繧呈怏蜉ｹ蛹悶＠縺ｦ縺上□縺輔＞縲・)
     }
     const timestamp = new Date().toISOString()
     let savedChart: ChartRecord | null = null
@@ -411,7 +454,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const deleteChart = useCallback<AppStateContextValue["deleteChart"]>((id) => {
     if (!encryptionKey) {
-      throw new Error("現在のアカウント状態ではデータを削除できません。サブスクリプションを有効化してください。")
+      throw new Error("迴ｾ蝨ｨ縺ｮ繧｢繧ｫ繧ｦ繝ｳ繝育憾諷九〒縺ｯ繝・・繧ｿ繧貞炎髯､縺ｧ縺阪∪縺帙ｓ縲ゅし繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ繧呈怏蜉ｹ蛹悶＠縺ｦ縺上□縺輔＞縲・)
     }
     setState((prev) => ({
       charts: prev.charts.filter((chart) => chart.id !== id),
@@ -420,7 +463,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const resetCharts = useCallback<AppStateContextValue["resetCharts"]>(() => {
     if (!encryptionKey) {
-      throw new Error("現在のアカウント状態ではデータを初期化できません。サブスクリプションを有効化してください。")
+      throw new Error("迴ｾ蝨ｨ縺ｮ繧｢繧ｫ繧ｦ繝ｳ繝育憾諷九〒縺ｯ繝・・繧ｿ繧貞・譛溷喧縺ｧ縺阪∪縺帙ｓ縲ゅし繝悶せ繧ｯ繝ｪ繝励す繝ｧ繝ｳ繧呈怏蜉ｹ蛹悶＠縺ｦ縺上□縺輔＞縲・)
     }
     setState(defaultState)
   }, [encryptionKey])
@@ -447,3 +490,5 @@ export function useAppState() {
   }
   return context
 }
+
+

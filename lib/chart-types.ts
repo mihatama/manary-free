@@ -5,6 +5,12 @@ export interface BreastDiagram {
   markers?: Record<string, boolean>
 }
 
+export interface ChartFeeItem {
+  label: string
+  price?: number | null
+  selected?: boolean
+}
+
 export interface ChartBase {
   id: string
   chartType: ChartType
@@ -20,7 +26,7 @@ export interface ChartBase {
 export interface BreastCareChartData {
   chartNumber?: string
   traineeName?: string
-  clinicLocation: string[]
+  clinicLocation?: string | null
   bodyWeight?: number | null
   weightGainPerDay?: number | null
   breastMilkInterval?: string
@@ -53,13 +59,7 @@ export interface BreastCareChartData {
   recommendations?: string
   diagnosis?: string
   paymentMethod?: string
-  initialConsultationFee?: boolean
-  singleSessionFee?: boolean
-  ticketFee?: boolean
-  rentalTowelFee?: boolean
-  careTowelFee?: boolean
-  otherFee?: number | null
-  otherFeeDescription?: string | null
+  fees?: ChartFeeItem[]
 }
 
 export interface PostpartumCareChartData {

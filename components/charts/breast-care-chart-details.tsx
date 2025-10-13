@@ -1,4 +1,4 @@
-import type React from "react"
+﻿import type React from "react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -12,7 +12,7 @@ const DetailItem = ({ label, value }: { label: string; value?: React.ReactNode }
     <Label className="col-span-1 pr-4 text-right text-sm font-semibold">{label}</Label>
     <div className="col-span-2 text-sm">
       {value === null || value === undefined || value === "" ? (
-        <span className="text-muted-foreground">未入力</span>
+        <span className="text-muted-foreground">譛ｪ蜈･蜉・/span>
       ) : (
         value
       )}
@@ -20,11 +20,11 @@ const DetailItem = ({ label, value }: { label: string; value?: React.ReactNode }
   </div>
 )
 
-const formatList = (items: string[]) => (items.length > 0 ? items.join("、") : <span className="text-muted-foreground">未入力</span>)
+const formatList = (items: string[]) => (items.length > 0 ? items.join("縲・) : <span className="text-muted-foreground">譛ｪ蜈･蜉・/span>)
 
 const formatNumber = (value?: number | null, unit?: string) => {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return <span className="text-muted-foreground">未入力</span>
+    return <span className="text-muted-foreground">譛ｪ蜈･蜉・/span>
   }
   return `${value.toLocaleString()}${unit ?? ""}`
 }
@@ -36,94 +36,94 @@ export function BreastCareChartDetails({ chart }: { chart: BreastCareChartRecord
     <div className="max-h-[75vh] space-y-6 overflow-y-auto p-2">
       <Card>
         <CardHeader>
-          <CardTitle>すいな法乳房ケアカルテ</CardTitle>
+          <CardTitle>縺吶＞縺ｪ豕穂ｹｳ謌ｿ繧ｱ繧｢繧ｫ繝ｫ繝・/CardTitle>
           <CardDescription>
-            {chart.patientName} 様（{chart.visitDate}）{chart.patientId ? ` / ID: ${chart.patientId}` : ""}
+            {chart.patientName} 讒假ｼ・chart.visitDate}・閲chart.patientId ? ` / ID: ${chart.patientId}` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          <DetailItem label="カルテ番号" value={data.chartNumber} />
-          <DetailItem label="担当助産師" value={chart.practitionerName} />
-          <DetailItem label="研修生" value={data.traineeName} />
-          <DetailItem label="場所" value={data.clinicLocation?.join("、")} />
-          <DetailItem label="赤ちゃん体重" value={formatNumber(data.bodyWeight, "g")} />
-          <DetailItem label="1日増加量" value={formatNumber(data.weightGainPerDay, "g")} />
-          <DetailItem label="メモ" value={chart.memo} />
+          <DetailItem label="繧ｫ繝ｫ繝・分蜿ｷ" value={data.chartNumber} />
+          <DetailItem label="諡・ｽ灘勧逕｣蟶ｫ" value={chart.practitionerName} />
+          <DetailItem label="遐比ｿｮ逕・ value={data.traineeName} />
+          <DetailItem label="蝣ｴ謇" value={data.clinicLocation ?? ""} />
+          <DetailItem label="襍､縺｡繧・ｓ菴馴㍾" value={formatNumber(data.bodyWeight, "g")} />
+          <DetailItem label="1譌･蠅怜刈驥・ value={formatNumber(data.weightGainPerDay, "g")} />
+          <DetailItem label="繝｡繝｢" value={chart.memo} />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">授乳・栄養情報</CardTitle>
+          <CardTitle className="text-lg">謗井ｹｳ繝ｻ譬・､頑ュ蝣ｱ</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <DetailItem label="母乳間隔" value={data.breastMilkInterval} />
-          <DetailItem label="ミルク（日中）" value={data.milkVolumeDay} />
-          <DetailItem label="ミルク（夜間）" value={data.milkVolumeNight} />
-          <DetailItem label="搾母乳 / ミルク量" value={data.formulaVolumePerFeed} />
-          <DetailItem label="ミルク回数 / 日" value={formatNumber(data.formulaFeedsPerDay, "回")} />
-          <DetailItem label="離乳食回数 / 日" value={formatNumber(data.weaningFeedsPerDay, "回")} />
-          <DetailItem label="離乳食の内容" value={data.weaningDetails} />
+          <DetailItem label="豈堺ｹｳ髢馴囈" value={data.breastMilkInterval} />
+          <DetailItem label="繝溘Ν繧ｯ・域律荳ｭ・・ value={data.milkVolumeDay} />
+          <DetailItem label="繝溘Ν繧ｯ・亥､憺俣・・ value={data.milkVolumeNight} />
+          <DetailItem label="謳ｾ豈堺ｹｳ / 繝溘Ν繧ｯ驥・ value={data.formulaVolumePerFeed} />
+          <DetailItem label="繝溘Ν繧ｯ蝗樊焚 / 譌･" value={formatNumber(data.formulaFeedsPerDay, "蝗・)} />
+          <DetailItem label="髮｢荵ｳ鬟溷屓謨ｰ / 譌･" value={formatNumber(data.weaningFeedsPerDay, "蝗・)} />
+          <DetailItem label="髮｢荵ｳ鬟溘・蜀・ｮｹ" value={data.weaningDetails} />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">排泄・発達状況</CardTitle>
+          <CardTitle className="text-lg">謗呈ｳ・・逋ｺ驕皮憾豕・/CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <DetailItem label="排便回数 / 日" value={formatNumber(data.stoolFrequency, "回")} />
-          <DetailItem label="便性状" value={data.stoolConsistency} />
-          <DetailItem label="発達の様子" value={data.babyDevelopment} />
-          <DetailItem label="離乳の進み具合" value={data.weaningStatus} />
+          <DetailItem label="謗剃ｾｿ蝗樊焚 / 譌･" value={formatNumber(data.stoolFrequency, "蝗・)} />
+          <DetailItem label="萓ｿ諤ｧ迥ｶ" value={data.stoolConsistency} />
+          <DetailItem label="逋ｺ驕斐・讒伜ｭ・ value={data.babyDevelopment} />
+          <DetailItem label="髮｢荵ｳ縺ｮ騾ｲ縺ｿ蜈ｷ蜷・ value={data.weaningStatus} />
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">S) 主観的情報</CardTitle>
+            <CardTitle className="text-lg">S) 荳ｻ隕ｳ逧・ュ蝣ｱ</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{data.subjectiveNote || "未入力"}</p>
+            <p className="whitespace-pre-wrap text-sm">{data.subjectiveNote || "譛ｪ蜈･蜉・}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">P) 計画</CardTitle>
+            <CardTitle className="text-lg">P) 險育判</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{data.planNote || "未入力"}</p>
+            <p className="whitespace-pre-wrap text-sm">{data.planNote || "譛ｪ蜈･蜉・}</p>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">乳房の状態・ケア</CardTitle>
+          <CardTitle className="text-lg">荵ｳ謌ｿ縺ｮ迥ｶ諷九・繧ｱ繧｢</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <DetailItem label="乳房の形" value={data.breastShape} />
-              <DetailItem label="ニップルシールド使用" value={data.nippleShieldUsed ? "あり" : "なし"} />
-              <DetailItem label="搾乳頻度" value={data.pumpingFrequency} />
-              <DetailItem label="搾乳方法" value={data.pumpingMethod} />
-              <DetailItem label="乳頭・乳輪の状態" value={formatList(data.nippleAreolaCondition)} />
-              <DetailItem label="疼痛部位" value={formatList(data.painLocation)} />
-              <DetailItem label="授乳姿勢" value={data.feedingPosition} />
-              <DetailItem label="家族などのサポート状況" value={data.familySupportStatus} />
+              <DetailItem label="荵ｳ謌ｿ縺ｮ蠖｢" value={data.breastShape} />
+              <DetailItem label="繝九ャ繝励Ν繧ｷ繝ｼ繝ｫ繝我ｽｿ逕ｨ" value={data.nippleShieldUsed ? "縺ゅｊ" : "縺ｪ縺・} />
+              <DetailItem label="謳ｾ荵ｳ鬆ｻ蠎ｦ" value={data.pumpingFrequency} />
+              <DetailItem label="謳ｾ荵ｳ譁ｹ豕・ value={data.pumpingMethod} />
+              <DetailItem label="荵ｳ鬆ｭ繝ｻ荵ｳ霈ｪ縺ｮ迥ｶ諷・ value={formatList(data.nippleAreolaCondition)} />
+              <DetailItem label="逍ｼ逞幃Κ菴・ value={formatList(data.painLocation)} />
+              <DetailItem label="謗井ｹｳ蟋ｿ蜍｢" value={data.feedingPosition} />
+              <DetailItem label="螳ｶ譌上↑縺ｩ縺ｮ繧ｵ繝昴・繝育憾豕・ value={data.familySupportStatus} />
             </div>
             <div className="flex items-center justify-evenly">
               <BreastDiagramInput side="right" value={data.breastDiagramRight} readOnly />
               <BreastDiagramInput side="left" value={data.breastDiagramLeft} readOnly />
             </div>
           </div>
-          <DetailItem label="気になる点・相談内容" value={data.concerns} />
-          <DetailItem label="左乳房の状態" value={data.leftBreastCondition} />
-          <DetailItem label="右乳房の状態" value={data.rightBreastCondition} />
-          <DetailItem label="ケア内容" value={data.careDetails} />
-          <DetailItem label="助言・次回までの課題" value={data.recommendations} />
+          <DetailItem label="豌励↓縺ｪ繧狗せ繝ｻ逶ｸ隲・・螳ｹ" value={data.concerns} />
+          <DetailItem label="蟾ｦ荵ｳ謌ｿ縺ｮ迥ｶ諷・ value={data.leftBreastCondition} />
+          <DetailItem label="蜿ｳ荵ｳ謌ｿ縺ｮ迥ｶ諷・ value={data.rightBreastCondition} />
+          <DetailItem label="繧ｱ繧｢蜀・ｮｹ" value={data.careDetails} />
+          <DetailItem label="蜉ｩ險繝ｻ谺｡蝗槭∪縺ｧ縺ｮ隱ｲ鬘・ value={data.recommendations} />
         </CardContent>
       </Card>
 
@@ -134,32 +134,34 @@ export function BreastCareChartDetails({ chart }: { chart: BreastCareChartRecord
         <CardContent className="space-y-4">
           <DetailItem label="診断" value={<p className="whitespace-pre-wrap">{data.diagnosis || "未入力"}</p>} />
           <DetailItem label="会計方法" value={data.paymentMethod} />
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">会計項目</Label>
-            <div className="flex flex-wrap gap-3 text-sm">
-              <span className={!data.initialConsultationFee ? "text-muted-foreground line-through" : undefined}>
-                初診料 1,000円
-              </span>
-              <span className={!data.singleSessionFee ? "text-muted-foreground line-through" : undefined}>
-                1回 5,500円
-              </span>
-              <span className={!data.ticketFee ? "text-muted-foreground line-through" : undefined}>チケット 14,850円</span>
-              <span className={!data.rentalTowelFee ? "text-muted-foreground line-through" : undefined}>
-                レンタルタオル 350円
-              </span>
-              <span className={!data.careTowelFee ? "text-muted-foreground line-through" : undefined}>
-                ケアタオル 250円
-              </span>
-            </div>
-          </div>
-          {data.otherFee !== undefined && data.otherFee !== null ? (
-            <DetailItem
-              label={`その他${data.otherFeeDescription ? `（${data.otherFeeDescription}）` : ""}`}
-              value={`${data.otherFee.toLocaleString()}円`}
-            />
-          ) : null}
+          <DetailItem
+            label="会計項目"
+            value={
+              data.fees && data.fees.length > 0 ? (
+                <ul className="space-y-1">
+                  {data.fees.map((fee, index) => (
+                    <li
+                      key={`${fee.label ?? "item"}-${index}`}
+                      className={`flex items-center justify-between text-sm${fee.selected ? "" : " text-muted-foreground"}`}
+                    >
+                      <span>{fee.label || "項目名未設定"}</span>
+                      <span>
+                        {fee.price !== undefined && fee.price !== null
+                          ? `${fee.price.toLocaleString()}円`
+                          : "金額未入力"}
+                        {!fee.selected ? <span className="ml-2 text-xs">(未適用)</span> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : undefined
+            }
+          />
         </CardContent>
+      </Card>
       </Card>
     </div>
   )
 }
+
+

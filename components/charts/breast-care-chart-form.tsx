@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useFieldArray, useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 
@@ -16,21 +16,25 @@ import type { BreastCareChartRecord, BreastDiagram, ChartPayload } from "@/lib/c
 
 import { BreastDiagramInput } from "./breast-diagram-input"
 
-const clinicLocationOptions = [
-  { value: "西宮", label: "西宮" },
-  { value: "宝塚", label: "宝塚" },
-  { value: "日本橋", label: "日本橋" },
-  { value: "愛知", label: "愛知" },
-  { value: "訪問", label: "訪問" },
-] as const
+type FeeFormItem = {
+  label: string
+  price?: number
+  selected?: boolean
+}
 
-const feeOptions = [
-  { name: "initialConsultationFee", label: "初診料 1,000円" },
-  { name: "singleSessionFee", label: "1回 5,500円" },
-  { name: "ticketFee", label: "チケット 14,850円" },
-  { name: "rentalTowelFee", label: "レンタルタオル 350円" },
-  { name: "careTowelFee", label: "ケアタオル 250円" },
-] as const
+const DEFAULT_FEE_ITEMS: FeeFormItem[] = [
+  { label: "\u521d\u8a3a\u6599", price: 1000, selected: false },
+  { label: "1\u56de", price: 5500, selected: false },
+  { label: "\u30c1\u30b1\u30c3\u30c8", price: 14850, selected: false },
+  { label: "\u30ec\u30f3\u30bf\u30eb\u30bf\u30aa\u30eb", price: 350, selected: false },
+  { label: "\u30b1\u30a2\u30bf\u30aa\u30eb", price: 250, selected: false },
+]
+
+const feeItemSchema = z.object({
+  label: z.string().min(1, "\u9805\u76ee\u540d\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044"),
+  price: z.union([z.string(), z.number()]).optional(),
+  selected: z.boolean().optional().default(false),
+})
 
 const breastDiagramFieldSchema = z
   .union([
@@ -52,7 +56,7 @@ const formSchema = z.object({
   memo: z.string().optional(),
   bodyWeight: z.union([z.string(), z.number()]).optional(),
   weightGainPerDay: z.union([z.string(), z.number()]).optional(),
-  clinicLocation: z.array(z.string()).default([]),
+  clinicLocation: z.string().optional(),
   breastMilkInterval: z.string().optional(),
   milkVolumeDay: z.string().optional(),
   milkVolumeNight: z.string().optional(),
@@ -83,13 +87,7 @@ const formSchema = z.object({
   breastDiagramLeft: breastDiagramFieldSchema,
   diagnosis: z.string().optional(),
   paymentMethod: z.string().optional(),
-  initialConsultationFee: z.boolean().optional().default(false),
-  singleSessionFee: z.boolean().optional().default(false),
-  ticketFee: z.boolean().optional().default(false),
-  rentalTowelFee: z.boolean().optional().default(false),
-  careTowelFee: z.boolean().optional().default(false),
-  otherFee: z.union([z.string(), z.number()]).optional(),
-  otherFeeDescription: z.string().optional(),
+  fees: z.array(feeItemSchema).default([]),
 })
 
 type DiagramFieldValue = z.infer<typeof breastDiagramFieldSchema>
@@ -120,21 +118,6 @@ const parseNumeric = (value: string | number | undefined): number | undefined =>
   }
   const parsed = Number(text)
   return Number.isNaN(parsed) ? undefined : parsed
-}
-
-const parseCurrency = (value: FormValues["otherFee"]): number | null | undefined => {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : undefined
-  }
-  const text = value?.trim()
-  if (!text) {
-    return undefined
-  }
-  const parsed = Number(text)
-  if (Number.isNaN(parsed)) {
-    return undefined
-  }
-  return parsed
 }
 
 const normalizeDiagramField = (value: DiagramFieldValue | undefined): BreastDiagram => {
@@ -200,7 +183,7 @@ export function BreastCareChartForm({
         chart?.data.weightGainPerDay !== undefined && chart?.data.weightGainPerDay !== null
           ? String(chart.data.weightGainPerDay)
           : "",
-      clinicLocation: chart?.data.clinicLocation ?? [],
+      clinicLocation: chart?.data.clinicLocation ?? "",
       breastMilkInterval: chart?.data.breastMilkInterval ?? "",
       milkVolumeDay: chart?.data.milkVolumeDay ?? "",
       milkVolumeNight: chart?.data.milkVolumeNight ?? "",
@@ -240,28 +223,75 @@ export function BreastCareChartForm({
       breastDiagramLeft: chart?.data.breastDiagramLeft ?? {},
       diagnosis: chart?.data.diagnosis ?? "",
       paymentMethod: chart?.data.paymentMethod ?? "",
-      initialConsultationFee: chart?.data.initialConsultationFee ?? false,
-      singleSessionFee: chart?.data.singleSessionFee ?? false,
-      ticketFee: chart?.data.ticketFee ?? false,
-      rentalTowelFee: chart?.data.rentalTowelFee ?? false,
-      careTowelFee: chart?.data.careTowelFee ?? false,
-      otherFee:
-        chart?.data.otherFee !== undefined && chart?.data.otherFee !== null ? String(chart.data.otherFee) : "",
-      otherFeeDescription: chart?.data.otherFeeDescription ?? "",
+      fees:
+        chart?.data.fees && chart.data.fees.length > 0
+          ? chart.data.fees.map((fee) => ({
+              label: fee.label ?? "",
+              price:
+                fee.price !== undefined && fee.price !== null && Number.isFinite(Number(fee.price))
+                  ? String(fee.price)
+                  : "",
+              selected: fee.selected ?? false,
+            }))
+          : DEFAULT_FEE_ITEMS.map((fee) => ({
+              label: fee.label,
+              price: fee.price !== undefined && fee.price !== null ? String(fee.price) : "",
+              selected: fee.selected ?? false,
+            })),
     }),
     [chart],
   )
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues,
-  })
+const {
+  register,
+  control,
+  handleSubmit,
+  reset,
+  watch,
+  formState: { errors, isSubmitting },
+} = useForm<FormValues>({
+  resolver: zodResolver(formSchema),
+  defaultValues,
+})
+
+const { fields: feeFields, append: appendFee, remove: removeFee } = useFieldArray({
+  control,
+  name: "fees",
+})
+
+const [
+  breastShapeValue,
+  nippleShieldUsedValue,
+  pumpingFrequencyValue,
+  pumpingMethodValue,
+  nippleAreolaConditionTextValue,
+  painLocationTextValue,
+  feedingPositionValue,
+  familySupportStatusValue,
+] = watch([
+  "breastShape",
+  "nippleShieldUsed",
+  "pumpingFrequency",
+  "pumpingMethod",
+  "nippleAreolaConditionText",
+  "painLocationText",
+  "feedingPosition",
+  "familySupportStatus",
+]) as [
+  string | undefined,
+  boolean | undefined,
+  string | undefined,
+  string | undefined,
+  string | undefined,
+  string | undefined,
+  string | undefined,
+  string | undefined,
+]
+
+const formatInputValue = (value?: string) => {
+  const text = value?.trim()
+  return text && text.length > 0 ? text : "未入力"
+}
 
   useEffect(() => {
     reset(defaultValues)
@@ -312,13 +342,22 @@ export function BreastCareChartForm({
         breastDiagramLeft: normalizeDiagramField(values.breastDiagramLeft),
         diagnosis: values.diagnosis?.trim() || undefined,
         paymentMethod: values.paymentMethod?.trim() || undefined,
-        initialConsultationFee: values.initialConsultationFee ?? false,
-        singleSessionFee: values.singleSessionFee ?? false,
-        ticketFee: values.ticketFee ?? false,
-        rentalTowelFee: values.rentalTowelFee ?? false,
-        careTowelFee: values.careTowelFee ?? false,
-        otherFee: parseCurrency(values.otherFee),
-        otherFeeDescription: values.otherFeeDescription?.trim() || undefined,
+        fees:
+          values.fees
+            ?.map((fee) => {
+              const label = fee.label?.trim() ?? ""
+              const price = parseNumeric(fee.price as string | number | undefined)
+              const selected = fee.selected ?? false
+              if (!label && price === undefined) {
+                return null
+              }
+              return {
+                label,
+                price: price ?? null,
+                selected,
+              }
+            })
+            .filter((item): item is { label: string; price: number | null; selected: boolean } => item !== null) ?? [],
       },
     }
 
@@ -367,33 +406,11 @@ export function BreastCareChartForm({
             <Input id="weightGainPerDay" type="number" inputMode="numeric" {...register("weightGainPerDay")} />
           </div>
           <div className="grid gap-2 md:col-span-2">
-            <Label>場所</Label>
-            <Controller
-              name="clinicLocation"
-              control={control}
-              render={({ field }) => (
-                <div className="flex flex-wrap gap-3">
-                  {clinicLocationOptions.map((location) => {
-                    const selected = field.value?.includes(location.value) ?? false
-                    return (
-                      <label key={location.value} className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={selected}
-                          onCheckedChange={(checked) => {
-                            const isChecked = Boolean(checked)
-                            const current = field.value ?? []
-                            const next = isChecked
-                              ? Array.from(new Set([...current, location.value]))
-                              : current.filter((item) => item !== location.value)
-                            field.onChange(next)
-                          }}
-                        />
-                        {location.label}
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
+            <Label htmlFor="clinicLocation">\u5834\u6240</Label>
+            <Input
+              id="clinicLocation"
+              {...register("clinicLocation")}
+              placeholder="\u4f8b: \u897f\u5bae / \u8a2a\u554f \u306a\u3069"
             />
           </div>
           <div className="grid gap-2 md:col-span-2">
@@ -564,12 +581,51 @@ export function BreastCareChartForm({
                   name="breastDiagramLeft"
                   control={control}
                   render={({ field }) => (
-                    <BreastDiagramInput side="left" value={field.value} onChange={field.onChange} />
-                  )}
-                />
-              </div>
+                <BreastDiagramInput side="left" value={field.value} onChange={field.onChange} />
+              )}
+            />
+          </div>
+          <div className="w-full max-w-md rounded-lg border border-dashed border-muted-foreground/40 bg-muted/10 p-4 text-xs text-muted-foreground md:text-sm">
+            <p className="text-sm font-semibold text-foreground">\u8a18\u9332\u30e1\u30e2</p>
+            <ul className="mt-2 space-y-1 leading-relaxed">
+              <li>
+                <span className="font-semibold text-foreground">\u4e73\u623f\u306e\u5f62\uff1a</span>
+                <span>{formatInputValue(breastShapeValue)}</span>
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">\u30cb\u30c3\u30d7\u30eb\u30b7\u30fc\u30eb\u30c9\uff1a</span>
+                <span>{nippleShieldUsedValue ? "\u4f7f\u7528\u3042\u308a" : "\u4f7f\u7528\u306a\u3057"}</span>
+              </li>
+              <li className="space-y-0.5">
+                <div>
+                  <span className="font-semibold text-foreground">\u643e\u4e73\uff1a</span>
+                  <span>{formatInputValue(pumpingFrequencyValue)}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-foreground">\u643e\u4e73\u5668\uff1a</span>
+                  <span>{formatInputValue(pumpingMethodValue)}</span>
+                </div>
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">\u4e73\u982d\u30fb\u4e73\u8f2a\u306e\u72b6\u614b\uff1a</span>
+                <span className="whitespace-pre-wrap">{formatInputValue(nippleAreolaConditionTextValue)}</span>
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">\u75bc\u75db\uff1a</span>
+                <span className="whitespace-pre-wrap">{formatInputValue(painLocationTextValue)}</span>
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">\u6388\u4e73\u59ff\u52e2\uff1a</span>
+                <span>{formatInputValue(feedingPositionValue)}</span>
+              </li>
+            </ul>
+            <div className="mt-2 leading-relaxed">
+              <span className="font-semibold text-foreground">\u3010\u5bb6\u65cf\u306a\u3069\u306e\u30b5\u30dd\u30fc\u30c8\u72b6\u6cc1\u3011</span>
+              <span className="ml-1 whitespace-pre-wrap">{formatInputValue(familySupportStatusValue)}</span>
             </div>
           </div>
+        </div>
+      </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">

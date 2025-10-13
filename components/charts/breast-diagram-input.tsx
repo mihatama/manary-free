@@ -419,6 +419,22 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
           <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="2" fill="none" />
           <circle cx="50" cy="50" r="22" stroke="currentColor" strokeWidth="1.5" fill="none" />
           <circle cx="50" cy="50" r="7" fill="currentColor" fillOpacity="0.2" />
+          <line x1="50" y1="4" x2="50" y2="12" stroke="currentColor" strokeWidth="1.5" />
+          <line x1="90" y1="50" x2="96" y2="50" stroke="currentColor" strokeWidth="1.5" />
+          <line x1="50" y1="90" x2="50" y2="96" stroke="currentColor" strokeWidth="1.5" />
+          <line x1="4" y1="50" x2="10" y2="50" stroke="currentColor" strokeWidth="1.5" />
+          <text x="50" y="9" textAnchor="middle" fontSize="8" fontWeight="600" fill="currentColor">
+            12
+          </text>
+          <text x="90" y="54" textAnchor="middle" dominantBaseline="middle" fontSize="8" fontWeight="600" fill="currentColor">
+            3
+          </text>
+          <text x="50" y="93" textAnchor="middle" dominantBaseline="middle" fontSize="8" fontWeight="600" fill="currentColor">
+            6
+          </text>
+          <text x="10" y="54" textAnchor="middle" dominantBaseline="middle" fontSize="8" fontWeight="600" fill="currentColor">
+            9
+          </text>
         </svg>
         <canvas
           ref={canvasRef}
