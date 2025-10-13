@@ -19,7 +19,9 @@ export default function Home() {
         <div className="w-full max-w-4xl space-y-10">
           <section className="mx-auto w-full max-w-xl space-y-4 rounded-lg border border-slate-200 bg-white/95 p-8 text-center shadow-sm">
             <h2 className="text-3xl font-bold text-primary">初月無料ローカル保存エディション</h2>
-            <p className="text-muted-foreground text-lg font-semibold">Manary にサインイン</p>
+            <p className="text-muted-foreground text-lg font-semibold">
+              ローカル保存で安心して使えるプランです。他のプランは https://manary.care/ へどうぞ。
+            </p>
           </section>
 
           <div className="mx-auto w-full max-w-xl">
