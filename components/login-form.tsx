@@ -12,21 +12,21 @@ const loginTheme = createTheme({
     colors: {
       brand: {
         primary: {
-          10: "#fdf2f8",
-          20: "#fce7f3",
-          40: "#fbcfe8",
-          60: "#f472b6",
-          80: "#ec4899",
-          90: "#db2777",
-          100: "#9d174d",
+          10: "#fff6f5",
+          20: "#fde7e4",
+          40: "#fbd2ce",
+          60: "#f69896",
+          80: "#ef706d",
+          90: "#d95753",
+          100: "#8c2d2b",
         },
       },
       font: {
-        interactive: { value: "#db2777" },
-        focus: { value: "#9d174d" },
+        interactive: { value: "#d95753" },
+        focus: { value: "#8c2d2b" },
       },
       border: {
-        focus: { value: "#fbcfe8" },
+        focus: { value: "#fbd2ce" },
       },
     },
     components: {
@@ -40,7 +40,7 @@ const loginTheme = createTheme({
             borderColor: { value: "{colors.brand.primary.80}" },
           },
           _focus: {
-            boxShadow: { value: "0 0 0 3px rgba(244, 114, 182, 0.35)" },
+            boxShadow: { value: "0 0 0 3px rgba(246, 152, 150, 0.35)" },
           },
         },
         link: {
@@ -57,10 +57,10 @@ const loginTheme = createTheme({
 
 export function LoginForm() {
   return (
-    <section className="w-full max-w-xl rounded-3xl bg-white/95 p-10 shadow-xl shadow-rose-100 ring-1 ring-rose-50 backdrop-blur">
+    <section className="w-full max-w-xl rounded-3xl bg-white/95 p-10 shadow-xl shadow-[0_25px_60px_-25px_rgba(246,152,150,0.6)] ring-1 ring-[rgba(246,152,150,0.25)] backdrop-blur">
       <div className="mb-8 space-y-3 text-center">
-        <p className="text-xs font-semibold uppercase tracking-widest text-rose-500">初月無料ローカル保存エディション</p>
-        <h1 className="text-2xl font-bold text-rose-600">Manary にサインイン</h1>
+        <p className="text-xs font-semibold uppercase tracking-widest text-primary">初月無料ローカル保存エディション</p>
+        <h1 className="text-2xl font-bold text-primary">Manary にサインイン</h1>
         <p className="text-sm text-muted-foreground">このエディションは30日間無料でご利用いただけます。</p>
         <p className="text-sm text-muted-foreground">
           カルテ情報は暗号化された状態でブラウザのローカルストレージに保存され、外部サーバーには送信されません。
@@ -105,7 +105,7 @@ function RedirectToDashboard({ signOut, userName }: RedirectProps) {
       {signOut && (
         <button
           type="button"
-          className="w-full rounded-full border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-600 transition hover:border-rose-300 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-200"
+          className="w-full rounded-full border border-primary/30 bg-white px-3 py-2 text-sm font-medium text-primary transition hover:border-primary/40 hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-primary/30"
           onClick={() => {
             void signOut()
           }}

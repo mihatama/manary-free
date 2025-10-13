@@ -439,7 +439,7 @@ export function BreastDiagramInput({ value, onChange, side, readOnly = false }: 
               <span
                 key={position}
                 className={cn(
-                  "pointer-events-none absolute flex h-9 w-9 items-center justify-center rounded-full border border-rose-400/80 bg-rose-200/70 text-sm font-semibold text-rose-700",
+                  "pointer-events-none absolute flex h-9 w-9 items-center justify-center rounded-full border border-primary/70 bg-primary/20 text-sm font-semibold text-primary",
                   POSITION_STYLES[position],
                 )}
               >

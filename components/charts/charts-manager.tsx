@@ -285,7 +285,7 @@ export function ChartsManager() {
             <CardDescription>乳房ケア・産後ケアのカルテをローカルストレージで管理します。</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => openNewChart("breast")} className="bg-rose-500 text-white hover:bg-rose-400">
+            <Button onClick={() => openNewChart("breast")} className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Plus className="mr-2 h-4 w-4" />
               乳房ケアカルテ作成
             </Button>
@@ -470,4 +470,3 @@ export function ChartsManager() {
     </>
   )
 }
-

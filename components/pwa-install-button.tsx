@@ -53,7 +53,7 @@ export function PwaInstallButton({ className }: PwaInstallButtonProps) {
 
   if (hasInstalled) {
     return (
-      <p className="text-xs text-rose-500" role="status">
+      <p className="text-xs text-primary" role="status">
         デスクトップにショートカットを追加しました。ありがとうございます。
       </p>
     )
@@ -71,7 +71,10 @@ export function PwaInstallButton({ className }: PwaInstallButtonProps) {
     <button
       type="button"
       onClick={handleInstall}
-      className={className ?? "w-full rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-2"}
+      className={
+        className ??
+        "w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2"
+      }
     >
       デスクトップアプリとしてインストール
     </button>
