@@ -510,7 +510,7 @@ export function BreastCareChartForm({
             <FieldWrapper label="来院日" error={errors.visitDate?.message}>
               <Input type="date" {...register("visitDate")} />
             </FieldWrapper>
-            <FieldWrapper label="担��助産師">
+            <FieldWrapper label="担当助産師">
               <Input {...register("practitionerName")} placeholder="例: 佐藤 仁美" />
             </FieldWrapper>
           </div>
@@ -556,7 +556,7 @@ export function BreastCareChartForm({
             </div>
           </FieldWrapper>
           <FieldWrapper label="場所">
-            <Input {...register("clinicLocation")} placeholder="例: 宝塁E/ 訪問（西宮市）など自由記�E" />
+            <Input {...register("clinicLocation")} />
           </FieldWrapper>
           <FieldWrapper label="メモ">
             <Textarea rows={3} {...register("memo")} placeholder="メモを入力してください" />
@@ -625,7 +625,7 @@ export function BreastCareChartForm({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">赤ちめE��惁E��</CardTitle>
+          <CardTitle className="text-xl">赤ちゃんの状態</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -670,12 +670,12 @@ export function BreastCareChartForm({
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <FieldWrapper label="乳房の形">
-              <Input {...register("breastShape")} placeholder="例: 冁E��状" />
+              <Input {...register("breastShape")} placeholder="例: 円錐形" />
             </FieldWrapper>
             <FieldWrapper label="ニップルシールド使用">
               <div className="flex items-center gap-2">
                 <Checkbox checked={nippleShieldUsedValue} onCheckedChange={(checked) => form.setValue("nippleShieldUsed", Boolean(checked))} />
-                <span>使用してぁE��</span>
+                <span>使用しています</span>
               </div>
             </FieldWrapper>
           </div>
@@ -729,7 +729,7 @@ export function BreastCareChartForm({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <FieldWrapper label="気になる点・相諁E�E容">
+            <FieldWrapper label="気になる点・相談内容">
               <Textarea rows={3} {...register("concerns")} />
             </FieldWrapper>
             <FieldWrapper label="ケア内容">
@@ -759,7 +759,7 @@ export function BreastCareChartForm({
           </CardHeader>
           <CardContent>
             <p className="whitespace-pre-wrap text-sm">{formatInputValue(watch("subjectiveNote"))}</p>
-            <Textarea className="mt-3" rows={4} {...register("subjectiveNote")} placeholder="S) 主観情報を記�E" />
+            <Textarea className="mt-3" rows={4} {...register("subjectiveNote")} placeholder="S) 主観情報を記入" />
           </CardContent>
         </Card>
         <Card>

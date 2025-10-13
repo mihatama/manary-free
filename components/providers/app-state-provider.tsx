@@ -470,7 +470,8 @@ async function loadState(encryptionKey?: string | null): Promise<AppState> {
       return defaultState
     }
 
-    const charts = sanitizeCharts((parsed as Partial<AppState> | null)?.charts)
+    const decryptedState = JSON.parse(payloadString) as Partial<AppState> | null
+    const charts = sanitizeCharts(decryptedState?.charts)
     return { charts }
   } catch (error) {
     console.error("Failed to load chart state", error)
