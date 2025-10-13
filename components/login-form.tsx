@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { I18n } from "aws-amplify"
+import { I18n } from "aws-amplify/utils"
 import { Authenticator, ThemeProvider, createTheme, translations } from "@aws-amplify/ui-react"
 
 import { PwaInstallButton } from "@/components/pwa-install-button"
