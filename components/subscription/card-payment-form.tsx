@@ -5,6 +5,7 @@ import type { FormEvent } from "react"
 import { useRouter } from "next/navigation"
 
 import { useSubscription } from "@/components/providers/subscription-provider"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,19 +24,19 @@ function validate(fields: {
 
   const trimmedNumber = fields.cardNumber.replace(/\s+/g, "")
   if (!/^\d{13,19}$/.test(trimmedNumber)) {
-    errors.cardNumber = "Please enter a valid card number."
+    errors.cardNumber = "カード番号を正しい形式で入力してください。"
   }
 
   if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(fields.expiry.trim())) {
-    errors.expiry = "Use the MM/YY format for the expiry date."
+    errors.expiry = "有効期限は MM/YY 形式で入力してください。"
   }
 
   if (!/^\d{3,4}$/.test(fields.cvc.trim())) {
-    errors.cvc = "CVC/CVV must be a 3-4 digit number."
+    errors.cvc = "CVC/CVV は 3〜4 桁の数字で入力してください。"
   }
 
   if (fields.cardholder.trim().length === 0) {
-    errors.cardholder = "Enter the cardholder name."
+    errors.cardholder = "カード名義人を入力してください。"
   }
 
   return errors
@@ -65,7 +66,7 @@ export function CardPaymentForm() {
     }
 
     if (!AUTO_UNLOCK_CODE) {
-      setError("Auto unlock code is not configured. Please contact an administrator.")
+      setError("自動解除コードが設定されていません。管理者にお問い合わせください。")
       return
     }
 
@@ -75,7 +76,7 @@ export function CardPaymentForm() {
 
       const result = await markAsPaid(AUTO_UNLOCK_CODE)
       if (!result.success) {
-        setError(result.error ?? "Failed to confirm the billing status. Please try again.")
+        setError(result.error ?? "契約状況を確認できませんでした。時間を置いて再度お試しください。")
         return
       }
 
@@ -90,8 +91,15 @@ export function CardPaymentForm() {
 
   return (
     <form className="space-y-4 rounded-lg border border-border bg-background p-6 shadow-sm" onSubmit={handleSubmit}>
+      <Alert variant="default">
+        <AlertTitle>オンライン決済は現在工事中です</AlertTitle>
+        <AlertDescription>
+          正式なカード決済の導入に向けて準備を進めています。しばらくお待ちください。下記フォームはフロント側のバリデーションのみを行うデモ動作で、実際のカード情報は送信されません。
+        </AlertDescription>
+      </Alert>
+
       <div className="space-y-2">
-        <Label htmlFor="card-number">Card number</Label>
+        <Label htmlFor="card-number">カード番号</Label>
         <Input
           id="card-number"
           inputMode="numeric"
@@ -105,7 +113,7 @@ export function CardPaymentForm() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="card-expiry">Expiry</Label>
+          <Label htmlFor="card-expiry">有効期限</Label>
           <Input
             id="card-expiry"
             placeholder="09/27"
@@ -116,7 +124,7 @@ export function CardPaymentForm() {
           {fieldErrors.expiry ? <p className="text-xs text-destructive">{fieldErrors.expiry}</p> : null}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="card-cvc">CVC/CVV</Label>
+          <Label htmlFor="card-cvc">CVC / CVV</Label>
           <Input
             id="card-cvc"
             inputMode="numeric"
@@ -130,7 +138,7 @@ export function CardPaymentForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="card-holder">Cardholder name</Label>
+        <Label htmlFor="card-holder">カード名義人</Label>
         <Input
           id="card-holder"
           placeholder="Jane Smith"
@@ -142,14 +150,14 @@ export function CardPaymentForm() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        These inputs simulate validation only. Real card data is never sent. Integrate your payment gateway SDK for production transactions.
+        入力内容はフロントエンドでの体験確認用です。決済情報の送信や課金処理は行われません。本運用では決済サービスの SDK を導入してください。
       </p>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {success ? <p className="text-sm text-emerald-600">Payment confirmed. Redirecting to the dashboard...</p> : null}
+      {success ? <p className="text-sm text-emerald-600">デモ決済の確認が完了しました。ダッシュボードに移動します...</p> : null}
 
       <Button type="submit" className="w-full" disabled={isUnlocking || isProcessing || success}>
-        {isProcessing || isUnlocking ? "Verifying..." : "Complete with card"}
+        {isProcessing || isUnlocking ? "確認中..." : "デモ決済を実行（工事中）"}
       </Button>
     </form>
   )

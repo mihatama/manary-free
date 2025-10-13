@@ -22,21 +22,21 @@ function describePlan(status: SubscriptionStatus, remainingDays: number, backend
   switch (status) {
     case "paid": {
       if (backendStatus === "past_due" || backendStatus === "unpaid") {
-        return "Paid plan (payment needs attention)"
+        return "有料プラン（お支払い要確認）"
       }
       if (backendStatus === "trialing") {
-        return "Paid plan (billing provider trial)"
+        return "有料プラン（決済側トライアル中）"
       }
-      return "Paid plan"
+      return "有料プラン"
     }
     case "trial": {
       if (normalizedDays <= 0) {
-        return "Free plan (ends today)"
+        return "無料トライアル（本日終了）"
       }
-      return `Free plan (${normalizedDays} day${normalizedDays === 1 ? "" : "s"} remaining)`
+      return `無料トライアル（残り${normalizedDays}日）`
     }
     default:
-      return "Free plan (expired)"
+      return "無料トライアル（終了済み）"
   }
 }
 
@@ -73,7 +73,7 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
   if (!isSubscriptionReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-accent">
-        <p className="text-sm text-muted-foreground">Confirming subscription status...</p>
+        <p className="text-sm text-muted-foreground">契約状況を確認しています...</p>
       </div>
     )
   }
@@ -81,7 +81,7 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
   if (status === "expired") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-accent">
-        <p className="text-sm text-muted-foreground">Your free trial has ended. Redirecting to the plans page...</p>
+        <p className="text-sm text-muted-foreground">無料トライアルが終了しました。プラン案内ページへ移動します...</p>
       </div>
     )
   }
@@ -91,15 +91,13 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
       <header className="border-b border-slate-200 bg-white">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Manary Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              Manage breast-care and postpartum-care charts with encrypted local storage.
-            </p>
+            <h1 className="text-2xl font-bold text-primary">Manary ダッシュボード</h1>
+            <p className="text-sm text-muted-foreground">乳房ケアと産後ケアのカルテを暗号化されたローカル保存で管理します。</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-end gap-1 text-right">
               <span className="text-sm font-medium text-primary">{userDisplayName}</span>
-              <span className="text-xs text-muted-foreground">Current plan: {currentPlan}</span>
+              <span className="text-xs text-muted-foreground">現在のプラン: {currentPlan}</span>
             </div>
             <Button
               variant="outline"
@@ -107,7 +105,7 @@ function DashboardContent({ user, onSignOut }: DashboardContentProps) {
                 void onSignOut()
               }}
             >
-              Sign out
+              サインアウト
             </Button>
           </div>
         </div>

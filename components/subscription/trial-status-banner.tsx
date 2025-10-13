@@ -14,7 +14,7 @@ function formatDate(date?: Date) {
     return ""
   }
   try {
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat("ja-JP", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -28,17 +28,17 @@ function formatDate(date?: Date) {
 function describeBackendStatus(status?: BillingSubscriptionStatus) {
   switch (status) {
     case "active":
-      return "Active"
+      return "有効"
     case "trialing":
-      return "Trialing"
+      return "トライアル中"
     case "past_due":
-      return "Past due"
+      return "支払い遅延"
     case "canceled":
-      return "Canceled"
+      return "解約済み"
     case "incomplete":
-      return "Incomplete"
+      return "未完了"
     case "unpaid":
-      return "Unpaid"
+      return "未払い"
     default:
       return undefined
   }
@@ -56,9 +56,9 @@ export function TrialStatusBanner() {
   const badgeText =
     status === "trial"
       ? remainingTrialDays <= 0
-        ? "Trial ended"
-        : `${remainingTrialDays} days left`
-      : "Trial expired"
+        ? "トライアル終了"
+        : `残り${remainingTrialDays}日`
+      : "トライアル期限切れ"
 
   const badgeVariant =
     status === "trial" ? (remainingTrialDays <= 5 ? "destructive" : "secondary") : "destructive"
@@ -86,21 +86,21 @@ export function TrialStatusBanner() {
               {badgeText}
             </span>
           </button>
-          {status === "trial" ? "You are using the free trial." : "The free trial has ended."}
+          {status === "trial" ? "無料トライアルをご利用中です。" : "無料トライアルは終了しました。"}
         </AlertTitle>
         <AlertDescription>
           <div className="space-y-2 text-sm text-muted-foreground">
             {status === "trial" ? (
               <span>
-                {trialEndsAt ? `Scheduled to end: ${formatDate(trialEndsAt)}.` : null}
-                Click the badge above to review subscription options.
+                {trialEndsAt ? `終了予定日: ${formatDate(trialEndsAt)}。` : ""}
+                上のバッジからプラン一覧をご確認ください。
               </span>
             ) : (
-              <span>Purchase a subscription to regain access to saved charts.</span>
+              <span>保存済みのカルテを再度利用するには有料プランへのアップグレードが必要です。</span>
             )}
             {backendStatus ? (
               <p className="text-xs text-muted-foreground">
-                Billing status: {backendStatus}
+                決済ステータス: {backendStatus}
                 {backendMessage ? " - " + backendMessage : ""}
               </p>
             ) : null}
@@ -108,7 +108,7 @@ export function TrialStatusBanner() {
         </AlertDescription>
       </div>
       <Button onClick={handleNavigate} className="w-full md:w-auto">
-        View plans
+        プランを確認
       </Button>
     </Alert>
   )
