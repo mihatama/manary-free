@@ -20,7 +20,11 @@ export default function Home() {
           <section className="mx-auto w-full max-w-xl space-y-4 rounded-lg border border-slate-200 bg-white/95 p-8 text-center shadow-sm">
             <h2 className="text-3xl font-bold text-primary">初月無料ローカル保存エディション</h2>
             <p className="text-muted-foreground text-lg font-semibold">
-              ローカル保存で安心して使えるプランです。他のプランは https://manary.care/ へどうぞ。
+              ローカル保存で安心して使えるプランです。他のプランは{" "}
+              <a href="https://manary.care/" className="text-primary underline hover:text-primary/80">
+                Manary紹介ページ
+              </a>{" "}
+              へどうぞ。
             </p>
           </section>
 
