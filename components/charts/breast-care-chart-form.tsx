@@ -317,7 +317,7 @@ function PaymentSummary({ formValues }: PaymentSummaryProps) {
     .map((item) => {
       const label = item.label?.trim() || "項目"
       const priceValue = parseNumeric(item.price ?? undefined)
-      const priceText = priceValue !== undefined ? ` ${priceValue.toLocaleString()}冁E : ""
+      const priceText = priceValue !== undefined ? ` ${priceValue.toLocaleString()}円` : ""
       return `${label}${priceText}`
     })
 
