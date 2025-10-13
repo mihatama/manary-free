@@ -60,11 +60,7 @@ export function PwaInstallButton({ className }: PwaInstallButtonProps) {
   }
 
   if (!deferredPrompt) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        対応ブラウザでは「共有」メニューやアドレスバーからホーム画面に追加できます。
-      </p>
-    )
+    return null
   }
 
   return (
@@ -80,3 +76,4 @@ export function PwaInstallButton({ className }: PwaInstallButtonProps) {
     </button>
   )
 }
+

@@ -1,6 +1,5 @@
-import { Suspense } from "react"
+﻿import { Suspense } from "react"
 import Image from "next/image"
-import Link from "next/link"
 
 import { LoginForm } from "@/components/login-form"
 
@@ -19,17 +18,12 @@ export default function Home() {
       <main className="container mx-auto flex flex-col items-center px-4 py-12">
         <div className="w-full max-w-4xl space-y-10">
           <section className="mx-auto w-full max-w-xl space-y-4 rounded-lg border border-slate-200 bg-white/95 p-8 text-center shadow-sm">
-            <h2 className="text-3xl font-bold text-primary">無料ローカル保存エディション</h2>
-            <p className="text-muted-foreground">
-              このエディションは30日間無料でご利用いただけます。カルテ情報は暗号化された状態でブラウザのローカルストレージに保存され、外部サーバーには送信されません。
-            </p>
-            <p className="text-sm text-muted-foreground">
-              予約管理や事前問診フォームなどのクラウド連携機能をご希望の場合は、別契約のプランが必要です。詳細は担当窓口までお問い合わせください。
-            </p>
+            <h2 className="text-3xl font-bold text-primary">初月無料ローカル保存エディション</h2>
+            <p className="text-muted-foreground text-lg font-semibold">Manary にサインイン</p>
           </section>
 
           <div className="mx-auto w-full max-w-xl">
-            <Suspense fallback={<div className="text-center text-muted-foreground">サインイン画面を読み込み中です…</div>}>
+            <Suspense fallback={<div className="text-center text-muted-foreground">繧ｵ繧､繝ｳ繧､繝ｳ逕ｻ髱｢繧定ｪｭ縺ｿ霎ｼ縺ｿ荳ｭ縺ｧ縺吮ｦ</div>}>
               <LoginForm />
             </Suspense>
           </div>
@@ -44,3 +38,9 @@ export default function Home() {
     </div>
   )
 }
+
+
+
+
+
+

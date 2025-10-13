@@ -2,7 +2,8 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Authenticator, ThemeProvider, createTheme } from "@aws-amplify/ui-react"
+import { I18n } from "aws-amplify"
+import { Authenticator, ThemeProvider, createTheme, translations } from "@aws-amplify/ui-react"
 
 import { PwaInstallButton } from "@/components/pwa-install-button"
 
@@ -55,19 +56,24 @@ const loginTheme = createTheme({
   },
 })
 
+let hasConfiguredI18n = false
+
+function configureAuthenticatorLocale() {
+  if (!hasConfiguredI18n) {
+    I18n.putVocabularies(translations)
+    I18n.setLanguage("ja")
+    hasConfiguredI18n = true
+  }
+}
+
 export function LoginForm() {
+  configureAuthenticatorLocale()
+
   return (
     <section className="w-full max-w-xl rounded-3xl bg-white/95 p-10 shadow-xl shadow-[0_25px_60px_-25px_rgba(246,152,150,0.6)] ring-1 ring-[rgba(246,152,150,0.25)] backdrop-blur">
       <div className="mb-8 space-y-3 text-center">
         <p className="text-xs font-semibold uppercase tracking-widest text-primary">初月無料ローカル保存エディション</p>
         <h1 className="text-2xl font-bold text-primary">Manary にサインイン</h1>
-        <p className="text-sm text-muted-foreground">このエディションは30日間無料でご利用いただけます。</p>
-        <p className="text-sm text-muted-foreground">
-          カルテ情報は暗号化された状態でブラウザのローカルストレージに保存され、外部サーバーには送信されません。
-        </p>
-        <p className="text-xs text-muted-foreground">
-          予約管理や事前問診フォームなどのクラウド連携機能をご希望の場合は、別契約のプランが必要です。
-        </p>
       </div>
       <div className="login-auth space-y-6">
         <ThemeProvider theme={loginTheme} colorMode="light">
@@ -100,7 +106,7 @@ function RedirectToDashboard({ signOut, userName }: RedirectProps) {
   return (
     <div className="space-y-4 text-center">
       <p className="text-sm text-muted-foreground">
-        {userName ? `${userName} さん、ダッシュボードへ移動します...` : "ダッシュボードへ移動します..."}
+        {userName ? `${userName} さん、ダッシュボードへ移動します…` : "ダッシュボードへ移動します…"}
       </p>
       {signOut && (
         <button
@@ -116,3 +122,4 @@ function RedirectToDashboard({ signOut, userName }: RedirectProps) {
     </div>
   )
 }
+
